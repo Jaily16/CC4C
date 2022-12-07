@@ -105,7 +105,7 @@ CREATE TABLE `blog` (
   `content_path` varchar(260) NOT NULL COMMENT '博客内容文件路径',
   `publish_time` varchar(20) NOT NULL COMMENT '博客发布时间',
   `clicks` int NOT NULL COMMENT '博客点击数',
-  `is_public` tinyint(1) NOT NULL COMMENT '是否公开博客',
+  `state` int NOT NULL COMMENT '博客的公开状态',
   PRIMARY KEY (`blog_id`),
   KEY `blog_fk` (`writer_id`),
   CONSTRAINT `blog_fk` FOREIGN KEY (`writer_id`) REFERENCES `user` (`user_id`)
@@ -190,8 +190,8 @@ CREATE TABLE `course` (
   `course_website` varchar(200) DEFAULT NULL COMMENT '课程网站地址',
   `course_book` varchar(200) DEFAULT NULL COMMENT '课程资料地址',
   `course_vedio` varchar(2000) NOT NULL COMMENT '课程视频地址',
-  `level` tinyint NOT NULL COMMENT '课程难度评级',
-  `is_published` tinyint(1) NOT NULL,
+  `level` int NOT NULL COMMENT '课程难度评级',
+  `state` int NOT NULL COMMENT '课程的发布状态',
   PRIMARY KEY (`course_id`),
   UNIQUE KEY `course_pk` (`course_name`),
   KEY `course_fk` (`language_name`),
@@ -269,7 +269,7 @@ DROP TABLE IF EXISTS `indirect_comment`;
 CREATE TABLE `indirect_comment` (
   `comment_id` varchar(35) NOT NULL COMMENT '评论id',
   `father_id` varchar(35) NOT NULL COMMENT '父评论id',
-  `layer` tinyint NOT NULL COMMENT '评论层数',
+  `layer` int NOT NULL COMMENT '评论层数',
   PRIMARY KEY (`comment_id`,`father_id`),
   CONSTRAINT `indirect_comment_fk` FOREIGN KEY (`comment_id`) REFERENCES `comment` (`comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -376,7 +376,7 @@ CREATE TABLE `user` (
   `password` varchar(16) NOT NULL COMMENT '用户密码',
   `major` char(1) DEFAULT NULL COMMENT '用户专业',
   `head_sculptrue` varchar(260) DEFAULT NULL COMMENT '用户头像存储路径',
-  `state` char(1) NOT NULL COMMENT '用户账号的状态',
+  `state` int NOT NULL COMMENT '用户账号的状态',
   `create_time` varchar(20) NOT NULL,
   `favourite_language` int DEFAULT NULL COMMENT '用户最喜欢的语言',
   PRIMARY KEY (`user_id`),
@@ -512,4 +512,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-11-30 23:40:35
+-- Dump completed on 2022-12-07 23:50:05
