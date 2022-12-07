@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: CC4C
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cc4c_dev1
+    username: root
+    password: '050598'
+server:
+  port: 4080
