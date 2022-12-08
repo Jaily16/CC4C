@@ -374,8 +374,8 @@ CREATE TABLE `user` (
   `user_name` varchar(30) NOT NULL COMMENT '用户姓名',
   `email` varchar(320) NOT NULL COMMENT '用户邮箱',
   `password` varchar(16) NOT NULL COMMENT '用户密码',
-  `major` char(1) DEFAULT NULL COMMENT '用户专业',
-  `head_sculptrue` varchar(260) DEFAULT NULL COMMENT '用户头像存储路径',
+  `major` int DEFAULT NULL COMMENT '用户专业',
+  `avatar` varchar(260) DEFAULT NULL COMMENT '用户头像存储路径',
   `state` int NOT NULL COMMENT '用户账号的状态',
   `create_time` varchar(20) NOT NULL,
   `favourite_language` int DEFAULT NULL COMMENT '用户最喜欢的语言',
@@ -512,4 +512,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-07 23:50:05
+-- Dump completed on 2022-12-08 15:42:24
