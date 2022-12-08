@@ -1,4 +1,4 @@
 package com.cc4c.dao;
 
-public class UserDao {
+public interface UserDao {
 }
