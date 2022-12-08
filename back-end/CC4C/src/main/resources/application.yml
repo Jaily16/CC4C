@@ -2,9 +2,14 @@ spring:
   application:
     name: CC4C
   datasource:
+    #数据库驱动名称
     driver-class-name: com.mysql.cj.jdbc.Driver
+    #数据库访问url，最后/cc4c_dev1处请填写你的数据库名称
     url: jdbc:mysql://localhost:3306/cc4c_dev1
+    #数据库访问用户名
     username: root
+    #数据库访问密码
     password: '050598'
 server:
+  #项目启动的端口号，可以自己设定，但请与前端设置的不同
   port: 4080
