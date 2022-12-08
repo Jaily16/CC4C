@@ -189,7 +189,7 @@ CREATE TABLE `course` (
   `description_path` varchar(260) NOT NULL COMMENT '课程描述文件路径',
   `course_website` varchar(200) DEFAULT NULL COMMENT '课程网站地址',
   `course_book` varchar(200) DEFAULT NULL COMMENT '课程资料地址',
-  `course_vedio` varchar(2000) NOT NULL COMMENT '课程视频地址',
+  `course_video` varchar(2000) NOT NULL COMMENT '课程视频地址',
   `level` int NOT NULL COMMENT '课程难度评级',
   `state` int NOT NULL COMMENT '课程的发布状态',
   PRIMARY KEY (`course_id`),
@@ -512,4 +512,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-08 15:42:24
+-- Dump completed on 2022-12-08 15:54:51
