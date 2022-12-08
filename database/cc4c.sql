@@ -104,7 +104,7 @@ CREATE TABLE `blog` (
   `title` varchar(75) NOT NULL COMMENT '博客标题',
   `content_path` varchar(260) NOT NULL COMMENT '博客内容文件路径',
   `publish_time` varchar(20) NOT NULL COMMENT '博客发布时间',
-  `clicks` int NOT NULL COMMENT '博客点击数',
+  `click` int NOT NULL COMMENT '博客点击数',
   `state` int NOT NULL COMMENT '博客的公开状态',
   PRIMARY KEY (`blog_id`),
   KEY `blog_fk` (`writer_id`),
@@ -512,4 +512,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-08 15:54:51
+-- Dump completed on 2022-12-08 16:09:09
