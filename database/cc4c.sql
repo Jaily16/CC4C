@@ -47,7 +47,7 @@ DROP TABLE IF EXISTS `administrator_allows_blog`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `administrator_allows_blog` (
   `admin_id` char(7) NOT NULL COMMENT '管理员id',
-  `blog_id` varchar(25) NOT NULL COMMENT '博客id',
+  `blog_id` bigint NOT NULL COMMENT '博客id',
   PRIMARY KEY (`admin_id`,`blog_id`),
   KEY `administrator_allows_blog_fk2` (`blog_id`),
   CONSTRAINT `administrator_allows_blog_fk1` FOREIGN KEY (`admin_id`) REFERENCES `administrator` (`admin_id`),
@@ -99,7 +99,7 @@ DROP TABLE IF EXISTS `blog`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `blog` (
-  `blog_id` varchar(25) NOT NULL COMMENT '博客id',
+  `blog_id` bigint NOT NULL COMMENT '博客id',
   `writer_id` bigint NOT NULL COMMENT '博客撰写者id',
   `title` varchar(75) NOT NULL COMMENT '博客标题',
   `content_path` varchar(260) NOT NULL COMMENT '博客内容文件路径',
@@ -129,8 +129,8 @@ DROP TABLE IF EXISTS `blog_direct_comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `blog_direct_comment` (
-  `comment_id` varchar(35) NOT NULL COMMENT '评论id',
-  `blog_id` varchar(25) NOT NULL COMMENT '博客id',
+  `comment_id` bigint NOT NULL COMMENT '评论id',
+  `blog_id` bigint NOT NULL COMMENT '博客id',
   PRIMARY KEY (`comment_id`,`blog_id`),
   KEY `blog_direct_comment_fk2` (`blog_id`),
   CONSTRAINT `blog_direct_comment_fk1` FOREIGN KEY (`comment_id`) REFERENCES `comment` (`comment_id`),
@@ -155,7 +155,7 @@ DROP TABLE IF EXISTS `comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `comment` (
-  `comment_id` varchar(35) NOT NULL COMMENT '评论id',
+  `comment_id` bigint NOT NULL COMMENT '评论id',
   `user_id` bigint NOT NULL,
   `content_path` varchar(260) NOT NULL COMMENT '评论内容存储路径',
   `time` varchar(20) NOT NULL COMMENT '评论时间',
@@ -216,7 +216,7 @@ DROP TABLE IF EXISTS `course_direct_comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `course_direct_comment` (
-  `comment_id` varchar(35) NOT NULL COMMENT '评论id',
+  `comment_id` bigint NOT NULL COMMENT '评论id',
   `course_id` int NOT NULL COMMENT '课程id',
   PRIMARY KEY (`comment_id`,`course_id`),
   KEY `course_direct_comment_fk2` (`course_id`),
@@ -267,11 +267,11 @@ DROP TABLE IF EXISTS `indirect_comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `indirect_comment` (
-  `comment_id` varchar(35) NOT NULL COMMENT '评论id',
-  `father_id` varchar(35) NOT NULL COMMENT '父评论id',
+  `comment_id` bigint NOT NULL COMMENT '评论id',
+  `father_id` bigint NOT NULL COMMENT '父评论id',
   `layer` int NOT NULL COMMENT '评论层数',
   PRIMARY KEY (`comment_id`,`father_id`),
-  CONSTRAINT `indirect_comment_fk` FOREIGN KEY (`comment_id`) REFERENCES `comment` (`comment_id`)
+  CONSTRAINT `indirect_comment_fk1` FOREIGN KEY (`comment_id`) REFERENCES `comment` (`comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -350,7 +350,7 @@ CREATE TABLE `programming_language` (
   `icon_path` varchar(260) NOT NULL COMMENT '编程语言图标路径',
   PRIMARY KEY (`language_id`),
   UNIQUE KEY `programming_language_pk` (`language_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -370,7 +370,7 @@ DROP TABLE IF EXISTS `user`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user` (
-  `user_id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户id',
+  `user_id` bigint NOT NULL COMMENT '用户id',
   `user_name` varchar(30) NOT NULL COMMENT '用户姓名',
   `email` varchar(320) NOT NULL COMMENT '用户邮箱',
   `password` varchar(16) NOT NULL COMMENT '用户密码',
@@ -404,7 +404,7 @@ DROP TABLE IF EXISTS `user_collects_blog`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_collects_blog` (
   `user_id` bigint NOT NULL COMMENT '用户id',
-  `blog_id` varchar(25) NOT NULL COMMENT '博客id',
+  `blog_id` bigint NOT NULL COMMENT '博客id',
   `time` varchar(20) NOT NULL COMMENT '收藏博客时间',
   PRIMARY KEY (`user_id`,`blog_id`),
   KEY `user_collects_blog_fk2` (`blog_id`),
@@ -458,7 +458,7 @@ DROP TABLE IF EXISTS `user_submits_blog`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_submits_blog` (
   `user_id` bigint NOT NULL COMMENT '用户id',
-  `blog_id` varchar(25) NOT NULL COMMENT '博客id',
+  `blog_id` bigint NOT NULL COMMENT '博客id',
   `submit_time` varchar(20) NOT NULL COMMENT '博客提交审核时间',
   PRIMARY KEY (`user_id`,`blog_id`),
   KEY `user_submits_blog_fk2` (`blog_id`),
@@ -512,4 +512,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-08 16:09:09
+-- Dump completed on 2022-12-09 20:43:01

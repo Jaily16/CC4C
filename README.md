@@ -25,11 +25,17 @@ Tongji University SSE 2022 Final Project
 
    springboot 2.6.11
 
+   依赖：
+
    Spring web
+
+   Druid
 
    Mysql Driver
 
    Mybatis Framework
+
+   MybatisPlus
 
    Lombok
 
