@@ -1,14 +1,18 @@
 package com.cc4c.controller;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public enum Code {
-    SUCCESS(100001);
-    private final Integer code;
-
-    Code(Integer code) {
-        this.code = code;
-    }
-
-    public Integer getCode() {
-        return code;
-    }
+  SUCCESS(200),
+  REGISTER_FAIL(40001),
+//  USERNAME_EXISTS(40001),
+//  USERNAME_EXISTS(40001),
+//  USERNAME_EXISTS(40001),
+//  USERNAME_EXISTS(40001),
+//  USERNAME_EXISTS(40001),
+  LOGIN_FAIL(40002);
+  private final Integer code;
 }
