@@ -74,7 +74,7 @@ DROP TABLE IF EXISTS `administrator_updates_course`;
 CREATE TABLE `administrator_updates_course` (
   `admin_id` char(7) NOT NULL COMMENT '管理员id',
   `course_id` int NOT NULL COMMENT '课程id',
-  `time` varchar(20) NOT NULL COMMENT '课程信息更新时间',
+  `time` datetime NOT NULL COMMENT '课程信息更新时间',
   PRIMARY KEY (`admin_id`,`course_id`),
   KEY `administrator_updates_course_fk2` (`course_id`),
   CONSTRAINT `administrator_updates_course_fk1` FOREIGN KEY (`admin_id`) REFERENCES `administrator` (`admin_id`),
@@ -103,7 +103,7 @@ CREATE TABLE `blog` (
   `writer_id` bigint NOT NULL COMMENT '博客撰写者id',
   `title` varchar(75) NOT NULL COMMENT '博客标题',
   `content_path` varchar(260) NOT NULL COMMENT '博客内容文件路径',
-  `publish_time` varchar(20) NOT NULL COMMENT '博客发布时间',
+  `publish_time` datetime NOT NULL COMMENT '博客发布时间',
   `click` int NOT NULL COMMENT '博客点击数',
   `state` int NOT NULL COMMENT '博客的公开状态',
   PRIMARY KEY (`blog_id`),
@@ -148,6 +148,32 @@ LOCK TABLES `blog_direct_comment` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `blog_involves_language`
+--
+
+DROP TABLE IF EXISTS `blog_involves_language`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `blog_involves_language` (
+  `blog_id` bigint NOT NULL COMMENT '博客id',
+  `language_id` int NOT NULL COMMENT '编程语言id',
+  PRIMARY KEY (`blog_id`,`language_id`),
+  KEY `blog_involves_language_fk2` (`language_id`),
+  CONSTRAINT `blog_involves_language_fk1` FOREIGN KEY (`blog_id`) REFERENCES `blog` (`blog_id`),
+  CONSTRAINT `blog_involves_language_fk2` FOREIGN KEY (`language_id`) REFERENCES `programming_language` (`language_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COMMENT='博客内容与那些编程语言相关';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `blog_involves_language`
+--
+
+LOCK TABLES `blog_involves_language` WRITE;
+/*!40000 ALTER TABLE `blog_involves_language` DISABLE KEYS */;
+/*!40000 ALTER TABLE `blog_involves_language` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `comment`
 --
 
@@ -158,7 +184,7 @@ CREATE TABLE `comment` (
   `comment_id` bigint NOT NULL COMMENT '评论id',
   `user_id` bigint NOT NULL,
   `content_path` varchar(260) NOT NULL COMMENT '评论内容存储路径',
-  `time` varchar(20) NOT NULL COMMENT '评论时间',
+  `time` datetime NOT NULL COMMENT '评论时间',
   `like` int NOT NULL COMMENT '点赞数',
   PRIMARY KEY (`comment_id`),
   KEY `comment_fk` (`user_id`),
@@ -245,6 +271,7 @@ CREATE TABLE `course_module` (
   `language_id` int NOT NULL COMMENT '编程语言id',
   `priority` int NOT NULL COMMENT '模块排序优先级',
   `module_name` varchar(30) NOT NULL COMMENT '模块名称',
+  `level` int DEFAULT NULL COMMENT '可选字段，标注该模块的难度等级',
   PRIMARY KEY (`language_id`,`priority`),
   CONSTRAINT `course_module_fk` FOREIGN KEY (`language_id`) REFERENCES `programming_language` (`language_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -350,7 +377,7 @@ CREATE TABLE `programming_language` (
   `icon_path` varchar(260) NOT NULL COMMENT '编程语言图标路径',
   PRIMARY KEY (`language_id`),
   UNIQUE KEY `programming_language_pk` (`language_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -359,6 +386,7 @@ CREATE TABLE `programming_language` (
 
 LOCK TABLES `programming_language` WRITE;
 /*!40000 ALTER TABLE `programming_language` DISABLE KEYS */;
+INSERT INTO `programming_language` VALUES (1,'java','2'),(2,'1','1');
 /*!40000 ALTER TABLE `programming_language` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -377,7 +405,7 @@ CREATE TABLE `user` (
   `major` int DEFAULT NULL COMMENT '用户专业',
   `avatar` varchar(260) DEFAULT NULL COMMENT '用户头像存储路径',
   `state` int NOT NULL COMMENT '用户账号的状态',
-  `create_time` varchar(20) NOT NULL,
+  `create_time` datetime NOT NULL,
   `favourite_language` int DEFAULT NULL COMMENT '用户最喜欢的语言',
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_unique` (`user_name`,`email`),
@@ -392,6 +420,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
+INSERT INTO `user` VALUES (1602639796138680322,'111','1211qq.com','123456',1,'212',2,'2022-12-13 20:21:18',1),(1602640576853839874,'1111','12112qq.com','123456',1,'212',2,'2022-12-13 20:24:24',1);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -405,7 +434,7 @@ DROP TABLE IF EXISTS `user_collects_blog`;
 CREATE TABLE `user_collects_blog` (
   `user_id` bigint NOT NULL COMMENT '用户id',
   `blog_id` bigint NOT NULL COMMENT '博客id',
-  `time` varchar(20) NOT NULL COMMENT '收藏博客时间',
+  `time` datetime NOT NULL COMMENT '收藏博客时间',
   PRIMARY KEY (`user_id`,`blog_id`),
   KEY `user_collects_blog_fk2` (`blog_id`),
   CONSTRAINT `user_collects_blog_fk1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
@@ -432,7 +461,7 @@ DROP TABLE IF EXISTS `user_favors_course`;
 CREATE TABLE `user_favors_course` (
   `user_id` bigint NOT NULL COMMENT '用户id',
   `course_id` int NOT NULL COMMENT '课程id',
-  `time` varchar(20) NOT NULL COMMENT '收藏课程时间',
+  `time` datetime NOT NULL COMMENT '收藏课程时间',
   PRIMARY KEY (`user_id`,`course_id`),
   KEY `user_favors_course_fk2` (`course_id`),
   CONSTRAINT `user_favors_course_fk1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
@@ -459,7 +488,7 @@ DROP TABLE IF EXISTS `user_submits_blog`;
 CREATE TABLE `user_submits_blog` (
   `user_id` bigint NOT NULL COMMENT '用户id',
   `blog_id` bigint NOT NULL COMMENT '博客id',
-  `submit_time` varchar(20) NOT NULL COMMENT '博客提交审核时间',
+  `submit_time` datetime NOT NULL COMMENT '博客提交审核时间',
   PRIMARY KEY (`user_id`,`blog_id`),
   KEY `user_submits_blog_fk2` (`blog_id`),
   CONSTRAINT `user_submits_blog_fk1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
@@ -486,7 +515,7 @@ DROP TABLE IF EXISTS `user_subscribes_language`;
 CREATE TABLE `user_subscribes_language` (
   `user_id` bigint NOT NULL COMMENT '用户id',
   `language_id` int NOT NULL COMMENT '编程语言id',
-  `subscribe_time` varchar(20) NOT NULL COMMENT '订阅时间',
+  `subscribe_time` datetime NOT NULL COMMENT '订阅时间',
   PRIMARY KEY (`user_id`,`language_id`),
   KEY `user_subscribes_language_fk2` (`language_id`),
   CONSTRAINT `user_subscribes_language_fk1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`),
@@ -512,4 +541,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-09 20:43:01
+-- Dump completed on 2022-12-14 14:25:18
