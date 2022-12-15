@@ -25,6 +25,7 @@ DROP TABLE IF EXISTS `administrator`;
 CREATE TABLE `administrator` (
   `admin_id` char(7) NOT NULL COMMENT '管理员id',
   `admin_password` varchar(16) NOT NULL COMMENT '管理员密码',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -106,6 +107,7 @@ CREATE TABLE `blog` (
   `publish_time` datetime NOT NULL COMMENT '博客发布时间',
   `click` int NOT NULL COMMENT '博客点击数',
   `state` int NOT NULL COMMENT '博客的公开状态',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`blog_id`),
   KEY `blog_fk` (`writer_id`),
   CONSTRAINT `blog_fk` FOREIGN KEY (`writer_id`) REFERENCES `user` (`user_id`)
@@ -183,9 +185,10 @@ DROP TABLE IF EXISTS `comment`;
 CREATE TABLE `comment` (
   `comment_id` bigint NOT NULL COMMENT '评论id',
   `user_id` bigint NOT NULL,
-  `content_path` varchar(260) NOT NULL COMMENT '评论内容存储路径',
+  `content` text NOT NULL COMMENT '评论内容',
   `time` datetime NOT NULL COMMENT '评论时间',
   `like` int NOT NULL COMMENT '点赞数',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`comment_id`),
   KEY `comment_fk` (`user_id`),
   CONSTRAINT `comment_fk` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
@@ -212,12 +215,13 @@ CREATE TABLE `course` (
   `course_id` int NOT NULL AUTO_INCREMENT COMMENT '课程id',
   `language_name` varchar(15) NOT NULL COMMENT '编程语言名称',
   `course_name` varchar(50) NOT NULL COMMENT '课程名称',
-  `description_path` varchar(260) NOT NULL COMMENT '课程描述文件路径',
+  `description` text NOT NULL COMMENT '课程描述',
   `course_website` varchar(200) DEFAULT NULL COMMENT '课程网站地址',
   `course_book` varchar(200) DEFAULT NULL COMMENT '课程资料地址',
   `course_video` varchar(2000) NOT NULL COMMENT '课程视频地址',
   `level` int NOT NULL COMMENT '课程难度评级',
   `state` int NOT NULL COMMENT '课程的发布状态',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`course_id`),
   UNIQUE KEY `course_pk` (`course_name`),
   KEY `course_fk` (`language_name`),
@@ -321,7 +325,8 @@ DROP TABLE IF EXISTS `language_documentation`;
 CREATE TABLE `language_documentation` (
   `language_id` int NOT NULL COMMENT '编程语言id',
   `doc_link` varchar(200) NOT NULL COMMENT '文档链接地址',
-  `description` varchar(150) DEFAULT NULL COMMENT '文档文字描述',
+  `description` text COMMENT '文档文字描述',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`language_id`,`doc_link`),
   CONSTRAINT `language_documentation_fk` FOREIGN KEY (`language_id`) REFERENCES `programming_language` (`language_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -375,9 +380,10 @@ CREATE TABLE `programming_language` (
   `language_id` int NOT NULL AUTO_INCREMENT COMMENT '编程语言id',
   `language_name` varchar(15) NOT NULL COMMENT '编程语言名称',
   `icon_path` varchar(260) NOT NULL COMMENT '编程语言图标路径',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`language_id`),
   UNIQUE KEY `programming_language_pk` (`language_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -386,7 +392,7 @@ CREATE TABLE `programming_language` (
 
 LOCK TABLES `programming_language` WRITE;
 /*!40000 ALTER TABLE `programming_language` DISABLE KEYS */;
-INSERT INTO `programming_language` VALUES (1,'java','2'),(2,'1','1');
+INSERT INTO `programming_language` VALUES (1,'java','G:\\cc4c\\programmingLanguage\\icon\\java.png',0),(2,'c++','G:\\cc4c\\programmingLanguage\\icon\\c++.png',0),(3,'python','G:\\cc4c\\programmingLanguage\\icon\\python.png',0),(4,'c','G:\\cc4c\\programmingLanguage\\icon\\c.png',0),(5,'csharp','G:\\cc4c\\programmingLanguage\\icon\\csharp.png',0);
 /*!40000 ALTER TABLE `programming_language` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -407,8 +413,10 @@ CREATE TABLE `user` (
   `state` int NOT NULL COMMENT '用户账号的状态',
   `create_time` datetime NOT NULL,
   `favourite_language` int DEFAULT NULL COMMENT '用户最喜欢的语言',
+  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除字段',
   PRIMARY KEY (`user_id`),
-  UNIQUE KEY `user_unique` (`user_name`,`email`),
+  UNIQUE KEY `user_unique` (`user_name`),
+  UNIQUE KEY `email_unique` (`email`),
   KEY `user_fk` (`favourite_language`),
   CONSTRAINT `user_fk` FOREIGN KEY (`favourite_language`) REFERENCES `programming_language` (`language_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -420,7 +428,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES (1602639796138680322,'111','1211qq.com','123456',1,'212',2,'2022-12-13 20:21:18',1),(1602640576853839874,'1111','12112qq.com','123456',1,'212',2,'2022-12-13 20:24:24',1);
+INSERT INTO `user` VALUES (1602639796138680322,'111','1211qq.com','123456',1,'212',2,'2022-12-13 20:21:18',1,0),(1602640576853839874,'1111','12112qq.com','123456',1,'212',2,'2022-12-13 20:24:24',1,0),(1603284684677148674,'1411','12188qq.com','123456',1,'212',2,'2022-12-15 15:03:51',1,0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -541,4 +549,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-12-14 14:25:18
+-- Dump completed on 2022-12-15 19:59:24
