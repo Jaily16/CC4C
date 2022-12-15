@@ -32,4 +32,14 @@
 ## Controller层
 ```python
 controller层提供的api接口根据service层的功能和前端要求的访问而定，要求使用restful开发风格，对于前端的http请求，查询数据为get请求，提交数据为post请求，修改数据为put请求，删除数据为delete请求，不传入数据的请求一般为get请求，涉及隐私数据的采用post或put请求，按照前面service的划分一共5个controller
+```  
+**关于Code的约定** 
+- 1** 信息
+- 2** 成功
+- 3** 重定向
+- 4** 客户错误
+- 5** 服务器错误  
+```python
+为了避免这个code约定重复，规定项目中的code均为5位数，以开头的数字区分错误类型，按照前面划分的模块，code中第二个数字：
+user为0，ProgrammingLanguage为1，Course为2，Blog为3，comment为4。(示例：课程添加成功(2 2 000))
 ```
