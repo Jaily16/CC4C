@@ -1,27 +1,26 @@
 package com.cc4c.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Data;
 
 import java.util.Date;
 
 @Data
-@TableName(value = "user")
 public class User {
-  @TableId(value = "user_id", type = IdType.ASSIGN_ID)
-  private Long id;
-  @TableField(value = "user_name")
-  private String name;
+  @TableId
+  private Long userId;
+  private String userName;
   private String email;
+  @TableField(select = false)
   private String password;
   private Integer major;
   private String avatar;
   private Integer state;
-  @TableField(value = "create_time")
-  private Date time;
-  @TableField(value = "favourite_language")
-  private Integer language;
+  private Date createTime;
+  private Integer favouriteLanguage;
+  @TableLogic(value="0",delval="1")
+  //value为正常数据的值，delval为删除数据的值
+  private Integer deleted;
 }

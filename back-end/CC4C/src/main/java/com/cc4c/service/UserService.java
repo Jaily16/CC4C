@@ -4,7 +4,6 @@ import com.cc4c.controller.Result;
 import com.cc4c.entity.User;
 import org.springframework.stereotype.Service;
 
-@Service
 public interface UserService {
   public Result register(User user);
 

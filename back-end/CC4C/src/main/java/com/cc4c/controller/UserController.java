@@ -6,14 +6,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/users")
 public class UserController {
   @Autowired
   private UserService userService;
 
   @PostMapping("/register")
   public Result register(@RequestBody User user) {
-    System.out.println(user.getName() + " registering ...");
+    System.out.println(user.getUserName() + " registering ...");
     return userService.register(user);
   }
 

@@ -19,7 +19,7 @@ public class UserServiceImpl implements UserService {
 
   public Result register(User user) {
     LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-    lambdaQueryWrapper.eq(User::getName, user.getName()).eq(User::getEmail, user.getEmail());
+    lambdaQueryWrapper.eq(User::getUserName, user.getUserName()).or().eq(User::getEmail, user.getEmail());
     if (userDao.exists(lambdaQueryWrapper)) {
       return new Result(Code.REGISTER_FAIL.getCode(), 0, "Username Exists!");
     }
@@ -30,7 +30,7 @@ public class UserServiceImpl implements UserService {
 
   public Result login(String name, String password) {
     LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-    lambdaQueryWrapper.eq(User::getName, name);
+    lambdaQueryWrapper.eq(User::getUserName, name);
     User user = userDao.selectOne(lambdaQueryWrapper);
     if (user == null) {
       return new Result(Code.LOGIN_FAIL.getCode(), 0, "Username Not Exists!");
