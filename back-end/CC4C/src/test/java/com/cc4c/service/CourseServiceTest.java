@@ -57,7 +57,7 @@ public class CourseServiceTest {
 
     @Test
     void testSearch(){
-        System.out.println(courseService.searchCourse("jav"));
+        System.out.println(courseService.searchCourse("java"));
     }
 
     @Test

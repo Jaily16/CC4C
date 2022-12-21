@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface BlogDao extends MPJBaseMapper<Blog> {
+    //table blog_draft
     @Insert("insert into blog_draft(user_id,content) values(#{userId},#{content})")
     public int addDraft(Long userId, String content);
 
@@ -17,4 +18,5 @@ public interface BlogDao extends MPJBaseMapper<Blog> {
 
     @Delete("delete from blog_draft where user_id = #{userId}")
     public int deleteDraft(Long userId);
+
 }

@@ -7,6 +7,7 @@ import com.cc4c.entity.BlogDraft;
 import com.cc4c.entity.Result;
 import com.cc4c.service.BlogService;
 import com.cc4c.utility.FileUtils;
+import org.apache.ibatis.annotations.Delete;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -53,14 +54,19 @@ public class BlogController {
     return blogService.userSubmitsBlog(blog);
   }
 
-  @PostMapping("/delete")
+  @DeleteMapping("/delete")
   public Result delete(Long userId, Long blogId) {
     return blogService.deleteBlog(userId, blogId);
   }
 
-  @PostMapping("/collect")
-  public Result userCollect(Long userId, Long blogId) {
+  @GetMapping("/collect/{uid}/{bid}")
+  public Result userCollect(@PathVariable(value = "uid") Long userId, @PathVariable(value = "bid") Long blogId) {
     return blogService.userCollectsBlog(userId, blogId);
+  }
+
+  @DeleteMapping("/collect/{uid}/{bid}")
+  public Result userCancelCollect(@PathVariable(value = "uid") Long userId, @PathVariable(value = "bid") Long blogId){
+    return blogService.userCancelBlog(userId, blogId);
   }
 
   @SaCheckRole("admin")
@@ -75,13 +81,8 @@ public class BlogController {
     return blogService.unapproveBlog(blogId);
   }
 
-  @PostMapping("/language")
-  public Result language(Long blogId, Integer languageId) {
-    return blogService.involvesLanguage(blogId, languageId);
-  }
-
-  @GetMapping("/{blog_id}")
-  public Result blogInfo(@PathVariable Long blog_id) {
+  @GetMapping("/{id}")
+  public Result blogInfo(@PathVariable("id") Long blog_id) {
     return blogService.blogInfo(blog_id);
   }
 

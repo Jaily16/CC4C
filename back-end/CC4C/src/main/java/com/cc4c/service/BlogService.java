@@ -8,13 +8,19 @@ import org.springframework.stereotype.Service;
 public interface BlogService {
   public Result userCollectsBlog(Long userId, Long blogId);
 
+  public Result userCancelBlog(Long userId, Long blogId);
+
   public Result userSubmitsBlog(Blog blog);
+
+  public Result userSubmitsBlogAll(Long userId);
 
   public Result approveBlog(Integer blogId);
 
   public Result unapproveBlog(Integer blogId);
 
   public Result deleteBlog(Long userId, Long blogId);
+
+  public Result blogListAll();
   public Result involvesLanguage(Long blogId, Integer languageId);
 
   public Result blogInfo(Long id);
@@ -35,4 +41,6 @@ public interface BlogService {
    * @return
    */
   public Result getBlogDraft(Long userId);
+
+
 }

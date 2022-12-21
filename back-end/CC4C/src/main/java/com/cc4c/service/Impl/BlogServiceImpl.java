@@ -60,6 +60,18 @@ public class BlogServiceImpl implements BlogService {
   }
 
   @Override
+  public Result userCancelBlog(Long userId, Long blogId) {
+    LambdaQueryWrapper<UserCollectsBlog> lambdaQueryWrapper = new LambdaQueryWrapper<UserCollectsBlog>()
+            .eq(UserCollectsBlog::getUserId, userId)
+            .eq(UserCollectsBlog::getBlogId, blogId);
+
+    if (!userCollectsBlogDao.exists(lambdaQueryWrapper)) {
+      return new Result(Code.FAIL.getCode(), 0, "User Not Collect!");
+    }
+    return new Result(Code.SUCCESS.getCode(), 1, "User Cancel Blog!");
+  }
+
+  @Override
   public Result userSubmitsBlog(Blog blog) {
     //先将博客内容存入数据库
     blog.setState(BlogState.VERIFIED.getState());
@@ -79,6 +91,27 @@ public class BlogServiceImpl implements BlogService {
       return new Result(Code.FAIL.getCode(), 0, "Insertion Failed!");
     }
     userSubmitsBlogDao.insert(new UserSubmitsBlog(userId, blogId, new Date()));
+    return new Result(Code.SUCCESS.getCode(), 1, "User Submits Blog!");
+  }
+
+  @Override
+  public Result userSubmitsBlogAll(Long userId) {
+    LambdaQueryWrapper<UserSubmitsBlog> lambdaQueryWrapper = new LambdaQueryWrapper<UserSubmitsBlog>()
+            .eq(UserSubmitsBlog::getUserId, userId);
+    if (userDao.selectById(userId) == null) {
+      return new Result(Code.FAIL.getCode(), 0, "User Not Exists!");
+    }
+
+    List<UserSubmitsBlog> blogList = userSubmitsBlogDao.selectList(lambdaQueryWrapper);
+
+    List<Long> idList = blogList.stream().map(UserSubmitsBlog::getBlogId).toList();
+
+    List<Blog> list = blogDao.selectBatchIds(idList);
+
+    for (Blog blog : list) {
+      blog.setContent(null);
+    }
+
     return new Result(Code.SUCCESS.getCode(), 1, "User Submits Blog!");
   }
 
@@ -120,6 +153,16 @@ public class BlogServiceImpl implements BlogService {
 
     blogDao.deleteById(blog);
     return new Result(Code.SUCCESS.getCode(), 1, "Blog Deleted!");
+  }
+
+  @Override
+  public Result blogListAll() {
+    List<Blog> list = blogDao.selectList(null);
+
+    for (Blog blog : list) {
+      blog.setContent(null);
+    }
+    return new Result(Code.SUCCESS.getCode(), list, "Blog List All Get!");
   }
 
   @Override

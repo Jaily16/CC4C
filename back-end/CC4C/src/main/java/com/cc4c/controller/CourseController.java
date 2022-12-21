@@ -70,4 +70,9 @@ public class CourseController {
         }
         return new Result(Code.COURSE_GET_FAVOR_COURSE_LIST_SUCCESS.getCode(), courseList);
     }
+
+    @GetMapping("/search/{info}")
+    private Result searchCourses(@PathVariable("info") String searchInfo){
+        return courseService.searchCourse(searchInfo);
+    }
 }

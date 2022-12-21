@@ -143,7 +143,8 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public Result searchCourse(String searchInfo) {
         LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.like(Course::getCourseName, searchInfo).or().eq(Course::getLanguageName, searchInfo);
+        lambdaQueryWrapper.like(Course::getCourseName, searchInfo).or().eq(Course::getLanguageName, searchInfo)
+                          .select(Course.class,info->!info.getColumn().equals("description"));
         List<Course> courses = courseDao.selectList(lambdaQueryWrapper);
         if(courses == null || courses.isEmpty()){
             return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), null, "no such course");
