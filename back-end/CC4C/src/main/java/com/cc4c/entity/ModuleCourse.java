@@ -8,6 +8,5 @@ import java.util.List;
 public class ModuleCourse {
     private Integer languageId;
     private Integer priority;
-    private String courseName;
-    private String moduleName;
+    private Integer courseId;
 }

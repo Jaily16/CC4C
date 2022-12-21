@@ -1,9 +1,11 @@
 package com.cc4c.entity;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+@AllArgsConstructor
 public class LanguageDocumentation {
     private Integer languageId;
     private String docLink;

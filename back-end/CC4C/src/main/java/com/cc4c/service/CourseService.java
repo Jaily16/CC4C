@@ -1,16 +1,18 @@
 package com.cc4c.service;
 
-import com.cc4c.controller.Code;
-import com.cc4c.controller.Result;
+import com.cc4c.entity.Code;
+import com.cc4c.entity.Result;
 import com.cc4c.entity.Course;
 import com.cc4c.entity.CourseModule;
 import com.cc4c.entity.ModuleCourse;
 
+import java.util.List;
+
 public interface CourseService {
     /**
      * 添加课程操作，返回添加课程的状态
-     * @param course
-     * @return
+     * @param course 课程对象
+     * @return 用code记录饭返回状态
      */
     public Code addCourse(Course course);
 
@@ -84,4 +86,31 @@ public interface CourseService {
      * @return
      */
     public Result searchCourse(String searchInfo);
+
+    public Result recommendCourseToUser(Integer languageId, Integer major);
+    public Boolean favorCourse(Long userId, Integer courseId);
+
+    /**
+     * 删除某个用户收藏的某个课程
+     * @param userId
+     * @param courseId
+     * @return
+     */
+    public Boolean cancelFavor(Long userId, Integer courseId);
+
+    /**
+     * 判断某个用户是否收藏某个课程
+     * @param userId
+     * @param courseId
+     * @return
+     */
+    public Boolean ifFavor(Long userId, Integer courseId);
+
+    /**
+     * 获取用户收藏的课程列表
+     * @param userId
+     * @return
+     */
+    public List<Course> getFavorCourseList(Long userId);
+
 }

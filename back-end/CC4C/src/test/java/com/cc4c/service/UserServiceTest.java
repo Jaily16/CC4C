@@ -9,20 +9,21 @@ import java.util.Date;
 
 @SpringBootTest
 public class UserServiceTest {
-    @Autowired
-    private UserService userService;
-
-    @Test
-    void testRegister(){
-        User user = new User();
-        user.setUserName("11231");
-        user.setEmail("12112qq.com");
-        user.setPassword("123456");
-        user.setMajor(1);
-        user.setAvatar("212");
-        user.setState(2);
-        user.setCreateTime(new Date());
-        user.setFavouriteLanguage(1);
-        System.out.println(userService.register(user));
-    }
+//    @Autowired
+//    private UserService userService;
+//
+//    @Test
+//    void testRegister(){
+//        User user = new User();
+//        user.setUserName("645");
+//        user.setEmail("66612qq.com");
+//        user.setPassword("123456");
+//        user.setMajor(1);
+//        user.setAvatar("212");
+//        user.setState(2);
+//        user.setCreateTime(new Date());
+//        user.setFavouriteLanguage(1);
+//        System.out.println(userService.register(user));
+//        System.out.println(user.getUserId());
+//    }
 }

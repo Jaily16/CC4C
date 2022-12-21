@@ -2,14 +2,14 @@ package com.cc4c.service;
 
 import com.cc4c.entity.Course;
 import com.cc4c.entity.CourseModule;
-import com.cc4c.entity.CourseVideo;
+import com.cc4c.entity.ModuleCourse;
 import com.cc4c.utility.CourseLevel;
+import com.cc4c.utility.ModuleLevel;
+import com.cc4c.utility.UserMajor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.ArrayList;
-import java.util.List;
 
 @SpringBootTest
 public class CourseServiceTest {
@@ -19,20 +19,19 @@ public class CourseServiceTest {
     @Test
     void testAdd(){
         Course course = new Course();
+        Integer id = 34;
+        course.setCourseId(id);
         course.setLanguageName("java");
-        course.setCourseName("2022java基础教程 从入门到起飞");
-        course.setDescription("Java基础的天花板教程，面向0基础同学，有手就行。从0开始，到进阶，最后起飞，层层递进。课程中会讲解很多编程思想，以及我是如何从0开始去分析一个问题，并把代码写出来的。拒绝一听就懂，一学就废。");
-        course.setCourseBook("book.pdf");
-        course.setCourseWebsite("http://yun.itheima.com/course/1002.html?capid=1$hm");
-        List<CourseVideo> courseVideos = new ArrayList<CourseVideo>();
-        courseVideos.add(new CourseVideo("bilibili 上部","https://www.bilibili.com/video/BV17F411T7Ao/?spm_id_from=333.999.0.0&vd_source=6368b03254ca1c1ef430df97e3015147"));
-        courseVideos.add(new CourseVideo("bilibili 下部","https://www.bilibili.com/video/BV1yW4y1Y7Ms/?spm_id_from=333.999.0.0&vd_source=6368b03254ca1c1ef430df97e3015147"));
-        courseVideos.add(new CourseVideo("itheima","http://yun.itheima.com/course/1002.html?capid=1$hm"));
-        courseVideos.add(new CourseVideo("youtube","https://www.youtube.com/playlist?list=PLFbd8KZNbe-8cHN7zAPg8S8zrrx7pF6cZ"));
-        course.setCourseVideos(courseVideos);
-        course.setLevel(CourseLevel.DIFFICULT.getLevel());
+        course.setCourseName("尚硅谷_SSM");
+        course.setDescription("default");
+        course.setLevel(CourseLevel.DIFFICULT_AND_DEFAULT.getLevel());
         course.setState(1);
         System.out.println(courseService.addCourse(course));
+        ModuleCourse moduleCourse = new ModuleCourse();
+        moduleCourse.setLanguageId(1);
+        moduleCourse.setPriority(5);
+        moduleCourse.setCourseId(id);
+        System.out.println(courseService.addCourseIntoModule(moduleCourse));
     }
 
     @Test
@@ -43,25 +42,17 @@ public class CourseServiceTest {
     @Test
     void testUpdate(){
         Course course = new Course();
-        course.setCourseId(1);
-        course.setLanguageName("java");
-        course.setCourseName("2022年新版SSM全套教程");
-        course.setDescription("本课程为黑马程序员的SSM最新全套SSM课程，讲解了Spring Spring MVC Mybatis的具体原理和使用方法");
-        course.setCourseBook("book.pdf");
-        course.setCourseWebsite("http://yun.itheima.com/course/1001.html?capid=1$hm");
-        List<CourseVideo> courseVideos = new ArrayList<CourseVideo>();
-        courseVideos.add(new CourseVideo("bilibili","https://www.bilibili.com/video/BV1Fi4y1S7ix?p=1&vd_source=6368b03254ca1c1ef430df97e3015147"));
-        courseVideos.add(new CourseVideo("itheima","http://yun.itheima.com/course/1001.html?capid=1$hm"));
-        courseVideos.add(new CourseVideo("youtube","https://www.youtube.com/playlist?list=PLFbd8KZNbe-_GnG93sgOx2EZJQi2FSQ7g"));
-        course.setCourseVideos(courseVideos);
-        course.setLevel(2);
+        course.setLanguageName("C++");
+        course.setCourseName("C语言和C++简介");
+        course.setDescription("这里是课程内容");
+        course.setLevel(CourseLevel.EASY.getLevel());
         course.setState(1);
         System.out.println(courseService.updateCourse(course));
     }
 
     @Test
     void testGetOneByName(){
-        System.out.println(courseService.getCourseByName("2022年新版SSM教程"));
+        System.out.println(courseService.getCourseByName("20天Java入门基础视频教程"));
     }
 
     @Test
@@ -70,11 +61,34 @@ public class CourseServiceTest {
     }
 
     @Test
-    void testAddModule(){
+    void testModule(){
         CourseModule module = new CourseModule();
         module.setLanguageId(1);
-        module.setModuleName("基础语法知识");
-        module.setPriority(1);
+        module.setModuleName("java开发框架");
+        module.setPriority(3);
+        module.setLevel(ModuleLevel.DEFAULT.getLevel());
         System.out.println(courseService.addCourseModule(module));
     }
+
+    @Test
+    void testCourseIntoModule(){
+        ModuleCourse moduleCourse = new ModuleCourse();
+        moduleCourse.setLanguageId(2);
+        moduleCourse.setPriority(3);
+        moduleCourse.setCourseId(14);
+        System.out.println(courseService.addCourseIntoModule(moduleCourse));
+    }
+
+    @Test
+    void testGetCourseModule(){
+//        System.out.println(courseService.getCourseModule(1));
+//        System.out.println(courseService.getCourseModuleByCourseName("2022年新版SSM全套教程"));
+        System.out.println(courseService.recommendCourseToUser(1, UserMajor.MAJOR_IN_CS.getMajor()));
+    }
+
+    @Test
+    void testFavor(){
+        System.out.println(courseService.favorCourse(1602639796138680322L, 3));
+    }
+
 }

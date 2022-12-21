@@ -1,23 +1,29 @@
 package com.cc4c.service.Impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc4c.controller.Code;
-import com.cc4c.controller.Result;
+import com.cc4c.entity.Code;
+import com.cc4c.entity.Result;
 import com.cc4c.dao.CourseDao;
 import com.cc4c.entity.Course;
 import com.cc4c.entity.CourseModule;
-import com.cc4c.entity.CourseVideo;
 import com.cc4c.entity.ModuleCourse;
 import com.cc4c.service.CourseService;
+import com.cc4c.utility.CourseLevel;
+import com.cc4c.utility.ModuleLevel;
+import com.cc4c.utility.UserMajor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class CourseServiceImpl implements CourseService {
     @Autowired
     private CourseDao courseDao;
+
+    //纯course部分相关服务
     @Override
     public Code addCourse(Course course) {
         LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
@@ -28,13 +34,13 @@ public class CourseServiceImpl implements CourseService {
         if(courseDao.insert(course) <= 0){
             return Code.COURSE_ADD_FAILED;
         }
-        //填充视频表
-        List<CourseVideo> courseVideos = course.getCourseVideos();
-        for (CourseVideo courseVideo: courseVideos) {
-            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
-                return Code.COURSE_ADD_VIDEO_FAILED;
-            }
-        }
+//        //填充视频表
+//        List<CourseVideo> courseVideos = course.getCourseVideos();
+//        for (CourseVideo courseVideo: courseVideos) {
+//            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
+//                return Code.COURSE_ADD_VIDEO_FAILED;
+//            }
+//        }
         return Code.COURSE_ADD_SUCCESS;
     }
 
@@ -80,21 +86,21 @@ public class CourseServiceImpl implements CourseService {
                 return Code.COURSE_NAME_REPEATED;
             }
         }
-        //删除先前的视频表
-        if(courseDao.deleteCourseVideoByName(oldName) <= 0){
-            return Code.COURSE_UPDATE_VIDEO_FAILED;
-        }
+//        //删除先前的视频表
+//        if(courseDao.deleteCourseVideoByName(oldName) <= 0){
+//            return Code.COURSE_UPDATE_VIDEO_FAILED;
+//        }
         //修改课程信息
         if(courseDao.updateById(course) <= 0){
             return Code.COURSE_UPDATE_FAILED;
         }
-        //填充视频表
-        List<CourseVideo> courseVideos = course.getCourseVideos();
-        for (CourseVideo courseVideo: courseVideos) {
-            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
-                return Code.COURSE_ADD_VIDEO_FAILED;
-            }
-        }
+//        //填充视频表
+//        List<CourseVideo> courseVideos = course.getCourseVideos();
+//        for (CourseVideo courseVideo: courseVideos) {
+//            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
+//                return Code.COURSE_ADD_VIDEO_FAILED;
+//            }
+//        }
         return Code.COURSE_UPDATE_SUCCESS;
     }
 
@@ -106,8 +112,8 @@ public class CourseServiceImpl implements CourseService {
         if(course == null){
             return new Result(Code.COURSE_GET_ONE_FAILED.getCode(), null, "course not exist");
         }
-        List<CourseVideo> videoList = courseDao.getCourseVideosByName(courseName);
-        course.setCourseVideos(videoList);
+//        List<CourseVideo> videoList = courseDao.getCourseVideosByName(courseName);
+//        course.setCourseVideos(videoList);
         return new Result(Code.COURSE_GET_ONE_SUCCESS.getCode(), course);
     }
 
@@ -145,5 +151,50 @@ public class CourseServiceImpl implements CourseService {
         return new Result(Code.COURSE_SEARCH_SUCCESS.getCode(), courses);
     }
 
+    //与user关联部分相关服务
+    @Override
+    public Result recommendCourseToUser(Integer languageId, Integer major) {
+        Integer smallLimit1 = ModuleLevel.DEFAULT.getLevel();
+        Integer smallLimit2 = CourseLevel.EASY_AND_DEFAULT.getLevel();
+        Integer bigLimit1 = ModuleLevel.DEFAULT.getLevel();
+        Integer bigLimit2 = CourseLevel.DIFFICULT_AND_DEFAULT.getLevel();
+        if(Objects.equals(major, UserMajor.MAJOR_NOT_IN_CS.getMajor())){
+            smallLimit1 = ModuleLevel.EASY.getLevel();
+            smallLimit2 = CourseLevel.EASY.getLevel();
+            bigLimit2 = CourseLevel.EASY_AND_DEFAULT.getLevel();
+        }
+        if(Objects.equals(major, UserMajor.MAJOR_IN_CS.getMajor())) {
+            bigLimit1 = ModuleLevel.DIFFICULT.getLevel();
+            smallLimit2 = CourseLevel.DIFFICULT_AND_DEFAULT.getLevel();
+            bigLimit2 = CourseLevel.DIFFICULT.getLevel();
+        }
+        List<CourseModule> modules = courseDao.getCourseModuleByLIdAndRange(languageId, smallLimit1, bigLimit1);
+        for(CourseModule module : modules){
+            List<String> courses = courseDao.getCoursesByModuleAndRange(module, smallLimit2, bigLimit2, CourseLevel.MUST_SHOW.getLevel());
+            module.setCourseList(courses);
+        }
+        return new Result(Code.COURSE_GET_RECOMMENDATION_SUCCESS.getCode(), modules, "recommend finished");
+    }
+
+    @Override
+    public Boolean favorCourse(Long userId, Integer courseId) {
+        Date date = new Date();
+        return courseDao.addFavorInfo(userId, courseId, date) > 0;
+    }
+
+    @Override
+    public Boolean cancelFavor(Long userId, Integer courseId) {
+        return courseDao.deleteFavorInfo(userId,courseId) > 0;
+    }
+
+    @Override
+    public Boolean ifFavor(Long userId, Integer courseId) {
+        return courseDao.ifFavor(userId, courseId);
+    }
+
+    @Override
+    public List<Course> getFavorCourseList(Long userId) {
+        return courseDao.getFavorCourses(userId);
+    }
 
 }

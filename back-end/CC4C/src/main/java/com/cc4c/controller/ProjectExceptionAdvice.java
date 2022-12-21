@@ -1,5 +1,6 @@
 package com.cc4c.controller;
 
+import com.cc4c.entity.Result;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice

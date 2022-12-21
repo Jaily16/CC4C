@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class CourseVideo {
-    private String platform;
-    private String url;
+public class AdministratorAllowsBlog {
+  private String adminId;
+  private Long blogId;
 }

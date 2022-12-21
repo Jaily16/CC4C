@@ -15,10 +15,6 @@ public class Course {
     private String courseName;
     private String languageName;
     private String description;
-    @TableField(exist = false)
-    private List<CourseVideo> courseVideos;
-    private String courseWebsite;
-    private String courseBook;
     private Integer level;
     private Integer state;
     @TableLogic(value="0",delval="1")
