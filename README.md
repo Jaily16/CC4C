@@ -19,7 +19,7 @@ Tongji University SSE 2022 Final Project
 
 1. springboot
 
-   jdk 1.8
+   jdk 17
 
    java 8
 
