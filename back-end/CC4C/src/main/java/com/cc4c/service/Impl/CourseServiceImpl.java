@@ -14,9 +14,11 @@ import com.cc4c.utility.UserMajor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class CourseServiceImpl implements CourseService {
@@ -25,23 +27,23 @@ public class CourseServiceImpl implements CourseService {
 
     //纯course部分相关服务
     @Override
-    public Code addCourse(Course course) {
+    public Result addCourse(Course course) {
         LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(Course::getCourseName, course.getCourseName());
         if(courseDao.exists(lambdaQueryWrapper)){
-            return Code.COURSE_NAME_REPEATED;
+            return new Result(Code.COURSE_NAME_REPEATED.getCode(), false,"课程名重复");
         }
         if(courseDao.insert(course) <= 0){
-            return Code.COURSE_ADD_FAILED;
+            return new Result(Code.COURSE_ADD_FAILED.getCode(), false, "课程添加失败");
         }
-//        //填充视频表
-//        List<CourseVideo> courseVideos = course.getCourseVideos();
-//        for (CourseVideo courseVideo: courseVideos) {
-//            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
-//                return Code.COURSE_ADD_VIDEO_FAILED;
-//            }
-//        }
-        return Code.COURSE_ADD_SUCCESS;
+        ModuleCourse moduleCourse = new ModuleCourse();
+        moduleCourse.setCourseId(course.getCourseId());
+        moduleCourse.setPriority(course.getPriority());
+        moduleCourse.setLanguageId(course.getLanguageId());
+        if(!addCourseIntoModule(moduleCourse)){
+            return new Result(Code.COURSE_ADD_MODULE_COURSE_FAILED.getCode(), false, "将课程添加进入模块失败");
+        }
+        return new Result(Code.COURSE_ADD_SUCCESS.getCode(), true, "课程添加成功");
     }
 
     @Override
@@ -86,21 +88,10 @@ public class CourseServiceImpl implements CourseService {
                 return Code.COURSE_NAME_REPEATED;
             }
         }
-//        //删除先前的视频表
-//        if(courseDao.deleteCourseVideoByName(oldName) <= 0){
-//            return Code.COURSE_UPDATE_VIDEO_FAILED;
-//        }
         //修改课程信息
         if(courseDao.updateById(course) <= 0){
             return Code.COURSE_UPDATE_FAILED;
         }
-//        //填充视频表
-//        List<CourseVideo> courseVideos = course.getCourseVideos();
-//        for (CourseVideo courseVideo: courseVideos) {
-//            if(courseDao.addCourseVideo(course.getCourseName(),courseVideo.getPlatform(),courseVideo.getUrl()) <= 0){
-//                return Code.COURSE_ADD_VIDEO_FAILED;
-//            }
-//        }
         return Code.COURSE_UPDATE_SUCCESS;
     }
 
@@ -112,8 +103,6 @@ public class CourseServiceImpl implements CourseService {
         if(course == null){
             return new Result(Code.COURSE_GET_ONE_FAILED.getCode(), null, "course not exist");
         }
-//        List<CourseVideo> videoList = courseDao.getCourseVideosByName(courseName);
-//        course.setCourseVideos(videoList);
         return new Result(Code.COURSE_GET_ONE_SUCCESS.getCode(), course);
     }
 
@@ -196,6 +185,33 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public List<Course> getFavorCourseList(Long userId) {
         return courseDao.getFavorCourses(userId);
+    }
+
+    @Override
+    public Result getCoursesByLanguage(String languageName) {
+        LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(Course::getLanguageName, languageName)
+                .select(Course.class,info->!info.getColumn().equals("description"));
+        List<Course> courses = courseDao.selectList(lambdaQueryWrapper);
+        if(courses == null || courses.isEmpty()){
+            return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), null, "no such course");
+        }
+        return new Result(Code.COURSE_SEARCH_SUCCESS.getCode(), courses);
+    }
+
+    @Override
+    public Result getHomeCourses() {
+        LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.select(Course.class,info->!info.getColumn().equals("description"));
+        List<Course> courses = courseDao.selectList(lambdaQueryWrapper);
+        for(Course course : courses){
+            Integer favors = courseDao.countFavor(course.getCourseId());
+            course.setFavorsNum(favors);
+        }
+        //按照课程收藏量排序
+        courses = courses.stream().sorted(Comparator.comparing(Course::getFavorsNum).reversed())
+                .collect(Collectors.toList());
+        return new Result(Code.SUCCESS.getCode(), courses);
     }
 
 }

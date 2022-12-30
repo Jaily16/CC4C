@@ -1,20 +1,24 @@
 package com.cc4c.service.Impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cc4c.entity.Blog;
 import com.cc4c.entity.Code;
 import com.cc4c.entity.Result;
 import com.cc4c.dao.UserDao;
 import com.cc4c.entity.User;
 import com.cc4c.service.UserService;
+import com.cc4c.utility.BlogState;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Objects;
@@ -28,21 +32,46 @@ public class UserServiceImpl implements UserService {
   public Result register(User user) {
     LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getName, user.getName());
     if (userDao.exists(lambdaQueryWrapper)) {
-      return new Result(Code.REGISTER_FAIL.getCode(), 0, "Username Exists!");
+      return new Result(Code.REGISTER_FAIL.getCode(), false, "用户名重复");
     }
     lambdaQueryWrapper.eq(User::getEmail, user.getEmail());
     if (userDao.exists(lambdaQueryWrapper)) {
-      return new Result(Code.REGISTER_FAIL.getCode(), 0, "Email Exists!");
+      return new Result(Code.REGISTER_FAIL.getCode(), false, "该邮箱已经被注册");
     }
     user.setTime(new Date());
-    user.setState(0);
     try {
       userDao.insert(user);
     } catch (Exception e) {
       e.printStackTrace();
-      return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), 0, "Violate Foreign Key Constraints!");
+      return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), false, "Violate Foreign Key Constraints!");
     }
-    return new Result(Code.SUCCESS.getCode(), 1, "Register Success!");
+    return new Result(Code.SUCCESS.getCode(), true, "注册成功");
+  }
+
+  @Override
+  public Result findPassword(User user) {
+    LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getEmail, user.getEmail());
+    User u = userDao.selectOne(lambdaQueryWrapper);
+    if(u == null){
+      return new Result(Code.FAIL.getCode(), false, "该用户不存在");
+    }
+    if(Objects.equals(u.getPassword(), user.getNewPassword())){
+      return new Result(Code.FAIL.getCode(), false, "新密码与原密码相同");
+    }
+    u.setPassword(user.getNewPassword());
+    userDao.updateById(u);
+    return new Result(Code.SUCCESS.getCode(), true, "新密码设置成功");
+  }
+
+  @Override
+  public Result changePassword(User user) {
+    User u = userDao.selectById(user.getId());
+    if(!Objects.equals(user.getPassword(), u.getPassword())){
+      return new Result(Code.FAIL.getCode(), false, "原密码输入错误");
+    }
+    u.setPassword(user.getNewPassword());
+    userDao.updateById(u);
+    return new Result(Code.SUCCESS.getCode(), true, "新密码设置成功");
   }
 
   @Override
@@ -50,93 +79,46 @@ public class UserServiceImpl implements UserService {
     LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getEmail, email);
     User user = userDao.selectOne(lambdaQueryWrapper);
     if (user == null) {
-      return new Result(Code.LOGIN_FAIL.getCode(), 0, "Username Not Exists!");
+      return new Result(Code.LOGIN_FAIL.getCode(), false, "该邮箱未注册!");
     }
-    user = userDao.selectOne(lambdaQueryWrapper.eq(User::getPassword, password));
+    user = userDao.selectOne(lambdaQueryWrapper.eq(User::getEmail, email));
     if (!Objects.equals(user.getPassword(), password)) {
       System.out.println(user);
       System.out.println(password);
-      return new Result(Code.LOGIN_FAIL.getCode(), 0, "Password Incorrect!");
+      return new Result(Code.LOGIN_FAIL.getCode(), false, "密码错误!");
     }
-    StpUtil.login(user.getId());
-    return new Result(Code.SUCCESS.getCode(), 1, "Login Success!");
+    return new Result(Code.SUCCESS.getCode(), true, "登录成功!");
   }
 
-
-  @Override
-  public Result logout() {
-    if (!StpUtil.isLogin()) {
-      return new Result(Code.SUCCESS.getCode(), 0, "No Login!");
-    }
-    StpUtil.logout();
-    return new Result(Code.SUCCESS.getCode(), 1, "Logout Success!");
-  }
 
   // TODO : add id_fail code
   public Result update(User user) {
-    if (!check_identity(user.getId())) {
-      return new Result(Code.FAIL.getCode(), 1, "No Accessibility!");
-    }
     try {
+      User u = userDao.selectById(user.getId());
+      if(!Objects.equals(user.getName(), u.getName())){
+        LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getName, user.getName());
+        if (userDao.exists(lambdaQueryWrapper)) {
+          return new Result(Code.REGISTER_FAIL.getCode(), false, "用户名重复");
+        }
+      }
       userDao.updateById(user);
     } catch (Exception e) {
       e.printStackTrace();
-      return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), 0, "Violate Foreign Key Constraints!");
+      return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), false, "修改信息异常");
     }
-    return new Result(Code.SUCCESS.getCode(), 1, "Logout Success!");
+    return new Result(Code.SUCCESS.getCode(), true, "修改用户信息成功");
   }
 
-  @Value("${cc4c.upload-path}")
-  private String uploadPath;
-  public static final ArrayList<String> AVATAR_TYPE = new ArrayList<>();
-
-  static {
-    AVATAR_TYPE.add("image/jpeg");
-    AVATAR_TYPE.add("image/png");
-    AVATAR_TYPE.add("image/bmp");
-    AVATAR_TYPE.add("image/gif");
-  }
-
-  @Override
-  public Result uploadAvatar(Long id, MultipartFile multipartFile) {
-    if (multipartFile.isEmpty()) {
-      return new Result(Code.FAIL.getCode(), 0, "Please Upload an Image!");
-    }
-    if (!AVATAR_TYPE.contains(multipartFile.getContentType())) {
-      return new Result(Code.FAIL.getCode(), 0, "Invalid Image File!");
-    }
-
-    File folder = new File(uploadPath);
-    if (!folder.isDirectory()) {
-      folder.mkdir();
-    }
-
-    // 对上传的文件重命名, 避免文件重名
-    String oldName = multipartFile.getOriginalFilename();
-    assert oldName != null;
-    String newName = id + oldName.substring(oldName.lastIndexOf("."));
-    try {
-      multipartFile.transferTo(new File(folder, newName));
-    } catch (IOException e) {
-      return new Result(Code.FAIL.getCode(), 0, "System Error!");
-    }
-    LambdaUpdateWrapper<User> lambdaUpdateWrapper = new LambdaUpdateWrapper<User>().eq(User::getId, id).set(User::getAvatar, uploadPath + "/avatar/" + newName);
-    userDao.update(null, lambdaUpdateWrapper);
-    return new Result(Code.SUCCESS.getCode(), 0, "Avatar Upload Success!");
-  }
-
-  @Override
-  public Result isLogin() {
-    return new Result(Code.SUCCESS.getCode(), StpUtil.isLogin(), "Check Over!");
-  }
-
-  public Boolean check_identity(Long id) {
-    return StpUtil.getLoginIdDefaultNull() == id;
-  }
 
   @Override
   public String getUserNameById(Long userId){
     return userDao.getUserNameById(userId);
+  }
+
+  @Override
+  public User getUserByEmail(String email) {
+    LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getEmail, email);
+    return userDao.selectOne(lambdaQueryWrapper);
   }
 
 }

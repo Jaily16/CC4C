@@ -6,6 +6,7 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public enum BlogState {
+  DENY(-1),
   UNVERIFIED(0),
   VERIFIED(1);
 

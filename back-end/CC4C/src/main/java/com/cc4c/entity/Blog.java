@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.Date;
@@ -13,6 +15,7 @@ import java.util.List;
 @Data
 public class Blog {
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long blogId;
     private Long writerId;
     private String title;

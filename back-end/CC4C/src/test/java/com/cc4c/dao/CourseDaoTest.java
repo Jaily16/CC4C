@@ -18,4 +18,9 @@ public class CourseDaoTest {
         System.out.println(courseDao.getCoursesByModule(range.get(0)));
     }
 
+    @Test
+    void testCount(){
+        System.out.println(courseDao.countFavor(1));
+    }
+
 }

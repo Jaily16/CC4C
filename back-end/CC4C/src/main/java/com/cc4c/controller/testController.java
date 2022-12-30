@@ -66,25 +66,5 @@ public class testController {
         }
     }
 
-    @PostMapping("/uploadImg")
-    public JSONObject img(@RequestParam(value = "file") MultipartFile file){
-        JSONObject json = new JSONObject();
-        try{
-            String s = FileUtils.uploadImg(file,
-                    saveImgPath,
-                    Objects.requireNonNull(file.getOriginalFilename()),
-                    requestImgPath);
-            System.out.println(s);
-            json.put("success", "1");
-            json.put("message", "success");
-            json.put("url", s);
-            return json;
-        }catch (Exception e){
-            e.printStackTrace();
-            json.put("STATUS", "ERROR");
-            json.put("MSG", "上传图片格式非法");
-            return json;
-        }
-    }
 }
 

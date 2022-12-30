@@ -14,13 +14,13 @@ public interface CommentDao extends BaseMapper<Comment> {
     @Select("select comment.* from course_direct_comment,comment " +
             "where course_direct_comment.course_id = #{courseId} " +
             "and course_direct_comment.comment_id = comment.comment_id " +
-            "order by comment.like desc")
+            "order by comment.time desc")
     public List<Comment> getCourseComments(Integer courseId);
 
     @Select("select comment.* from blog_direct_comment,comment " +
             "where blog_direct_comment.blog_id = #{blogId} " +
             "and blog_direct_comment.comment_id = comment.comment_id " +
-            "order by comment.like desc")
+            "order by comment.time desc")
     public List<Comment> getBlogComments(Long blogId);
 
     @Select("select comment.*,father_id,layer from indirect_comment,comment " +

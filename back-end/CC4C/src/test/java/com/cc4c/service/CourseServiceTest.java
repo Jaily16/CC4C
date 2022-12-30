@@ -19,17 +19,17 @@ public class CourseServiceTest {
     @Test
     void testAdd(){
         Course course = new Course();
-        Integer id = 34;
+        Integer id = 61;
         course.setCourseId(id);
-        course.setLanguageName("java");
-        course.setCourseName("尚硅谷_SSM");
+        course.setLanguageName("python");
+        course.setCourseName("黑马_2022新版python8天入门到精通");
         course.setDescription("default");
-        course.setLevel(CourseLevel.DIFFICULT_AND_DEFAULT.getLevel());
+        course.setLevel(CourseLevel.EASY_AND_DEFAULT.getLevel());
         course.setState(1);
         System.out.println(courseService.addCourse(course));
         ModuleCourse moduleCourse = new ModuleCourse();
-        moduleCourse.setLanguageId(1);
-        moduleCourse.setPriority(5);
+        moduleCourse.setLanguageId(3);
+        moduleCourse.setPriority(1);
         moduleCourse.setCourseId(id);
         System.out.println(courseService.addCourseIntoModule(moduleCourse));
     }
@@ -63,8 +63,8 @@ public class CourseServiceTest {
     @Test
     void testModule(){
         CourseModule module = new CourseModule();
-        module.setLanguageId(1);
-        module.setModuleName("java开发框架");
+        module.setLanguageId(3);
+        module.setModuleName("python高级");
         module.setPriority(3);
         module.setLevel(ModuleLevel.DEFAULT.getLevel());
         System.out.println(courseService.addCourseModule(module));
@@ -83,12 +83,16 @@ public class CourseServiceTest {
     void testGetCourseModule(){
 //        System.out.println(courseService.getCourseModule(1));
 //        System.out.println(courseService.getCourseModuleByCourseName("2022年新版SSM全套教程"));
-        System.out.println(courseService.recommendCourseToUser(1, UserMajor.MAJOR_IN_CS.getMajor()));
+        System.out.println(courseService.recommendCourseToUser(3, UserMajor.MAJOR_IN_CS.getMajor()));
     }
 
     @Test
     void testFavor(){
-        System.out.println(courseService.favorCourse(1602639796138680322L, 3));
+        System.out.println(courseService.favorCourse(1605928940969508866L, 3));
     }
 
+    @Test
+    void testGet(){
+        System.out.println(courseService.getHomeCourses());
+    }
 }

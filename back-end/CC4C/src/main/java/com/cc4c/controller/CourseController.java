@@ -3,6 +3,7 @@ package com.cc4c.controller;
 import com.alibaba.fastjson.JSONObject;
 import com.cc4c.entity.Code;
 import com.cc4c.entity.Course;
+import com.cc4c.entity.CourseModule;
 import com.cc4c.entity.Result;
 import com.cc4c.service.CourseService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,11 @@ import java.util.List;
 public class CourseController {
     @Autowired
     private CourseService courseService;
+
+    @GetMapping("/home")
+    private Result getHomeCourses(){
+        return courseService.getHomeCourses();
+    }
 
     @GetMapping("/recommend/{language}/{major}")
     private Result getRecommendedCourses(@PathVariable("language") Integer languageId,
@@ -74,5 +80,30 @@ public class CourseController {
     @GetMapping("/search/{info}")
     private Result searchCourses(@PathVariable("info") String searchInfo){
         return courseService.searchCourse(searchInfo);
+    }
+
+    @GetMapping("/language/{name}")
+    private Result getCoursesByLanguage(@PathVariable("name") String languageName){
+        return courseService.getCoursesByLanguage(languageName);
+    }
+
+    //admin操作
+    @PostMapping("/module")
+    private Result addCourseModule(@RequestBody CourseModule courseModule){
+        Code code = courseService.addCourseModule(courseModule);
+        if(code == Code.MODULE_PRIORITY_REPEATED){
+            return new Result(code.getCode(),false, "模块优先级重复!");
+        }
+        return new Result(code.getCode(),true, "课程模块添加成功");
+    }
+
+    @GetMapping("/module/{id}")
+    private Result getCourseModules(@PathVariable("id") Integer languageId){
+        return courseService.getCourseModule(languageId);
+    }
+
+    @PostMapping("/add")
+    private Result addCourse(@RequestBody Course course){
+        return courseService.addCourse(course);
     }
 }

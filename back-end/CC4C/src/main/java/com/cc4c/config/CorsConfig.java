@@ -12,10 +12,10 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 //是否发送Cookie
-                .allowCredentials(false)
+                .allowCredentials(true)
                 //放行哪些原始域
-                .allowedOrigins("*")
-                .allowedMethods(new String[]{"GET", "POST", "PUT", "DELETE"})
+                .allowedOriginPatterns("http://localhost:5173")
+                .allowedMethods("GET", "POST", "PUT", "DELETE")
                 .allowedHeaders("*")
                 .exposedHeaders("*");
     }

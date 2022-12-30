@@ -4,18 +4,20 @@ import com.cc4c.entity.Result;
 import com.cc4c.entity.User;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
+
 public interface UserService {
   public Result register(User user);
 
-  public Result login(String name, String password);
+  public Result findPassword(User user);
 
-  public Result logout();
+  public Result changePassword(User user);
+
+  public Result login(String name, String password);
 
   public Result update(User user);
 
-  public Result uploadAvatar(Long id, MultipartFile multipartFile);
-
-  public Result isLogin();
-
   public String getUserNameById(Long userId);
+
+  public User getUserByEmail(String email);
 }

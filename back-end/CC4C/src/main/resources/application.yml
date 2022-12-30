@@ -19,9 +19,6 @@ spring:
       #文件传输的大小上限
       max-file-size: 100MB
       max-request-size: 1000MB
-  web:
-    resources:
-      static-locations: classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/,file:${cc4c.upload-path}
 server:
   #项目启动的端口号，可以自己设定，但请与前端设置的不同
   port: 4080
@@ -29,25 +26,11 @@ server:
 #自定义配置属性
 cc4c:
   #存储博客图片的路径
-  save-img-path: G:\Code Download\myVue\public\blogImg\
+  save-img-path: G:\Code Programming\Vue3\CC4C\public\blogImg\
   #返回的请求访问博客图片的路径
   request-img-path: http://localhost:5173/blogImg/
   #头像存储路径
-  upload-path: D:/Homework-upgrade/java
+  save-avatar-path: G:\Code Programming\Vue3\CC4C\public\avatar\
+  #返回的请求访问头像图片的路径
+  request-avatar-path: http://localhost:5173/avatar/
 
-############## Sa-Token 配置 (文档: https://sa-token.cc) ##############
-sa-token:
-  # token名称 (同时也是cookie名称)
-  # token-name: satoken
-  # token有效期，单位s 默认30天, -1代表永不过期
-  timeout: 2592000
-  # token临时有效期 (指定时间内无操作就视为token过期) 单位: 秒
-  # activity-timeout: -1
-  # 是否允许同一账号并发登录 (为true时允许一起登录, 为false时新登录挤掉旧登录)
-  is-concurrent: true
-  # 在多人登录同一账号时，是否共用一个token (为true时所有登录共用一个token, 为false时每次登录新建一个token)
-  is-share: true
-  # token风格
-  token-style: uuid
-  # 是否输出操作日志
-  is-log: false

@@ -19,17 +19,6 @@ public interface CourseDao extends BaseMapper<Course> {
             "user_favors_course.user_id = #{userId} and user_favors_course.course_id = course.course_id")
     public List<Course> getFavorCourses(Long userId);
 
-    //table course_video
-//    @Insert("insert into course_video (course_name,video_platform,video_link) values (#{courseName},#{platform},#{url})")
-//    public int addCourseVideo(String courseName, String platform, String url);
-//
-//    @Select("select video_platform, video_link from course_video where course_name = #{courseName}")
-//    @Results({@Result(property = "platform", column = "video_platform"),
-//              @Result(property = "url", column = "video_link")})
-//    public List<CourseVideo> getCourseVideosByName(String courseName);
-
-//    @Delete("delete from course_video where course_name = #{courseName}")
-//    public int deleteCourseVideoByName(String courseName);
 
     //table course_module
     @Insert("insert into course_module (language_id,priority,module_name,level) values(#{languageId},#{priority},#{moduleName},#{level})")
@@ -68,6 +57,9 @@ public interface CourseDao extends BaseMapper<Course> {
 
     @Select("select count(*) from user_favors_course where user_id = #{userId} and course_id = #{courseId}")
     public Boolean ifFavor(Long userId, Integer courseId);
+
+    @Select("select count(*) from user_favors_course where course_id = #{courseId}")
+    public Integer countFavor(Integer courseId);
 
     @Delete("delete from user_favors_course where user_id = #{userId} and course_id = #{courseId}")
     public int deleteFavorInfo(Long userId, Integer courseId);

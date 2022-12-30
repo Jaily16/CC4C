@@ -7,8 +7,8 @@ import org.springframework.stereotype.Service;
 public interface AdminService {
   public Result login(String name, String password);
 
-  public Result logout();
-
-
-  public Result kickout(String user_name);
+//  public Result logout();
+//
+//
+//  public Result kickout(String user_name);
 }

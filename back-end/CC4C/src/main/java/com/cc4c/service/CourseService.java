@@ -14,7 +14,7 @@ public interface CourseService {
      * @param course 课程对象
      * @return 用code记录饭返回状态
      */
-    public Code addCourse(Course course);
+    public Result addCourse(Course course);
 
     /**
      * 添加课程模块操作，返回添加课程模块的状态
@@ -87,7 +87,20 @@ public interface CourseService {
      */
     public Result searchCourse(String searchInfo);
 
+    /**
+     * 根据用户的专业推荐课程
+     * @param languageId
+     * @param major
+     * @return
+     */
     public Result recommendCourseToUser(Integer languageId, Integer major);
+
+    /**
+     * 收藏课程，返回是否收藏成功
+     * @param userId
+     * @param courseId
+     * @return
+     */
     public Boolean favorCourse(Long userId, Integer courseId);
 
     /**
@@ -112,5 +125,18 @@ public interface CourseService {
      * @return
      */
     public List<Course> getFavorCourseList(Long userId);
+
+    /**
+     * 根据编程语言获取所有课程列表
+     * @param languageName
+     * @return
+     */
+    public Result getCoursesByLanguage(String languageName);
+
+    /**
+     * 根据收藏数为用户推荐课程
+     * @return
+     */
+    public Result getHomeCourses();
 
 }
