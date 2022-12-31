@@ -4,6 +4,7 @@ import com.cc4c.entity.Code;
 import com.cc4c.entity.Result;
 import com.cc4c.dao.CommentDao;
 import com.cc4c.entity.Comment;
+import com.cc4c.entity.User;
 import com.cc4c.service.CommentService;
 import com.cc4c.service.UserService;
 import com.cc4c.utility.CommentType;
@@ -49,7 +50,7 @@ public class CommentServiceImpl implements CommentService {
     public Result getCourseComments(Integer courseId) {
         List<Comment> courseComments = commentDao.getCourseComments(courseId);
         if(!courseComments.isEmpty()){
-            getUserName(courseComments);
+            getUserInfo(courseComments);
             getIndirectComments(courseComments);
         }
         return new Result(Code.COMMENT_GET_SUCCESS.getCode(), courseComments);
@@ -59,7 +60,7 @@ public class CommentServiceImpl implements CommentService {
     public Result getBlogComments(Long blogId) {
         List<Comment> blogComments = commentDao.getBlogComments(blogId);
         if(!blogComments.isEmpty()){
-            getUserName(blogComments);
+            getUserInfo(blogComments);
             getIndirectComments(blogComments);
         }
         return new Result(Code.COMMENT_GET_SUCCESS.getCode(), blogComments);
@@ -68,22 +69,25 @@ public class CommentServiceImpl implements CommentService {
     public void getIndirectComments(@NotNull List<Comment> commentList){
         for(Comment comment : commentList){
             List<Comment> indirectComments = commentDao.getIndirectComments(comment.getCommentId());
-            getUserName(indirectComments);
+            getUserInfo(indirectComments);
             comment.setSubCommentList(indirectComments);
             for(Comment indirectComment : indirectComments){
                 List<Comment> indirectComments1 = commentDao.getIndirectComments(indirectComment.getCommentId());
-                getUserName(indirectComments1);
+                getUserInfo(indirectComments1);
                 indirectComment.setSubCommentList(indirectComments1);
             }
         }
     }
 
-    public void getUserName(@NotNull List<Comment> commentList){
+    public void getUserInfo(@NotNull List<Comment> commentList){
         for(Comment comment : commentList){
-            comment.setUserName(userService.getUserNameById(comment.getUserId()));
+            User user = userService.getUserById(comment.getUserId());
+            comment.setUserName(user.getName());
+            comment.setUserAvatar(user.getAvatar());
             if(comment.getFatherId() != null){
                 Comment fatherComment = commentDao.getById(comment.getFatherId());
-                comment.setFatherName(userService.getUserNameById(fatherComment.getUserId()));
+                User father = userService.getUserById(fatherComment.getUserId());
+                comment.setFatherName(father.getName());
             }
         }
     }

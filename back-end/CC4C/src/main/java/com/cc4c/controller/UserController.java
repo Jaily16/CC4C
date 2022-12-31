@@ -44,13 +44,11 @@ public class UserController {
             saveAvatarPath,
             Objects.requireNonNull(file.getOriginalFilename()),
             requestAvatarPath);
-    System.out.println(paths);
     return new Result(Code.SUCCESS.getCode(), paths);
   }
 
   @PostMapping("/register")
   public Result register(@RequestBody User user) {
-    System.out.println(user.getName() + " registering ...");
     return userService.register(user);
   }
 
@@ -86,13 +84,11 @@ public class UserController {
 
   @PutMapping("/update")
   public Result update(@RequestBody User user) {
-    System.out.println(user.getName() + " modifying ...");
     return userService.update(user);
   }
 
   @GetMapping("/email/{email}")
   public Result email(@PathVariable("email") String email) {
-    System.out.println(email + " sending ...");
     return emailService.email(email);
   }
 

@@ -83,8 +83,6 @@ public class UserServiceImpl implements UserService {
     }
     user = userDao.selectOne(lambdaQueryWrapper.eq(User::getEmail, email));
     if (!Objects.equals(user.getPassword(), password)) {
-      System.out.println(user);
-      System.out.println(password);
       return new Result(Code.LOGIN_FAIL.getCode(), false, "密码错误!");
     }
     return new Result(Code.SUCCESS.getCode(), true, "登录成功!");
@@ -111,8 +109,8 @@ public class UserServiceImpl implements UserService {
 
 
   @Override
-  public String getUserNameById(Long userId){
-    return userDao.getUserNameById(userId);
+  public User getUserById(Long userId){
+    return userDao.selectById(userId);
   }
 
   @Override

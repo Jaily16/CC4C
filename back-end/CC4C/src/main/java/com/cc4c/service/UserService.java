@@ -17,7 +17,7 @@ public interface UserService {
 
   public Result update(User user);
 
-  public String getUserNameById(Long userId);
+  public User getUserById(Long userId);
 
   public User getUserByEmail(String email);
 }

@@ -38,7 +38,6 @@ public class BlogController {
               saveImgPath,
               Objects.requireNonNull(file.getOriginalFilename()),
               requestImgPath);
-      System.out.println(s);
       json.put("success", "1");
       json.put("message", "success");
       json.put("url", s);

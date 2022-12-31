@@ -6,11 +6,13 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Date;
 import java.util.List;
 
 @Data
+@NoArgsConstructor
 public class Comment {
     @TableId
     @JsonSerialize(using = ToStringSerializer.class)
@@ -32,6 +34,8 @@ public class Comment {
     private Integer layer = 0;
     @TableField(exist = false)
     private String userName;
+    @TableField(exist = false)
+    private String userAvatar;
     @TableField(exist = false)
     private String fatherName;
     @TableField(exist = false)
