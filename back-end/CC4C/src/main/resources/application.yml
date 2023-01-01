@@ -14,6 +14,13 @@ spring:
     host: smtp.qq.com
     password: 'feoykrbhiorycaai'
     username: 1669812103@qq.com
+    default-encoding: UTF-8
+    port: 465
+    properties:
+      mail:
+        smtp:
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
   servlet:
     multipart:
       #文件传输的大小上限

@@ -24,6 +24,6 @@ public class CommentServiceTest {
 
     @Test
     void testGet(){
-        System.out.println(commentService.getBlogComments(1L));
+        System.out.println(commentService.getCourseComments(21));
     }
 }

@@ -9,7 +9,16 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
+//文件工具类
 public class FileUtils {
+    /**
+     * 将博客图片上传并存储
+     * @param file (图片)文件
+     * @param path1 文件存储的绝对路径
+     * @param name 文件名
+     * @param path2 文件请求的url路径
+     * @return 文件存储是否成功，若成功返回图片的url请求路径，用于md编辑器的回显
+     */
     public static String uploadImg(MultipartFile file, String path1, String name, String path2){
         // 通过uuid产生一个图片名字
         String uuid = UUID.randomUUID().toString().trim().replaceAll("-","");
@@ -34,6 +43,14 @@ public class FileUtils {
         return requestPath + imgName;
     }
 
+    /**
+     * 将用户头像上传并存储
+     * @param file (图片)文件
+     * @param path1 文件存储的绝对路径
+     * @param name 文件名
+     * @param path2 文件请求的url路径
+     * @return 文件存储是否成功，若成功返回图片的url请求路径以及绝对路径，用于用户信息的存储以及前端图片的回显
+     */
     public static Map<String, String> uploadAvatar(MultipartFile file, String path1, String name, String path2){
         // 通过uuid产生一个图片名字
         String uuid = UUID.randomUUID().toString().trim().replaceAll("-","");
