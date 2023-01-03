@@ -203,6 +203,9 @@ public class BlogServiceImpl implements BlogService {
 
   @Override
   public Result addBlogDraft(Long userId, String content) {
+    if(blogDao.countDraft(userId)){
+      return new Result(Code.FAIL.getCode(), false, "不能重复保存草稿");
+    }
     blogDao.addDraft(userId,content);
     return new Result(Code.SUCCESS.getCode(), true);
   }

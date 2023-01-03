@@ -16,6 +16,9 @@ public interface BlogDao extends MPJBaseMapper<Blog> {
     @Insert("insert into blog_draft(user_id,content) values(#{userId},#{content})")
     public int addDraft(Long userId, String content);
 
+    @Select("select count(*) from blog_draft where user_id = #{userId}")
+    public Boolean countDraft(Long userId);
+
     @Select("select content from blog_draft where user_id = #{userId}")
     public String getDraft(Long userId);
 
