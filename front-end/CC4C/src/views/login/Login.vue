@@ -4,8 +4,8 @@
             <el-col :span="6" style="margin: 80px 0px 500px 0px; ">
                 <!-- <h1>{{this.$store.state.user.name}}</h1> -->
                 <div style="text-align: center;">
-                    <el-image style="height: 150px; width: 150px; " src="src/assets/logo/Logo_part1.png" />
-                    <el-image style="height: 50px; width: 350px; " src="src/assets/logo/Logo_part3.png" />
+                    <el-image style="height: 150px; width: 150px; " :src="assets.logoPart1" />
+                    <el-image style="height: 50px; width: 350px; " :src="assets.logoPart3" />
                 </div>
                 <div
                     style="background-color: white; padding: 30px 50px 50px 50px; border-radius: 10px;box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)">
@@ -14,7 +14,8 @@
                         placeholder="请输入密码"></el-input>
 
                     <el-row justify="center">
-                        <el-button type="primary" style="width: 100%; font-weight: bolder;" @click="login()">
+                        <el-button type="primary" style="width: 100%; font-weight: bolder;" :loading="loggingIn"
+                            @click="login()">
                             登录
                         </el-button>
                         <el-divider></el-divider>
@@ -68,6 +69,7 @@ import axios from 'axios'
 import { useRouter } from 'vue-router';
 import store from '@/store'
 import { ElMessage } from 'element-plus';
+import { assets } from '@/assets';
 
 axios.defaults.withCredentials = true;//这样全局设置允许
 
@@ -82,48 +84,46 @@ var form = reactive({
     email: '',
     password: ''
 })
-// // 用于接收后台返回的user信息
-var user = reactive({
-
-})
-// 用于接收后台返回的json数据
-var res = ref({
-    code: '',
-    data: '',
-    msg: ''
-});
+const loggingIn = ref(false);
 // 登陆事件
-function login() {
-    axios.post("http://localhost:4080/users/login",
-        {
+async function login() {
+    if (!form.email || !form.password) {
+        ElMessage.warning('请输入邮箱和密码');
+        return;
+    }
+
+    loggingIn.value = true;
+    try {
+        const loginResp = await axios.post("http://localhost:4080/users/login", {
             email: form.email,
             password: form.password
-        }).then((resp) => {
-            res = resp.data;
-            // console.log(res);
-            // 登陆成功
-            if (res.data == true) {
-                // 获取用户信息保存至vuex
-                axios.get("http://localhost:4080/users/info").then((resp) => {
-                    // console.log(resp.data.data);
-                    store.commit("SET_ID", resp.data.data.id);
-                    store.commit("SET_NAME", resp.data.data.name);
-                    store.commit("SET_EMAIL", resp.data.data.email);
-                    store.commit("SET_MAJOR", resp.data.data.major);
-                    store.commit("SET_LANGUAGE", resp.data.data.language);
-                    store.commit("SET_AVATAR", resp.data.data.avatar);
-                    // console.log(store.state.user)
-                })
-                // 跳转到主页
-                router.push({ path: '/home' })
-            }
-            // 登陆失败
-            else {
-                alert(res.msg);
-            }
-        }).catch(function (error) {
-            console.log(error);
         });
+
+        if (loginResp.data.data !== true) {
+            ElMessage.error(loginResp.data.msg || '登录失败');
+            return;
+        }
+
+        // 必须等用户信息写入 Vuex 后再进入业务页面，避免首屏接口使用空用户 ID。
+        const infoResp = await axios.get("http://localhost:4080/users/info");
+        const currentUser = infoResp.data.data;
+        if (!currentUser || !currentUser.id) {
+            ElMessage.error(infoResp.data.msg || '获取用户信息失败');
+            return;
+        }
+        store.commit("SET_ID", currentUser.id);
+        store.commit("SET_NAME", currentUser.name);
+        store.commit("SET_EMAIL", currentUser.email);
+        store.commit("SET_MAJOR", currentUser.major);
+        store.commit("SET_LANGUAGE", currentUser.language);
+        store.commit("SET_AVATAR", currentUser.avatar);
+        await router.push({ path: '/home' });
+    } catch (error) {
+        ElMessage.error('登录服务暂时不可用，请稍后重试');
+        console.error(error);
+    } finally {
+        loggingIn.value = false;
+    }
 }
 
 // 找回密码

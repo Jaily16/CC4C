@@ -3,6 +3,7 @@ package com.cc4c.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,7 @@ public class User {
   @TableField(value = "user_name")
   private String name;
   private String email;
+  @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
   private String password;
   private Integer major;
   private String avatar;
@@ -33,5 +35,6 @@ public class User {
   //value为正常数据的值，delval为删除数据的值
   private Integer deleted;
   @TableField(exist = false)
+  @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
   private String newPassword;
 }

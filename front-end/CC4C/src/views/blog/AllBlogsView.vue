@@ -18,7 +18,7 @@
                     </el-col> -->
                 </el-row>
                 <el-scrollbar height="900px">
-                    <el-row v-for="blog in blogList" @dblclick="flyTo(blog.blogId)"
+                    <el-row v-for="blog in blogList" @click="flyTo(blog.blogId)"
                         style="  border-radius: 5px;background-color: aliceblue;box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);height: 80px; margin:0px 0px 10px 0px;">
 
                         <el-col :span="22">

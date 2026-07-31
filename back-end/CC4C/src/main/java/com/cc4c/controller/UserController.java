@@ -69,6 +69,8 @@ public class UserController {
       Cookie cookie = new Cookie("user_email", user.getEmail());
       // 设置cookie保存时间为两个小时
       cookie.setMaxAge(60 * 60 * 2);
+      cookie.setPath("/");
+      cookie.setHttpOnly(true);
       resp.addCookie(cookie);
     }
     return login;
@@ -77,6 +79,9 @@ public class UserController {
   @GetMapping("/logout")
   private Result logout(HttpServletResponse resp){
     Cookie cookie = new Cookie("user_email", "");
+    cookie.setMaxAge(0);
+    cookie.setPath("/");
+    cookie.setHttpOnly(true);
     resp.addCookie(cookie);
     return new Result(Code.SUCCESS.getCode(), true);
   }
@@ -95,7 +100,7 @@ public class UserController {
 
   @GetMapping("/verify")
   private Result verifyUser(@CookieValue(value = "user_email", defaultValue = "1234567890123") String email){
-    if("1234567890123".equals(email)){
+    if("1234567890123".equals(email) || userService.getUserByEmail(email) == null){
       return new Result(Code.FAIL.getCode(), false, "请先登录");
     }
     return new Result(Code.SUCCESS.getCode(), true);
@@ -104,6 +109,9 @@ public class UserController {
   @GetMapping("/info")
   private Result getUserInfo(@CookieValue(value = "user_email") String email){
     User user = userService.getUserByEmail(email);
+    if (user == null) {
+      return new Result(Code.FAIL.getCode(), false, "User does not exist");
+    }
     return new Result(Code.SUCCESS.getCode(), user);
   }
 

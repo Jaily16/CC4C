@@ -6,7 +6,7 @@
         <div style="margin: 0px 0px 30px 0px">
           <h2>添加课程</h2>
         </div>
-        <el-row gutter="50">
+        <el-row :gutter="50">
           <el-col :span="10">
             <h3>课程标题</h3>
             <el-input v-model="addCourseForm.courseName">
@@ -14,13 +14,13 @@
           </el-col>
           <el-col :span="6">
             <h3>课程难度</h3>
-            <el-select v-model="addModuleForm.level" placeholder="请选择">
+            <el-select v-model="addCourseForm.level" placeholder="请选择">
               <el-option v-for="level in courseLevel" :label="level.label" :value="level.value" />
             </el-select>
           </el-col>
           <el-col :span="8">
             <h3>课程语言模块</h3>
-            <el-cascader v-model="module" :options="modules" />
+            <el-cascader v-model="selectedModule" :options="modules" />
             <el-button type="primary" style="margin: 0px 0px 0px 20px"
               @click="addModuleDialog = true">添加语言模块</el-button>
           </el-col>
@@ -86,10 +86,10 @@ import MdEditor from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import axios from "axios";
 
-import { alertProps, ElMessage, } from "element-plus";
+import { ElMessage } from "element-plus";
 
 // 语言模块
-const module = reactive([]);
+const selectedModule = ref([]);
 const modules = reactive([
   {
     label: 'java',
@@ -189,51 +189,46 @@ var moduleLevel = reactive([
 
 
 
-// 获取 课程模块数据
-for (let n = 0; n < modules.length; n++) {
-  axios.get("http://localhost:4080/courses/module/" + (n + 1)).then((resp) => {
-    for (let i = 0; i < resp.data.data.length; i++) {
-      modules[n].children.push({
-        'label': resp.data.data[i].moduleName,
-        'value': resp.data.data[i].priority,
-        'languageId': resp.data.data[i].languageId,
-      });
-    }
-  });
+async function loadModules() {
+  try {
+    const responses = await Promise.all(
+      modules.map((_, index) => axios.get("http://localhost:4080/courses/module/" + (index + 1)))
+    );
+    responses.forEach((resp, index) => {
+      modules[index].children = (resp.data.data || []).map((courseModule) => ({
+        label: courseModule.moduleName,
+        value: courseModule.priority,
+        languageId: courseModule.languageId,
+      }));
+    });
+  } catch (error) {
+    ElMessage.error('课程模块加载失败，请稍后重试');
+    console.error(error);
+  }
 }
 
+loadModules();
+
 // 增加语言模块
-function addModule() {
-  if (addModuleForm.moduleName == '') {
-    alert('模块名称不能为空')
+async function addModule() {
+  if (!addModuleForm.moduleName.trim()) {
+    ElMessage.warning('模块名称不能为空');
     return;
   }
-  axios.post("http://localhost:4080/courses/module", addModuleForm).then((resp) => {
-    if (resp.data.data == false) {
-      alert(resp.data.msg)
+  try {
+    const resp = await axios.post("http://localhost:4080/courses/module", addModuleForm);
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '课程模块添加失败');
+      return;
     }
-    else {
-      alert('课程模块添加成功')
-      // 获取 课程模块数据
-      for (let n = 0; n < modules.length; n++) {
-        axios.get("http://localhost:4080/courses/module/" + (n + 1)).then((resp) => {
-          for (let i = 0; i < resp.data.data.length; i++) {
-            modules[n].children.push({
-              'label': resp.data.data[i].moduleName,
-              'value': resp.data.data[i].priority,
-              'languageId': resp.data.data[i].languageId,
-            });
-          }
-        });
-      }
-
-    }
-
-
-    // 关闭对话框
+    await loadModules();
     addModuleDialog.value = false;
-  });
-
+    addModuleForm.moduleName = '';
+    ElMessage.success('课程模块添加成功');
+  } catch (error) {
+    ElMessage.error('课程模块添加失败，请稍后重试');
+    console.error(error);
+  }
 }
 
 
@@ -267,17 +262,39 @@ function langMap(langName) {
 }
 
 // 添加课程
-function addCourse() {
-  // console.log(langMap(this.module[0]))
-  this.addCourseForm.languageName = this.module[0];
-  this.addCourseForm.languageId = langMap(this.module[0]);
-  this.addCourseForm.priority = this.module[1];
+async function addCourse() {
+  if (!addCourseForm.courseName.trim()) {
+    ElMessage.warning('课程标题不能为空');
+    return;
+  }
+  if (selectedModule.value.length !== 2) {
+    ElMessage.warning('请选择课程语言模块');
+    return;
+  }
+  if (!addCourseForm.description.trim()) {
+    ElMessage.warning('课程内容不能为空');
+    return;
+  }
 
-  console.log(addCourseForm)
+  addCourseForm.languageName = selectedModule.value[0];
+  addCourseForm.languageId = langMap(selectedModule.value[0]);
+  addCourseForm.priority = selectedModule.value[1];
 
-  axios.post("http://localhost:4080/courses/add", addCourseForm).then((resp) => {
-    ElMessage({ type: 'success', message: "课程发布成功" });
-  });
+  try {
+    const resp = await axios.post("http://localhost:4080/courses/add", addCourseForm);
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '课程发布失败');
+      return;
+    }
+    ElMessage.success(resp.data.msg || '课程发布成功');
+    addCourseForm.courseName = '';
+    addCourseForm.description = '';
+    addCourseForm.level = 0;
+    selectedModule.value = [];
+  } catch (error) {
+    ElMessage.error('课程发布失败，请稍后重试');
+    console.error(error);
+  }
 }
 
 
@@ -331,9 +348,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
   // });
 
 </script>
-  
+
 <style scoped>
 
 </style>
-  
-  

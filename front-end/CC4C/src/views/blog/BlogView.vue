@@ -9,7 +9,7 @@
           <h2>浏览博客</h2>
         </div>
         <el-scrollbar height="900px">
-          <el-row v-for="blog in blogList" @dblclick="flyTo(blog.blogId)"
+          <el-row v-for="blog in blogList" @click="flyTo(blog.blogId)"
             style="border-radius: 5px;background-color: aliceblue;box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);height: 80px; margin:0px 0px 10px 0px;">
 
             <el-col :span="22">
@@ -56,7 +56,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/users/verify").then((resp) => {
   if (resp.data.data == false) {
     alert(resp.data.msg);
-    window.location.href = "http://localhost:5173/login";
+    window.location.href = "/login";
     return;
   }
 });

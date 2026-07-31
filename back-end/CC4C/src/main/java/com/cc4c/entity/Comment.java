@@ -20,6 +20,7 @@ public class Comment {
     private Long userId;
     private String content;
     private Date time;
+    @TableField(value = "`like`")
     private Integer like;
     @TableLogic(value="0",delval="1")
     //value为正常数据的值，delval为删除数据的值

@@ -6,7 +6,7 @@
         <div style="margin: 0px 0px 30px 0px">
           <h2>撰写博客</h2>
         </div>
-        <el-row gutter="50">
+        <el-row :gutter="50">
           <el-col :span="18">
             <h3>文章标题</h3>
             <el-input v-model="title">
@@ -15,10 +15,10 @@
           <el-col :span="6">
             <h3>文章语言</h3>
             <el-checkbox-group v-model="langList">
-              <el-checkbox label="1">java</el-checkbox>
-              <el-checkbox label="4">c</el-checkbox>
-              <el-checkbox label="2">c++</el-checkbox>
-              <el-checkbox label="3">python</el-checkbox>
+              <el-checkbox :label="1">java</el-checkbox>
+              <el-checkbox :label="4">c</el-checkbox>
+              <el-checkbox :label="2">c++</el-checkbox>
+              <el-checkbox :label="3">python</el-checkbox>
             </el-checkbox-group>
           </el-col>
         </el-row>
@@ -55,7 +55,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/users/verify").then((resp) => {
   if (resp.data.data == false) {
     alert(resp.data.msg);
-    window.location.href = "http://localhost:5173/login";
+    window.location.href = "/login";
     return;
   }
 });
@@ -70,7 +70,7 @@ var langList = ref([]);
 var text = ref('');
 
 // 发布文章
-function publish() {
+async function publish() {
   if (title.value == '') {
     ElMessage({ type: 'warning', message: "文章标题不能为空" });
   }
@@ -81,33 +81,48 @@ function publish() {
     ElMessage({ type: 'warning', message: "文章内容不能为空" });
   }
   else {
-    axios.post("http://localhost:4080/blogs/submit", {
-      writerId: store.state.user.id,
-      title: title.value,
-      languageList: langList.value,
-      content: text.value
-    }).then((resp) => {
-      // ElMessage({ type: 'success', message: "成功发布" });
-      alert('成功发布');
-      window.location.reload();
-
-    });
+    try {
+      const resp = await axios.post("http://localhost:4080/blogs/submit", {
+        writerId: store.state.user.id,
+        title: title.value.trim(),
+        languageList: langList.value,
+        content: text.value
+      });
+      if (!resp.data.data) {
+        ElMessage.error(resp.data.msg || '博客发布失败');
+        return;
+      }
+      ElMessage.success('博客已提交，等待管理员审核');
+      title.value = '';
+      langList.value = [];
+      text.value = '';
+    } catch (error) {
+      ElMessage.error('博客发布失败，请稍后重试');
+      console.error(error);
+    }
   }
 }
 
 // 保存草稿
-function draft() {
+async function draft() {
   if (text.value == '') {
     ElMessage({ type: 'warning', message: "文章内容不能为空" });
   }
   else {
-    axios.post("http://localhost:4080/blogs/draft", {
-      userId: store.state.user.id,
-      content: text.value
-    }).then((resp) => {
-      ElMessage({ type: 'success', message: "成功保存至草稿箱" });
-
-    });
+    try {
+      const resp = await axios.post("http://localhost:4080/blogs/draft", {
+        userId: store.state.user.id,
+        content: text.value
+      });
+      if (resp.data.data !== true) {
+        ElMessage.error(resp.data.msg || '草稿保存失败');
+        return;
+      }
+      ElMessage.success('成功保存至草稿箱');
+    } catch (error) {
+      ElMessage.error('草稿保存失败，请稍后重试');
+      console.error(error);
+    }
   }
 }
 

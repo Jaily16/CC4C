@@ -1,2 +1,12 @@
 
 .vscode/extensions.json
+
+# Front-end dependencies and build output
+/front-end/CC4C/node_modules/
+/front-end/CC4C/dist/
+
+# Back-end build and functional-test output
+/back-end/CC4C/target/
+
+# Local scratch files
+/temp/

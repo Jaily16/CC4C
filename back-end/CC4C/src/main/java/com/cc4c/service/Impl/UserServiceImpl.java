@@ -30,19 +30,18 @@ public class UserServiceImpl implements UserService {
 
   @Override
   public Result register(User user) {
-    LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getName, user.getName());
-    if (userDao.exists(lambdaQueryWrapper)) {
+    LambdaQueryWrapper<User> nameQuery = new LambdaQueryWrapper<User>().eq(User::getName, user.getName());
+    if (userDao.exists(nameQuery)) {
       return new Result(Code.REGISTER_FAIL.getCode(), false, "用户名重复");
     }
-    lambdaQueryWrapper.eq(User::getEmail, user.getEmail());
-    if (userDao.exists(lambdaQueryWrapper)) {
+    LambdaQueryWrapper<User> emailQuery = new LambdaQueryWrapper<User>().eq(User::getEmail, user.getEmail());
+    if (userDao.exists(emailQuery)) {
       return new Result(Code.REGISTER_FAIL.getCode(), false, "该邮箱已经被注册");
     }
     user.setTime(new Date());
     try {
       userDao.insert(user);
     } catch (Exception e) {
-      e.printStackTrace();
       return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), false, "Violate Foreign Key Constraints!");
     }
     return new Result(Code.SUCCESS.getCode(), true, "注册成功");
@@ -66,6 +65,9 @@ public class UserServiceImpl implements UserService {
   @Override
   public Result changePassword(User user) {
     User u = userDao.selectById(user.getId());
+    if (u == null) {
+      return new Result(Code.FAIL.getCode(), false, "User does not exist");
+    }
     if(!Objects.equals(user.getPassword(), u.getPassword())){
       return new Result(Code.FAIL.getCode(), false, "原密码输入错误");
     }
@@ -93,6 +95,9 @@ public class UserServiceImpl implements UserService {
   public Result update(User user) {
     try {
       User u = userDao.selectById(user.getId());
+      if (u == null) {
+        return new Result(Code.FAIL.getCode(), false, "User does not exist");
+      }
       if(!Objects.equals(user.getName(), u.getName())){
         LambdaQueryWrapper<User> lambdaQueryWrapper = new LambdaQueryWrapper<User>().eq(User::getName, user.getName());
         if (userDao.exists(lambdaQueryWrapper)) {
@@ -101,7 +106,6 @@ public class UserServiceImpl implements UserService {
       }
       userDao.updateById(user);
     } catch (Exception e) {
-      e.printStackTrace();
       return new Result(Code.FOREIGN_KEY_CONSTRAINT_VIOLATION.getCode(), false, "修改信息异常");
     }
     return new Result(Code.SUCCESS.getCode(), true, "修改用户信息成功");

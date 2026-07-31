@@ -29,7 +29,8 @@ public interface BlogDao extends MPJBaseMapper<Blog> {
     public Boolean ifCollect(Long userId, Long blogId);
 
     @Select("select blog.* from blog,user_collects_blog where " +
-            "user_collects_blog.user_id = #{userId} and user_collects_blog.blog_id = blog.blog_id")
+            "user_collects_blog.user_id = #{userId} and user_collects_blog.blog_id = blog.blog_id " +
+            "and blog.deleted = 0")
     public List<Blog> getCollectBlogs(Long userId);
 
 }

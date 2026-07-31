@@ -13,4 +13,6 @@ public interface AdminService {
    */
   public Result login(String name, String password);
 
+  boolean exists(String adminId);
+
 }

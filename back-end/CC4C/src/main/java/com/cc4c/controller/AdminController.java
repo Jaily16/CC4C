@@ -24,6 +24,8 @@ public class AdminController {
             Cookie cookie = new Cookie("admin", admin.getAdminId());
             // 设置cookie保存时间为1个小时
             cookie.setMaxAge(60 * 60);
+            cookie.setPath("/");
+            cookie.setHttpOnly(true);
             resp.addCookie(cookie);
         }
         return result;
@@ -32,13 +34,16 @@ public class AdminController {
     @GetMapping("/logout")
     private Result logout(HttpServletResponse resp){
         Cookie cookie = new Cookie("admin", "");
+        cookie.setMaxAge(0);
+        cookie.setPath("/");
+        cookie.setHttpOnly(true);
         resp.addCookie(cookie);
         return new Result(Code.SUCCESS.getCode(), true);
     }
 
     @GetMapping("/verify")
     private Result verifyAdmin(@CookieValue(value = "admin", defaultValue = "38219038928391") String adminId){
-        if("38219038928391".equals(adminId)){
+        if("38219038928391".equals(adminId) || !adminService.exists(adminId)){
             return new Result(Code.FAIL.getCode(), false, "请先登录");
         }
         return new Result(Code.SUCCESS.getCode(), true);

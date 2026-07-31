@@ -2,8 +2,8 @@
   <el-row class="nav-top" style="border-bottom: solid 1px lightgray;">
 
     <el-col :span="3" style="background-color: aliceblue">
-      <el-image style="width: 50px; height: 50px; padding: 7px 0px 0px 10px" src="src\assets\logo\Logo_part1.png" />
-      <el-image style="width: 100px; height: 50px; padding: 7px 0px 0px 10px" src="src\assets\logo\Logo_part2.png" />
+      <el-image style="width: 50px; height: 50px; padding: 7px 0px 0px 10px" :src="assets.logoPart1" />
+      <el-image style="width: 100px; height: 50px; padding: 7px 0px 0px 10px" :src="assets.logoPart2" />
     </el-col>
 
 
@@ -29,7 +29,7 @@
       </el-col> -->
 
     <el-col :span="12" style="background-color: aliceblue">
-      <el-image style="width: 400px; height: 50px; padding: 7px 0px 0px 10px" src="src\assets\logo\Logo_part3.png" />
+      <el-image style="width: 400px; height: 50px; padding: 7px 0px 0px 10px" :src="assets.logoPart3" />
     </el-col>
 
     <el-col :span="2" style="background-color: aliceblue; padding:20px 0px 0px 0px; text-align: center;">
@@ -49,28 +49,37 @@
 <script setup>
 import axios from 'axios';
 import store from '@/store'
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { assets } from '@/assets';
 import {
   SwitchButton,
   Position
 } from "@element-plus/icons-vue"
 
+const router = useRouter();
+
 // 登出
-function logout() {
-  axios.get('http://localhost:4080/users/logout').then((resp) => {
-    if (resp.data.data == true) {
-      alert('退出登录！')
+async function logout() {
+  try {
+    const resp = await axios.get('http://localhost:4080/users/logout');
+    if (resp.data.data === true) {
       store.commit('RESET_STATE');
-      window.location.href = "http://localhost:5173/home";
+      ElMessage.success('已退出登录');
+      await router.push('/login');
     }
     else {
-      alert('退出登录失败！')
+      ElMessage.error(resp.data.msg || '退出登录失败');
     }
-  })
+  } catch (error) {
+    ElMessage.error('退出登录失败，请稍后重试');
+    console.error(error);
+  }
 }
 
 // 跳转至登陆
 function flyToLogin() {
-  window.location.href = 'http://localhost:5173/login'
+  router.push('/login');
 }
 
 </script>

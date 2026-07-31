@@ -9,6 +9,7 @@ import com.cc4c.utility.BlogState;
 import com.cc4c.utility.OrderType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,12 +28,17 @@ public class BlogServiceImpl implements BlogService {
   @Autowired
   private BlogInvolvesLanguageDao blogInvolvesLanguageDao;
 
+  @Autowired
+  private UserDao userDao;
 
+  @Autowired
+  private ProgrammingLanguageDao programmingLanguageDao;
 
   @Override
   public Result userCollectsBlog(Long userId, Long blogId) {
     Blog blog = blogDao.selectById(blogId);
-    if(!Objects.equals(blog.getState(), BlogState.VERIFIED.getState())){
+    if (blog == null || userDao.selectById(userId) == null
+            || !Objects.equals(blog.getState(), BlogState.VERIFIED.getState())) {
       return new Result(Code.FAIL.getCode(), false, "您不能收藏尚未发布的博客");
     }
     LambdaQueryWrapper<UserCollectsBlog> lambdaQueryWrapper = new LambdaQueryWrapper<UserCollectsBlog>()
@@ -60,7 +66,18 @@ public class BlogServiceImpl implements BlogService {
   }
 
   @Override
+  @Transactional
   public Result userSubmitsBlog(Blog blog) {
+    if (blog == null || blog.getWriterId() == null || userDao.selectById(blog.getWriterId()) == null) {
+      return new Result(Code.FAIL.getCode(), false, "Blog writer does not exist");
+    }
+    Set<Integer> languageIds = new LinkedHashSet<>(
+        blog.getLanguageList() == null ? Collections.emptyList() : blog.getLanguageList());
+    if (languageIds.contains(null)
+        || (!languageIds.isEmpty()
+        && programmingLanguageDao.selectBatchIds(languageIds).size() != languageIds.size())) {
+      return new Result(Code.FAIL.getCode(), false, "Blog language does not exist");
+    }
     //先将博客内容存入数据库
     blog.setPublishTime(new Date());
     if(blogDao.insert(blog) <= 0){
@@ -68,9 +85,10 @@ public class BlogServiceImpl implements BlogService {
     }
     Long blogId = blog.getBlogId();
     Long userId = blog.getWriterId();
-    List<Integer> languageList = blog.getLanguageList();
-    for(Integer languageId : languageList){
-      involvesLanguage(blogId, languageId);
+    for(Integer languageId : languageIds){
+      if (blogInvolvesLanguageDao.insert(new BlogInvolvesLanguage(blogId, languageId)) <= 0) {
+        throw new IllegalStateException("Unable to associate blog language");
+      }
     }
     LambdaQueryWrapper<UserSubmitsBlog> lambdaQueryWrapper = new LambdaQueryWrapper<UserSubmitsBlog>()
         .eq(UserSubmitsBlog::getUserId, userId)
@@ -78,7 +96,9 @@ public class BlogServiceImpl implements BlogService {
     if (userSubmitsBlogDao.selectOne(lambdaQueryWrapper) != null) {
       return new Result(Code.FAIL.getCode(), 0, "博客添加失败");
     }
-    userSubmitsBlogDao.insert(new UserSubmitsBlog(userId, blogId, new Date()));
+    if (userSubmitsBlogDao.insert(new UserSubmitsBlog(userId, blogId, new Date())) <= 0) {
+      throw new IllegalStateException("Unable to associate blog writer");
+    }
     return new Result(Code.SUCCESS.getCode(), 1);
   }
 
@@ -88,6 +108,9 @@ public class BlogServiceImpl implements BlogService {
             .eq(UserSubmitsBlog::getUserId, userId);
 
     List<UserSubmitsBlog> blogList = userSubmitsBlogDao.selectList(lambdaQueryWrapper);
+    if (blogList.isEmpty()) {
+      return new Result(Code.SUCCESS.getCode(), Collections.emptyList());
+    }
     List<Long> idList = blogList.stream().map(UserSubmitsBlog::getBlogId).toList();
     List<Blog> list = blogDao.selectBatchIds(idList);
     //将博客按照时间顺序排序
@@ -189,6 +212,9 @@ public class BlogServiceImpl implements BlogService {
     LambdaQueryWrapper<BlogInvolvesLanguage> lambdaQueryWrapper = new LambdaQueryWrapper<BlogInvolvesLanguage>()
         .eq(BlogInvolvesLanguage::getLanguageId, languageId);
     List<BlogInvolvesLanguage> blogList = blogInvolvesLanguageDao.selectList(lambdaQueryWrapper);
+    if (blogList.isEmpty()) {
+      return new Result(Code.SUCCESS.getCode(), Collections.emptyList(), "Blog List By Language Get!");
+    }
     List<Long> idList = blogList.stream().map(BlogInvolvesLanguage::getBlogId).toList();
     List<Blog> list = blogDao.selectBatchIds(idList);
     List<Blog> showList = new ArrayList<>();
@@ -203,6 +229,9 @@ public class BlogServiceImpl implements BlogService {
 
   @Override
   public Result addBlogDraft(Long userId, String content) {
+    if (userDao.selectById(userId) == null) {
+      return new Result(Code.FAIL.getCode(), false, "User does not exist");
+    }
     if(blogDao.countDraft(userId)){
       return new Result(Code.FAIL.getCode(), false, "不能重复保存草稿");
     }
@@ -241,6 +270,9 @@ public class BlogServiceImpl implements BlogService {
   @Override
   public Result clickBlog(Long blogId) {
     Blog blog = blogDao.selectById(blogId);
+    if (blog == null) {
+      return new Result(Code.FAIL.getCode(), false, "Blog does not exist");
+    }
     blog.setClick(blog.getClick() + 1);
     blogDao.updateById(blog);
     return new Result(Code.SUCCESS.getCode(), true);

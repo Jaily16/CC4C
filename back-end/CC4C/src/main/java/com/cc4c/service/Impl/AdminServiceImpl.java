@@ -32,4 +32,9 @@ public class AdminServiceImpl implements AdminService {
     return new Result(Code.SUCCESS.getCode(), 1, "管理员登录成功");
   }
 
+  @Override
+  public boolean exists(String adminId) {
+    return adminId != null && adminDao.selectById(adminId) != null;
+  }
+
 }

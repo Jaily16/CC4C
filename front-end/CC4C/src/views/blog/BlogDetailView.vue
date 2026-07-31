@@ -37,16 +37,16 @@
               </el-button> -->
 
             <el-button style="height: 50px; width:50px" @click="starBlog()"  v-show="this.$store.state.user.id != ''">
-              <el-image v-show='isFavor != true' src="src\assets\button\Star.png"
+              <el-image v-show='isFavor != true' :src="assets.actions.star"
                 style="height: 30px; width:30px"></el-image>
-              <el-image v-show='isFavor == true' src="src\assets\button\StarFilled.png"
+              <el-image v-show='isFavor == true' :src="assets.actions.starFilled"
                 style="height: 30px; width:30px"></el-image>
             </el-button>
 
             <el-button style="height: 50px; width:50px" @click="isCommentOpen = !isCommentOpen" v-show="blogData.state == 1">
-              <el-image v-show='isCommentOpen != true' src="src\assets\button\Comment.png"
+              <el-image v-show='isCommentOpen != true' :src="assets.actions.comment"
                 style="height: 30px; width:30px"></el-image>
-              <el-image v-show='isCommentOpen == true' src="src\assets\button\CommentFilled.png"
+              <el-image v-show='isCommentOpen == true' :src="assets.actions.commentFilled"
                 style="height: 30px; width:30px"></el-image>
             </el-button>
 
@@ -68,7 +68,7 @@
             <el-col :span="22">
               <el-row style=" padding: 0px 30px 0px 30px;">
                 <el-input :rows="10" type="textarea" v-model="commentText" maxlength="1000" show-word-limit
-                  resize="none">
+                  resize="none" placeholder="发表评论">
                 </el-input>
                 <el-button size="small" style="background-color: rgb(252,85,49); color:white; margin: 5px 0px 0px 0px;"
                   @click="comment()">
@@ -82,7 +82,7 @@
           <el-row v-for="(comment, key) in commentList"
             style="margin:10px 0px 0px 0px; padding:10px 10px 10px 10px;border-radius: 10px; background-color:antiquewhite;">
             <el-col :span="2">
-              <el-image src="src\assets\kun.png" style="height: 10px width: 10px; border-radius:50%">
+              <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
               </el-image>
             </el-col>
             <el-col :span="18" style="padding: 0px 0px 0px 20px;">
@@ -105,7 +105,7 @@
               <el-row v-for="subcomment in comment.subCommentList"
                 style="margin:0px 0px 0px 0px; padding:10px 0px 0px 0px;border-radius: 10px; background-color:antiquewhite; ">
                 <el-col :span="2">
-                  <el-image src="src\assets\kun.png" style="height: 10px width: 10px; border-radius:50%">
+                  <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
                   </el-image>
                 </el-col>
                 <el-col :span="22" style="padding: 0px 0px 0px 20px;">
@@ -142,6 +142,7 @@ import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import axios from "axios";
 import store from '@/store'
+import { assets } from '@/assets';
 
 
 axios.defaults.withCredentials = true;//这样全局设置允许
@@ -158,72 +159,62 @@ const scrollElement = document.documentElement;
 
 // 获取 博客数据 博客收藏状态 评论区
 const route = useRoute();
-var commentList = reactive([]);
-axios.get("http://localhost:4080/blogs/" + route.query.blogId).then((resp) => {
-  blogData = resp.data.data;
-  // console.log(blogData)
-  text.value = blogData.content;
-  axios.get("http://localhost:4080/blogs/ifCollect/" + store.state.user.id + '/' + blogData.blogId).then((resp) => {
-    isFavor.value = resp.data.data;
-  })
-  axios.get("http://localhost:4080/comments/blog/" + blogData.blogId).then((resp) => {
-    commentList = resp.data.data;
-    console.log(commentList)
-
-  });
-})
-
-
+const commentList = ref([]);
 // 保存博客数据
-var blogData = reactive({});
+const blogData = ref({});
 
 // 是否收藏
 const isFavor = ref(false);
 // 收藏博客
-function starBlog() {
-  if (this.isFavor != true) {
-    axios.get("http://localhost:4080/blogs/collect/" + store.state.user.id + '/' + blogData.blogId).then((resp) => {
-      if (resp.data.data == true) {
-        ElMessage({
-          message: '收藏成功',
-          type: 'success',
-        })
-        this.isFavor = true;
-      }
-      else {
-        ElMessage({
-          message: '收藏失败',
-          type: 'danger',
-        })
-      }
-    });
+async function starBlog() {
+  if (!blogData.value.blogId) {
+    ElMessage.warning('博客尚未加载完成');
+    return;
   }
-  else {
-    axios.delete("http://localhost:4080/blogs/collect/" + store.state.user.id + '/' + blogData.blogId).then((resp) => {
-    });
-    ElMessage({
-      message: '取消收藏',
-      type: 'success',
-    })
-    this.isFavor = false;
+  try {
+    const resp = isFavor.value
+      ? await axios.delete("http://localhost:4080/blogs/collect/" + store.state.user.id + '/' + blogData.value.blogId)
+      : await axios.get("http://localhost:4080/blogs/collect/" + store.state.user.id + '/' + blogData.value.blogId);
+    if (!resp.data.data) {
+      ElMessage.error(resp.data.msg || '收藏操作失败');
+      return;
+    }
+    isFavor.value = !isFavor.value;
+    ElMessage.success(isFavor.value ? '收藏成功' : '取消收藏成功');
+  } catch (error) {
+    ElMessage.error('收藏操作失败，请稍后重试');
+    console.error(error);
   }
 }
 
 // 评论
-const commentText = ref('发表评论');
+const commentText = ref('');
 const isCommentOpen = ref(false);
-function comment() {
-  axios.post('http://localhost:4080/comments/blog', {
-    userId: store.state.user.id,
-    content: commentText.value,
-    blogId: this.blogData.blogId,
-  }).then((resp) => {
-    alert('评论成功')
-    window.location.reload();
-  })
+async function comment() {
+  if (!commentText.value.trim()) {
+    ElMessage.warning('评论内容不能为空');
+    return;
+  }
+  try {
+    const resp = await axios.post('http://localhost:4080/comments/blog', {
+      userId: store.state.user.id,
+      content: commentText.value.trim(),
+      blogId: blogData.value.blogId,
+    });
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '评论失败');
+      return;
+    }
+    commentText.value = '';
+    await loadComments();
+    ElMessage.success('评论成功');
+  } catch (error) {
+    ElMessage.error('评论失败，请稍后重试');
+    console.error(error);
+  }
 }
 // 回复
-const replyText = ref('发表回复');
+const replyText = ref('');
 const isReplyOpen = ref(-1);
 function replyOpen(key) {
   if (isReplyOpen.value == -1) {
@@ -234,16 +225,72 @@ function replyOpen(key) {
     isReplyOpen.value = -1;
   }
 }
-function reply(fatherId) {
-  axios.post('http://localhost:4080/comments/indirect', {
-    userId: store.state.user.id,
-    content: replyText.value,
-    fatherId: fatherId
-  }).then((resp) => {
-    alert('回复成功')
-    window.location.reload();
-  })
+async function reply(fatherId) {
+  if (!replyText.value.trim()) {
+    ElMessage.warning('回复内容不能为空');
+    return;
+  }
+  try {
+    const resp = await axios.post('http://localhost:4080/comments/indirect', {
+      userId: store.state.user.id,
+      content: replyText.value.trim(),
+      fatherId: fatherId
+    });
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '回复失败');
+      return;
+    }
+    replyText.value = '';
+    isReplyOpen.value = -1;
+    await loadComments();
+    ElMessage.success('回复成功');
+  } catch (error) {
+    ElMessage.error('回复失败，请稍后重试');
+    console.error(error);
+  }
 }
+
+async function loadComments() {
+  if (!blogData.value.blogId) {
+    commentList.value = [];
+    return;
+  }
+  const resp = await axios.get("http://localhost:4080/comments/blog/" + blogData.value.blogId);
+  commentList.value = resp.data.data || [];
+}
+
+async function loadBlog() {
+  const blogId = String(route.query.blogId || '');
+  if (!blogId) {
+    ElMessage.error('缺少博客 ID');
+    return;
+  }
+  try {
+    const resp = await axios.get("http://localhost:4080/blogs/" + encodeURIComponent(blogId));
+    if (!resp.data.data || !resp.data.data.blogId) {
+      ElMessage.error(resp.data.msg || '博客加载失败');
+      return;
+    }
+    blogData.value = resp.data.data;
+    text.value = blogData.value.content || '';
+
+    const requests = [loadComments()];
+    if (store.state.user.id) {
+      requests.push(
+        axios.get("http://localhost:4080/blogs/ifCollect/" + store.state.user.id + '/' + blogData.value.blogId)
+          .then((favorResp) => {
+            isFavor.value = favorResp.data.data === true;
+          })
+      );
+    }
+    await Promise.all(requests);
+  } catch (error) {
+    ElMessage.error('博客加载失败，请稍后重试');
+    console.error(error);
+  }
+}
+
+loadBlog();
 </script>
 
 <style>

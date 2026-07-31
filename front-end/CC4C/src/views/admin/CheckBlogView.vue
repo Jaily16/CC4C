@@ -49,11 +49,8 @@
 import { ref, reactive } from "vue";
 import MdEditor from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
-import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import axios from "axios";
-
-const route = useRoute();
 
 var text = ref("## 博客内容 \n 请在左侧选择您要审核的博客");
 
@@ -74,36 +71,68 @@ var blogList = ref([
 // 正在审核博客的ID
 var checkedBlogId = ref('')
 
-// 获得所有待审核的博客
-axios.get("http://localhost:4080/blogs/examine").then((resp) => {
+async function loadPendingBlogs() {
+  try {
+    const resp = await axios.get("http://localhost:4080/blogs/examine");
     blogList.value = resp.data.data;
-});
+  } catch (error) {
+    ElMessage.error('待审核博客加载失败，请稍后重试');
+    console.error(error);
+  }
+}
+
+// 获得所有待审核的博客
+loadPendingBlogs();
 
 // 展示正在审核的博客的内容
-function flyTo(row) {
+async function flyTo(row) {
     canOperate.value = true;
-    // console.log(row.blogId)
     checkedBlogId.value = row.blogId;
-    axios.get("http://localhost:4080/blogs/" + checkedBlogId.value).then((resp) => {
+    try {
+        const resp = await axios.get("http://localhost:4080/blogs/" + checkedBlogId.value);
         text.value = resp.data.data.content;
-    });
+    } catch (error) {
+        canOperate.value = false;
+        ElMessage.error('博客内容加载失败，请稍后重试');
+        console.error(error);
+    }
 }
 
 // 审核通过
-function approve() {
-    axios.put("http://localhost:4080/blogs/approve/" + checkedBlogId.value).then((resp) => {
-        alert("审核通过！")
-        window.location.reload();
-    });
+async function approve() {
+    try {
+        const resp = await axios.put("http://localhost:4080/blogs/approve/" + checkedBlogId.value);
+        if (!resp.data.data) {
+            ElMessage.error(resp.data.msg || '审核操作失败');
+            return;
+        }
+        ElMessage.success('审核通过');
+        canOperate.value = false;
+        checkedBlogId.value = '';
+        text.value = "## 博客内容 \n 请在左侧选择您要审核的博客";
+        await loadPendingBlogs();
+    } catch (error) {
+        ElMessage.error('审核操作失败，请稍后重试');
+        console.error(error);
+    }
 }
 // 审核不通过
-function deny() {
-    axios.put("http://localhost:4080/blogs/deny/" + checkedBlogId.value).then((resp) => {
-        alert("审核不通过！")
-        window.location.reload();
-
-    });
-
+async function deny() {
+    try {
+        const resp = await axios.put("http://localhost:4080/blogs/deny/" + checkedBlogId.value);
+        if (!resp.data.data) {
+            ElMessage.error(resp.data.msg || '审核操作失败');
+            return;
+        }
+        ElMessage.success('审核不通过');
+        canOperate.value = false;
+        checkedBlogId.value = '';
+        text.value = "## 博客内容 \n 请在左侧选择您要审核的博客";
+        await loadPendingBlogs();
+    } catch (error) {
+        ElMessage.error('审核操作失败，请稍后重试');
+        console.error(error);
+    }
 }
 
 // 是否能审核

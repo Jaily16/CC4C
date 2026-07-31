@@ -20,7 +20,7 @@
           <el-tabs v-model="activeName" type="card" class="demo-tabs" style="">
             <el-tab-pane label="综合" name="first"> -->
           <el-scrollbar height="700px">
-            <el-row v-for="blog in blogList" @dblclick="flyTo(blog.blogId)"
+            <el-row v-for="blog in blogList" @click="flyTo(blog.blogId)"
               style="height: 80px;margin: 0px 0px 10px 0px;background-color: aliceblue;border-radius: 5px;box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);">
               <el-col :span="21">
                 <el-row style="height: 40px; font-size: 20px; padding-left: 10px; padding-top: 7px; ">
@@ -93,7 +93,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/users/verify").then((resp) => {
   if (resp.data.data == false) {
     alert(resp.data.msg);
-    window.location.href = "http://localhost:5173/login";
+    window.location.href = "/login";
     return;
   }
 });

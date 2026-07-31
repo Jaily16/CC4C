@@ -47,7 +47,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/admin/verify").then((resp) => {
     if (resp.data.data == false) {
         alert(resp.data.msg);
-        window.location.href = "http://localhost:5173/adminlogin";
+        window.location.href = "/adminLogin";
         return;
     }
 });
@@ -62,6 +62,3 @@ a {
     text-decoration: none;
 }
 </style>
-     
-  
-  

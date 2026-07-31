@@ -22,7 +22,8 @@
             <el-col :span="6">
                 <div
                     style="height:80px;background-color: white;padding:5px 0px 0px 10px; margin: 10px 0px 0px 0px ;border: solid 1px rgb(220,223,230); border-top-right-radius: 5px; border-bottom-right-radius: 5px;">
-                    <el-input v-model="searchInfo" :prefix-icon="Search" placeholder="搜索全部课程" :change="search()"
+                    <el-input v-model="searchInfo" :prefix-icon="Search" placeholder="搜索全部课程"
+                        @change="search" @keyup.enter="search"
                         style="padding:20px 20px 0px 20px" />
                 </div>
             </el-col>
@@ -38,18 +39,12 @@
                     <el-row style="padding: 10px 20px 0px 20px;">
 
                         <el-col v-for="Course in allCourses" :span="4" style="padding: 0px 10px 10px 10px;"
-                            @dblclick="flyTo(Course.courseName)">
+                            @click="flyTo(Course.courseName)">
                             <div
                                 style="  border-radius: 5px;background-color: aliceblue;box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);">
                                 <el-row style="padding: 20px 30px 10px 30px; ">
-                                    <el-image v-if="Course.languageName == 'java'" style="width: 200px; height: 100px"
-                                        src="src\assets\LangImg\JavaImg.png" />
-                                    <el-image v-if="Course.languageName == 'c'" style="width: 200px; height: 100px"
-                                        src="src\assets\LangImg\CImg.png" />
-                                    <el-image v-if="Course.languageName == 'c++'" style="width: 200px; height: 100px"
-                                        src="src\assets\LangImg\C++Img.png" />
-                                    <el-image v-if="Course.languageName == 'python'" style="width: 200px; height: 100px"
-                                        src="src\assets\LangImg\PythonImg.png" />
+                                    <el-image :src="assets.languageCards[Course.languageName]"
+                                        style="width: 200px; height: 100px" />
                                 </el-row>
                                 <el-row style="padding: 10px 10px; font-size: 10px;">
                                     {{ Course.courseName }}
@@ -66,11 +61,12 @@
 </template>
   
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref } from 'vue';
 import axios from 'axios';
 import "md-editor-v3/lib/style.css";
 import { Search } from "@element-plus/icons-vue";
 import { useRouter } from 'vue-router';
+import { assets } from '@/assets';
 
 const router = useRouter();
 
@@ -79,19 +75,19 @@ const mainLang = ref('java');
 const langs = [
     {
         name: 'java',
-        icon: 'src/assets/LangImg/JAVA.png'
+        icon: assets.languageIcons.java
     },
     {
         name: 'c++',
-        icon: 'src/assets/LangImg/C++.png'
+        icon: assets.languageIcons['c++']
     }, 
     {
         name: 'python',
-        icon: 'src/assets/LangImg/PYTHON.png'
+        icon: assets.languageIcons.python
     },
     {
         name: 'c',
-        icon: 'src/assets/LangImg/C.png'
+        icon: assets.languageIcons.c
     }, 
 ]
 

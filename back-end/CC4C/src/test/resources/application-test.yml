@@ -1,0 +1,9 @@
+spring:
+  mail:
+    username: test-sender@example.com
+
+cc4c:
+  save-img-path: ${user.dir}/target/functional-files/blog/
+  request-img-path: http://localhost:5173/test-blog/
+  save-avatar-path: ${user.dir}/target/functional-files/avatar/
+  request-avatar-path: http://localhost:5173/test-avatar/

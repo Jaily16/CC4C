@@ -10,7 +10,7 @@
             <el-carousel-item v-for="item in langDisplay">
               <!-- <h3 class="small justify-center" text="2xl">广告位招租</h3> -->
 
-              <el-image :src="item" :fit="fit"></el-image>
+              <el-image :src="item" fit="cover"></el-image>
             </el-carousel-item>
           </el-carousel>
         </div>
@@ -32,14 +32,7 @@
             <el-col v-for="course in courses.slice(0, 6)" :span="4" @click="flyToCourse(course.courseName)">
               <div class="goodCourse">
                 <el-row style="padding: 20px 30px 10px 30px">
-                  <el-image v-if="course.languageName == 'java'" style="width: 200px; height: 100px"
-                    src="src\assets\LangImg\JavaImg.png" />
-                  <el-image v-if="course.languageName == 'c'" style="width: 200px; height: 100px"
-                    src="src\assets\LangImg\CImg.png" />
-                  <el-image v-if="course.languageName == 'c++'" style="width: 200px; height: 100px"
-                    src="src\assets\LangImg\C++Img.png" />
-                  <el-image v-if="course.languageName == 'python'" style="width: 200px; height: 100px"
-                    src="src\assets\LangImg\PythonImg.png" />
+                  <el-image :src="assets.languageCards[course.languageName]" style="width: 200px; height: 100px" />
                 </el-row>
                 <el-row style="padding: 10px 10px; font-size: 10px;height:50px">
                   {{ course.courseName }}
@@ -64,7 +57,7 @@
             </el-col>
           </el-row>
 
-          <el-row class="goodBlog" v-for="blog in blogs.slice(0, 4)" @dblclick="flyToBlog(blog.blogId)"
+          <el-row class="goodBlog" v-for="blog in blogs.slice(0, 4)" @click="flyToBlog(blog.blogId)"
             style="height: 70px; margin: 0px 0px 10px 0px;">
             <el-col :span="20">
               <el-row style="font-size: 15px; padding: 5px 0px 0px 10px">
@@ -90,19 +83,14 @@
   </div>
 </template>
 <script setup>
-import { ref, reactive } from "vue";
+import { ref } from "vue";
 import { useRouter } from 'vue-router';
 import axios from "axios";
+import { assets } from '@/assets';
 
 const router = useRouter();
 
-const langDisplay = [
-  'src/assets/LangImg/Bilibili.jpg',
-  'src/assets/LangImg/Java_Display.jpg',
-  'src/assets/LangImg/C++_Display.jpg',
-  'src/assets/LangImg/Python_Display.jpg',
-  'src/assets/LangImg/C_Display.jpg',
-]
+const langDisplay = assets.languageDisplays;
 
 axios.defaults.withCredentials = true;//这样全局设置允许
 

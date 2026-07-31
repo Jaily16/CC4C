@@ -31,6 +31,9 @@ public interface CommentDao extends BaseMapper<Comment> {
     @Select("select * from comment where comment_id = #{commentId} and deleted = 0")
     public Comment getById(Long commentId);
 
+    @Select("select layer from indirect_comment where comment_id = #{commentId}")
+    public Integer getIndirectLayer(Long commentId);
+
 
     //table course_direct_comment
     @Insert("insert into course_direct_comment(comment_id,course_id) values (#{commentId},#{courseId})")

@@ -19,20 +19,14 @@
           <h2>收藏课程</h2>
 
           <el-scrollbar height="550px">
-            <el-row gutter="20">
+            <el-row :gutter="20">
               <el-col v-for="favoriteCourse in favoriteCourses" :span="8" style="padding: 0px 10px 10px 10px;"
-                @dblclick="flyToCourse(favoriteCourse.courseName)">
+                @click="flyToCourse(favoriteCourse.courseName)">
                 <div
                   style="  border-radius: 5px;background-color: aliceblue;box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);">
                   <el-row style="padding: 20px 30px 10px 30px">
-                    <el-image v-if="favoriteCourse.languageName == 'java'" style="width: 200px; height: 100px"
-                      src="src\assets\LangImg\JavaImg.png" />
-                    <el-image v-if="favoriteCourse.languageName == 'c'" style="width: 200px; height: 100px"
-                      src="src\assets\LangImg\CImg.png" />
-                    <el-image v-if="favoriteCourse.languageName == 'c++'" style="width: 200px; height: 100px"
-                      src="src\assets\LangImg\C++Img.png" />
-                    <el-image v-if="favoriteCourse.languageName == 'python'" style="width: 200px; height: 100px"
-                      src="src\assets\LangImg\PythonImg.png" />
+                    <el-image :src="assets.languageCards[favoriteCourse.languageName]"
+                      style="width: 200px; height: 100px" />
                   </el-row>
                   <el-row style="padding: 10px 10px; font-size: 10px;">
                     {{ favoriteCourse.courseName }}
@@ -50,7 +44,7 @@
           style="height: 650px; margin: 20px 0px 0px 0px; padding: 0px 20px 0px 20px; background-color: white;border-radius: 5px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)">
           <h2>收藏博客</h2>
           <el-scrollbar height="550px">
-            <el-row v-for="favoriteBlog in favoriteBlogs" class="goodBlog" @dblclick="flyToBlog(favoriteBlog.blogId)"
+            <el-row v-for="favoriteBlog in favoriteBlogs" class="goodBlog" @click="flyToBlog(favoriteBlog.blogId)"
               style="height: 70px; margin: 0px 0px 10px 0px;">
               <el-col>
                 <el-row style="
@@ -80,11 +74,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive } from "vue";
+import { ref } from "vue";
 import UserInfo from "../components/UserInfo.vue";
 import axios from "axios";
 import { useRouter } from 'vue-router';
 import store from '@/store'
+import { assets } from '@/assets';
 
 const router = useRouter();
 
@@ -97,7 +92,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/users/verify").then((resp) => {
   if (resp.data.data == false) {
     alert(resp.data.msg);
-    window.location.href = "http://localhost:5173/login";
+    window.location.href = "/login";
     return;
   }
 });

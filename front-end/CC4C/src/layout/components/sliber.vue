@@ -9,7 +9,7 @@
     <div v-if="!isCollapse" style="width: 200px;padding: 10px 0px 0px 0px;">
       <el-row>
         <el-col :span="24" style="text-align: center;">
-          <el-avatar v-if="this.$store.state.user.id == ''" shape="square" :size="100" src="src\assets\kun.png" />
+          <el-avatar v-if="this.$store.state.user.id == ''" shape="square" :size="100" :src="assets.defaultAvatar" />
           <el-avatar v-else shape="square" :size="100" :src="this.$store.state.user.avatar" />
           <p v-if="this.$store.state.user.id == ''">游客</p>
           <p v-else>{{ this.$store.state.user.name }}</p>
@@ -111,17 +111,16 @@
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref } from "vue";
+import { assets } from '@/assets';
 import {
   Notebook,
   HomeFilled,
   StarFilled,
   UserFilled,
-  Histogram,
   Reading,
 } from "@element-plus/icons-vue";
 
-const squareUrl = ref('src/assets/kun.png');
 // 折叠控制
 const isCollapse = ref(false);
 

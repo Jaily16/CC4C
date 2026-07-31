@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc4c.entity.Code;
 import com.cc4c.entity.Result;
 import com.cc4c.dao.CourseDao;
+import com.cc4c.dao.UserDao;
 import com.cc4c.entity.Course;
 import com.cc4c.entity.CourseModule;
 import com.cc4c.entity.ModuleCourse;
@@ -13,7 +14,10 @@ import com.cc4c.utility.ModuleLevel;
 import com.cc4c.utility.UserMajor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -24,14 +28,26 @@ import java.util.stream.Collectors;
 public class CourseServiceImpl implements CourseService {
     @Autowired
     private CourseDao courseDao;
+    @Autowired
+    private UserDao userDao;
 
     //纯course部分相关服务
     @Override
+    @Transactional
     public Result addCourse(Course course) {
         LambdaQueryWrapper<Course> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(Course::getCourseName, course.getCourseName());
         if(courseDao.exists(lambdaQueryWrapper)){
             return new Result(Code.COURSE_NAME_REPEATED.getCode(), false,"课程名重复");
+        }
+        CourseModule targetModule = new CourseModule();
+        targetModule.setLanguageId(course.getLanguageId());
+        targetModule.setPriority(course.getPriority());
+        if (course.getLanguageId() == null
+                || course.getPriority() == null
+                || !Boolean.TRUE.equals(courseDao.countCourseModule(targetModule))) {
+            return new Result(Code.COURSE_ADD_MODULE_COURSE_FAILED.getCode(), false,
+                    "Course module does not exist");
         }
         if(courseDao.insert(course) <= 0){
             return new Result(Code.COURSE_ADD_FAILED.getCode(), false, "课程添加失败");
@@ -41,6 +57,7 @@ public class CourseServiceImpl implements CourseService {
         moduleCourse.setPriority(course.getPriority());
         moduleCourse.setLanguageId(course.getLanguageId());
         if(!addCourseIntoModule(moduleCourse)){
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return new Result(Code.COURSE_ADD_MODULE_COURSE_FAILED.getCode(), false, "将课程添加进入模块失败");
         }
         return new Result(Code.COURSE_ADD_SUCCESS.getCode(), true, "课程添加成功");
@@ -110,7 +127,7 @@ public class CourseServiceImpl implements CourseService {
     public Result getCourseModule(Integer languageId) {
         List<CourseModule> modules = courseDao.getCourseModulesByLId(languageId);
         if(modules == null || modules.isEmpty()){
-            return new Result(Code.COURSE_GET_MODULES_FAILED.getCode(), null, "get modules failed");
+            return new Result(Code.COURSE_GET_MODULES_SUCCESS.getCode(), Collections.emptyList());
         }
         for(CourseModule module : modules){
             List<String> courses = courseDao.getCoursesByModule(module);
@@ -136,7 +153,7 @@ public class CourseServiceImpl implements CourseService {
                           .select(Course.class,info->!info.getColumn().equals("description"));
         List<Course> courses = courseDao.selectList(lambdaQueryWrapper);
         if(courses == null || courses.isEmpty()){
-            return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), null, "no such course");
+            return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), Collections.emptyList(), "no such course");
         }
         return new Result(Code.COURSE_SEARCH_SUCCESS.getCode(), courses);
     }
@@ -168,6 +185,11 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     public Boolean favorCourse(Long userId, Integer courseId) {
+        if (userDao.selectById(userId) == null
+                || courseDao.selectById(courseId) == null
+                || Boolean.TRUE.equals(courseDao.ifFavor(userId, courseId))) {
+            return false;
+        }
         Date date = new Date();
         return courseDao.addFavorInfo(userId, courseId, date) > 0;
     }
@@ -194,7 +216,7 @@ public class CourseServiceImpl implements CourseService {
                 .select(Course.class,info->!info.getColumn().equals("description"));
         List<Course> courses = courseDao.selectList(lambdaQueryWrapper);
         if(courses == null || courses.isEmpty()){
-            return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), null, "no such course");
+            return new Result(Code.COURSE_SEARCH_NO_RESULT.getCode(), Collections.emptyList(), "no such course");
         }
         return new Result(Code.COURSE_SEARCH_SUCCESS.getCode(), courses);
     }

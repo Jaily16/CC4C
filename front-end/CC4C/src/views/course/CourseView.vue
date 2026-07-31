@@ -38,7 +38,7 @@
           style="height:1000px;  background-color: white;border-radius: 5px; border: solid 1px rgb(220,223,230); margin: 0px 10px 0px 20px;">
           <h2 style="padding-left: 20px; ">课程目录</h2>
           <el-menu>
-            <el-sub-menu v-for="(courseModule, key1) in courseModules" :index="key1">
+            <el-sub-menu v-for="(courseModule, key1) in courseModules" :index="String(key1)">
               <template #title>
                 <span>{{ courseModule.moduleName }}</span>
               </template>
@@ -78,16 +78,16 @@
 
 
               <el-button style="height: 50px; width:50px" @click="starCourse()">
-                <el-image v-show='isFavor != true' src="src\assets\button\Star.png"
+                <el-image v-show='isFavor != true' :src="assets.actions.star"
                   style="height: 30px; width:30px"></el-image>
-                <el-image v-show='isFavor == true' src="src\assets\button\StarFilled.png"
+                <el-image v-show='isFavor == true' :src="assets.actions.starFilled"
                   style="height: 30px; width:30px"></el-image>
               </el-button>
 
               <el-button style="height: 50px; width:50px" @click="isCommentOpen = !isCommentOpen">
-                <el-image v-show='isCommentOpen != true' src="src\assets\button\Comment.png"
+                <el-image v-show='isCommentOpen != true' :src="assets.actions.comment"
                   style="height: 30px; width:30px"></el-image>
-                <el-image v-show='isCommentOpen == true' src="src\assets\button\CommentFilled.png"
+                <el-image v-show='isCommentOpen == true' :src="assets.actions.commentFilled"
                   style="height: 30px; width:30px"></el-image>
               </el-button>
 
@@ -111,7 +111,7 @@
             <el-col :span="22">
               <el-row style=" padding: 0px 30px 0px 30px;">
                 <el-input :rows="10" type="textarea" v-model="commentText" maxlength="1000" show-word-limit
-                  resize="none">
+                  resize="none" placeholder="发表评论">
                 </el-input>
                 <el-button size="small" style="background-color: rgb(252,85,49); color:white; margin: 5px 0px 0px 0px;"
                   @click="comment()">
@@ -125,7 +125,7 @@
           <el-row v-for="(comment, key) in commentList"
             style="margin:10px 0px 0px 0px; padding:10px 10px 10px 10px;border-radius: 10px; background-color:antiquewhite;">
             <el-col :span="2">
-              <el-image src="src\assets\kun.png" style="height: 10px width: 10px; border-radius:50%">
+              <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
               </el-image>
             </el-col>
             <el-col :span="18" style="padding: 0px 0px 0px 20px;">
@@ -148,7 +148,7 @@
               <el-row v-for="subcomment in comment.subCommentList"
                 style="margin:0px 0px 0px 0px; padding:10px 0px 0px 0px;border-radius: 10px; background-color:antiquewhite; ">
                 <el-col :span="2">
-                  <el-image src="src\assets\kun.png" style="height: 10px width: 10px; border-radius:50%">
+                  <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
                   </el-image>
                 </el-col>
                 <el-col :span="22" style="padding: 0px 0px 0px 20px;">
@@ -183,6 +183,7 @@ import MdEditor from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { ElMessage } from 'element-plus';
 import store from '@/store';
+import { assets } from '@/assets';
 
 
 // 验证用户的登陆状态
@@ -190,7 +191,7 @@ axios.defaults.withCredentials = true;//这样全局设置允许
 axios.get("http://localhost:4080/users/verify").then((resp) => {
   if (resp.data.data == false) {
     alert(resp.data.msg);
-    window.location.href = "http://localhost:5173/login";
+    window.location.href = "/login";
     return;
   }
 });
@@ -203,22 +204,22 @@ const langs = [
   {
     no: '1',
     name: 'java',
-    icon: 'src/assets/LangImg/JAVA.png'
+    icon: assets.languageIcons.java
   },
   {
     no: '2',
     name: 'c++',
-    icon: 'src/assets/LangImg/C++.png'
+    icon: assets.languageIcons['c++']
   },
   {
     no: '3',
     name: 'python',
-    icon: 'src/assets/LangImg/PYTHON.png'
+    icon: assets.languageIcons.python
   },
   {
     no: '4',
     name: 'c',
-    icon: 'src/assets/LangImg/C.png'
+    icon: assets.languageIcons.c
   }]
 // 选择语言
 function selectLang(lang) {
@@ -240,48 +241,57 @@ const state = reactive({
 
 // 收藏课程
 const canStar = ref(false);
-function starCourse() {
-  if (this.isFavor != true) {
-    axios.get("http://localhost:4080/courses/star/" + store.state.user.id + '/' + this.courseData.courseId).then((resp) => {
-    });
-    ElMessage({
-      message: '收藏成功',
-      type: 'success',
-    })
-    this.isFavor = true;
+async function starCourse() {
+  if (!courseData.value.courseId) {
+    ElMessage.warning('请先选择课程');
+    return;
   }
-  else {
-    axios.delete("http://localhost:4080/courses/deleteFavor/" + store.state.user.id + '/' + this.courseData.courseId).then((resp) => {
-    });
-    ElMessage({
-      message: '取消收藏',
-      type: 'success',
-    })
-    this.isFavor = false;
+  try {
+    const resp = isFavor.value
+      ? await axios.delete("http://localhost:4080/courses/deleteFavor/" + store.state.user.id + '/' + courseData.value.courseId)
+      : await axios.get("http://localhost:4080/courses/star/" + store.state.user.id + '/' + courseData.value.courseId);
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '收藏操作失败');
+      return;
+    }
+    isFavor.value = !isFavor.value;
+    ElMessage.success(isFavor.value ? '收藏成功' : '取消收藏成功');
+  } catch (error) {
+    ElMessage.error('收藏操作失败，请稍后重试');
+    console.error(error);
   }
 }
 
 
 // 评论
-const commentText = ref('发表评论');
+const commentText = ref('');
 const isCommentOpen = ref(false);
-function comment() {
-  axios.post('http://localhost:4080/comments/course', {
-    userId: store.state.user.id,
-    content: commentText.value,
-    courseId: this.courseData.courseId,
-  }).then((resp) => {
-    // alert('评论成功')
-    axios.get("http://localhost:4080/comments/course/" + courseData.courseId).then((resp) => {
-      commentList = resp.data.data;
-      isCommentOpen.value = true;
+async function comment() {
+  if (!commentText.value.trim()) {
+    ElMessage.warning('评论内容不能为空');
+    return;
+  }
+  try {
+    const resp = await axios.post('http://localhost:4080/comments/course', {
+      userId: store.state.user.id,
+      content: commentText.value.trim(),
+      courseId: courseData.value.courseId,
     });
-    isCommentOpen.value = false;
-    // window.location.reload();
-  })
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '评论失败');
+      return;
+    }
+    commentText.value = '';
+    await loadComments();
+    isCommentOpen.value = true;
+    ElMessage.success('评论成功');
+  } catch (error) {
+    ElMessage.error('评论失败，请稍后重试');
+    console.error(error);
+  }
 }
 // 回复
-const replyText = ref('发表回复');
+const replyText = ref('');
 const isReplyOpen = ref(-1);
 function replyOpen(key) {
   if (isReplyOpen.value == -1) {
@@ -291,20 +301,30 @@ function replyOpen(key) {
     isReplyOpen.value = -1;
   }
 }
-function reply(fatherId) {
-  axios.post('http://localhost:4080/comments/indirect', {
-    userId: store.state.user.id,
-    content: replyText.value,
-    fatherId: fatherId
-  }).then((resp) => {
-    // alert('回复成功')
-    axios.get("http://localhost:4080/comments/course/" + courseData.courseId).then((resp) => {
-      commentList = resp.data.data;
-      isCommentOpen.value = true;
+async function reply(fatherId) {
+  if (!replyText.value.trim()) {
+    ElMessage.warning('回复内容不能为空');
+    return;
+  }
+  try {
+    const resp = await axios.post('http://localhost:4080/comments/indirect', {
+      userId: store.state.user.id,
+      content: replyText.value.trim(),
+      fatherId: fatherId
     });
-    isCommentOpen.value = false;
-    // window.location.reload();
-  })
+    if (resp.data.data !== true) {
+      ElMessage.error(resp.data.msg || '回复失败');
+      return;
+    }
+    replyText.value = '';
+    isReplyOpen.value = -1;
+    await loadComments();
+    isCommentOpen.value = true;
+    ElMessage.success('回复成功');
+  } catch (error) {
+    ElMessage.error('回复失败，请稍后重试');
+    console.error(error);
+  }
 }
 
 // 课程模块数据
@@ -315,26 +335,42 @@ axios.get("http://localhost:4080/courses/recommend/" + '1' + '/' + store.state.u
 });
 
 // 用于接收课程信息
-var courseData = reactive({});
+const courseData = ref({});
 // 用户课程收藏状态
-var isFavor = ref(false);
+const isFavor = ref(false);
 // 用于保存评论列表
-var commentList = reactive([]);
+const commentList = ref([]);
+
+async function loadComments() {
+  if (!courseData.value.courseId) {
+    commentList.value = [];
+    return;
+  }
+  const resp = await axios.get("http://localhost:4080/comments/course/" + courseData.value.courseId);
+  commentList.value = resp.data.data || [];
+}
+
 // 获取 课程数据 收藏状态 评论区
-function flyTo(courseName) {
-  this.canStar = true;
-  axios.get("http://localhost:4080/courses/" + courseName).then((resp) => {
-    this.courseData = resp.data.data;
-    this.text = this.courseData.description;
+async function flyTo(courseName) {
+  try {
+    const courseResp = await axios.get("http://localhost:4080/courses/" + encodeURIComponent(courseName));
+    if (!courseResp.data.data || !courseResp.data.data.courseId) {
+      ElMessage.error(courseResp.data.msg || '课程加载失败');
+      return;
+    }
+    courseData.value = courseResp.data.data;
+    text.value = courseData.value.description || '';
+    canStar.value = true;
 
-    axios.get("http://localhost:4080/courses/ifFavor/" + store.state.user.id + '/' + courseData.courseId).then((resp) => {
-      this.isFavor = resp.data.data;
-    });
-
-    axios.get("http://localhost:4080/comments/course/" + courseData.courseId).then((resp) => {
-      commentList = resp.data.data;
-    });
-  });
+    const [favorResp] = await Promise.all([
+      axios.get("http://localhost:4080/courses/ifFavor/" + store.state.user.id + '/' + courseData.value.courseId),
+      loadComments()
+    ]);
+    isFavor.value = favorResp.data.data === true;
+  } catch (error) {
+    ElMessage.error('课程加载失败，请稍后重试');
+    console.error(error);
+  }
 }
 </script>
 

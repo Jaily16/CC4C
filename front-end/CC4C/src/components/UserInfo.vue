@@ -131,6 +131,7 @@ import {
     EditPen,
     Lock
 } from "@element-plus/icons-vue";
+import { ElMessage } from 'element-plus';
 
 // 用户头像
 const circleUrl = ref(store.state.user.avatar)
@@ -157,44 +158,46 @@ var editInfoFormDialog = ref(false);
 var infoForm = reactive({
     id: store.state.user.id,
     name: store.state.user.name,
-    major: store.state.user.name.major,
-    language: store.state.user.name.language,
-    avatar: store.state.user.name.avatar
+    major: Number(store.state.user.major),
+    language: Number(store.state.user.language),
+    avatar: store.state.user.avatar
 })
 // 编辑信息
-function editInfo() {
+async function editInfo() {
+    if (!infoForm.name.trim()) {
+        ElMessage.warning('用户名不能为空');
+        return;
+    }
     if (imageUrl.value != '') {
         infoForm.avatar = imageUrl.value;
     }
-    axios.put('http://localhost:4080/users/update', infoForm).then((resp) => {
-        console.log(resp.data.data)
-
-        // 修改失败
-        if (resp.data.data == false) {
-            alert(resp.data.msg)
-            window.location.reload();
+    try {
+        const updateResp = await axios.put('http://localhost:4080/users/update', infoForm);
+        if (updateResp.data.data !== true) {
+            ElMessage.error(updateResp.data.msg || '用户信息修改失败');
             return;
         }
-        else {
-            alert('用户信息修改成功')
-        }
 
-        // 重新获取用户信息并更新vuex
-        axios.get("http://localhost:4080/users/info").then((resp) => {
-            store.commit("SET_ID", resp.data.data.id);
-            store.commit("SET_NAME", resp.data.data.name);
-            store.commit("SET_EMAIL", resp.data.data.email);
-            store.commit("SET_MAJOR", resp.data.data.major);
-            store.commit("SET_LANGUAGE", resp.data.data.language);
-            store.commit("SET_AVATAR", resp.data.data.avatar);
-
-            window.location.reload();
-        })
-
-        // editInfoFormDialog.value = false;
-        // imageUrl.value = ''
-
-    })
+        const infoResp = await axios.get("http://localhost:4080/users/info");
+        const currentUser = infoResp.data.data;
+        store.commit("SET_ID", currentUser.id);
+        store.commit("SET_NAME", currentUser.name);
+        store.commit("SET_EMAIL", currentUser.email);
+        store.commit("SET_MAJOR", currentUser.major);
+        store.commit("SET_LANGUAGE", currentUser.language);
+        store.commit("SET_AVATAR", currentUser.avatar);
+        circleUrl.value = currentUser.avatar;
+        infoForm.name = currentUser.name;
+        infoForm.major = Number(currentUser.major);
+        infoForm.language = Number(currentUser.language);
+        infoForm.avatar = currentUser.avatar;
+        editInfoFormDialog.value = false;
+        imageUrl.value = '';
+        ElMessage.success('用户信息修改成功');
+    } catch (error) {
+        ElMessage.error('用户信息修改失败，请稍后重试');
+        console.error(error);
+    }
 }
 
 // 修改密码对话框
@@ -206,22 +209,25 @@ var pwdForm = reactive({
     newPassword: ''
 })
 // 修改密码
-function changePwd() {
-    axios.put('http://localhost:4080/users/password/change', pwdForm).then((resp) => {
-        // 修改失败
-        if (resp.data.data == false) {
-            alert(resp.data.msg)
-            // window.location.reload();
+async function changePwd() {
+    if (!pwdForm.password || !pwdForm.newPassword) {
+        ElMessage.warning('原密码和新密码不能为空');
+        return;
+    }
+    try {
+        const resp = await axios.put('http://localhost:4080/users/password/change', pwdForm);
+        if (resp.data.data !== true) {
+            ElMessage.error(resp.data.msg || '密码修改失败');
             return;
         }
-        // 修改成功
-        else {
-            alert('密码修改成功！')
-        }
+        ElMessage.success('密码修改成功');
         changePwdFormDialog.value = false
         pwdForm.password = '';
         pwdForm.newPassword = '';
-    })
+    } catch (error) {
+        ElMessage.error('密码修改失败，请稍后重试');
+        console.error(error);
+    }
 }
 
 
@@ -237,10 +243,10 @@ function uploadAvatar(item) {
     const isJPG = item.file.type == 'image/jpeg' || item.file.type == 'image/png';
     const isLt2M = item.file.size / 1024 / 1024 < 2;
     if (!isJPG) {
-        this.$message.error('上传图片只能是 JPG 或 PNG 格式!');
+        ElMessage.error('上传图片只能是 JPG 或 PNG 格式!');
     }
     if (!isLt2M) {
-        this.$message.error('上传图片大小不能超过 2MB!');
+        ElMessage.error('上传图片大小不能超过 2MB!');
     }
 
     //图片格式大小信息没问题 执行上传图片的方法
@@ -253,9 +259,15 @@ function uploadAvatar(item) {
         mf.append('file', item.file);
 
         axios.post('http://localhost:4080/users/uploadAvatar', mf).then((resp) => {
-            console.log(resp.data.data)
+            if (!resp.data.data || !resp.data.data.requestPath) {
+                ElMessage.error(resp.data.msg || '头像上传失败');
+                return;
+            }
             imageUrl.value = resp.data.data.requestPath;
-        })
+        }).catch((error) => {
+            ElMessage.error('头像上传失败，请稍后重试');
+            console.error(error);
+        });
     }
 }
 

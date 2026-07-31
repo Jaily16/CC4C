@@ -88,7 +88,7 @@ public class BlogController {
 
   @GetMapping("/ifCollect/{uid}/{bid}")
   public Result ifCollect(@PathVariable(value = "uid") Long userId, @PathVariable(value = "bid") Long blogId){
-    return blogService.ifCollect(userId,blogId) ? new Result(Code.FAIL.getCode(), true) : new Result(Code.FAIL.getCode(), false);
+    return new Result(Code.SUCCESS.getCode(), blogService.ifCollect(userId, blogId));
   }
 
   @PutMapping("/approve/{id}")
