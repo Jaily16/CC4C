@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles({"local", "test"})
+@ActiveProfiles("test")
 @Transactional
 abstract class FunctionalTestSupport {
 

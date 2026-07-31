@@ -41,4 +41,3 @@ cc4c:
   save-avatar-path: "${CC4C_SAVE_AVATAR_PATH:D:/codex/CC4C_v2/front-end/CC4C/public/avatar/}"
   #返回的请求访问头像图片的路径
   request-avatar-path: "${CC4C_REQUEST_AVATAR_PATH:http://localhost:5173/avatar/}"
-

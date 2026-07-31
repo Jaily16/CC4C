@@ -7,7 +7,7 @@
 
 # Back-end build and functional-test output
 /back-end/CC4C/target/
-/back-end/CC4C/src/main/resources/application-local.yml
+/back-end/CC4C/src/main/resources/application.yml
 
 # Local scratch files
 /temp/
