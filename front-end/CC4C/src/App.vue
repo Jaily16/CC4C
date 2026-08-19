@@ -1,13 +1,15 @@
-<script setup>
-
-</script>
-
 <template>
-  <div class="app">
+  <div class="app-shell">
     <router-view />
   </div>
 </template>
 
-<style scoped>
+<script setup>
+</script>
 
+<style>
+.app-shell {
+  min-width: 0;
+  min-height: 100vh;
+}
 </style>

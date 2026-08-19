@@ -1,255 +1,265 @@
 <template>
-  <div class="courseDetail">
-    <div class="course" style="background-color:rgb(244,246,248)">
-      <!-- 语言选择 -->
-      <el-row justify="center">
-        <el-col :span="2">
-          <div
-            style="height:80px;background-color: white;padding:5px 0px 0px 0px; margin: 10px 00px 10px 0px;border: solid 1px rgb(220,223,230);border-radius: 5px; ; text-align: center;">
-            <h3>选择语言</h3>
+  <main class="course-browser">
+    <section class="course-browser__content" aria-labelledby="course-browser-title">
+      <header class="page-heading">
+        <p class="page-heading__eyebrow">学习资源</p>
+        <h1 id="course-browser-title">浏览课程</h1>
+        <p>选择语言后，从课程目录中继续你的学习。</p>
+      </header>
+
+      <section class="language-bar" aria-label="课程语言选择">
+        <span class="language-bar__label">选择语言</span>
+        <el-radio-group v-model="mainLang" class="language-picker" @change="selectLang">
+          <el-radio-button v-for="lang in langs" :key="lang.name" :label="lang.name">
+            <span class="language-option">
+              <el-image :src="lang.icon" :alt="lang.name" fit="contain" />
+              <span>{{ lang.name }}</span>
+            </span>
+          </el-radio-button>
+        </el-radio-group>
+      </section>
+
+      <section class="course-workspace">
+        <aside class="course-directory" aria-label="课程目录">
+          <div class="course-directory__heading">
+            <h2>课程目录</h2>
+            <span>{{ mainLang }}</span>
           </div>
-        </el-col>
-        <el-col :span="20">
-          <div
-            style="height:80px;background-color: white;padding:5px 0px 0px 20px; margin: 10px  0px 10px 0px;border: solid 1px rgb(220,223,230);border-radius: 5px; ;">
-            <el-radio-group v-model="mainLang" size="small">
-              <el-radio-button v-for="lang in langs" :label="lang.name" @click="selectLang(lang)">
-                <div style="height: 60px; width: 60px; ">
-                  <el-image :src="lang.icon" />
+          <PageFeedback
+            :loading="modulesLoading"
+            :empty="!modulesLoading && !modulesError && courseModules.length === 0"
+            :error="modulesError"
+            empty-title="当前语言暂无课程"
+            empty-description="请切换语言，或稍后再试。"
+            @retry="loadCourseModules"
+          >
+            <el-collapse accordion>
+              <el-collapse-item
+                v-for="module in courseModules"
+                :key="module.moduleId || module.moduleName"
+                :name="module.moduleId || module.moduleName"
+                :title="module.moduleName"
+              >
+                <div class="course-directory__items">
+                  <button
+                    v-for="courseName in module.courseList || []"
+                    :key="courseName"
+                    type="button"
+                    class="course-directory__item"
+                    :class="{ 'course-directory__item--active': courseData && courseData.courseName === courseName }"
+                    @click="openCourse(courseName)"
+                  >
+                    {{ courseName }}
+                  </button>
                 </div>
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-        </el-col>
-        <!-- <el-col :span="4">
-          <div
-            style="height:80px;background-color: white;padding:5px 0px 0px 10px; margin: 10px 0px 0px 0px ;border: solid 1px rgb(220,223,230);">
-            <el-input v-model="searchInfo" :prefix-icon="Search" placeholder="搜索" style="padding:20px 20px 0px 20px" />
-            <el-button @click="search()">
-              搜索
-            </el-button>
-          </div>
-        </el-col> -->
-      </el-row>
-      <!-- 课程展示 -->
-      <el-row justify="center">
-        <!-- 课程目录 -->
-        <el-col :span="4"
-          style="height:1000px;  background-color: white;border-radius: 5px; border: solid 1px rgb(220,223,230); margin: 0px 10px 0px 20px;">
-          <h2 style="padding-left: 20px; ">课程目录</h2>
-          <el-menu>
-            <el-sub-menu v-for="(courseModule, key1) in courseModules" :index="String(key1)">
-              <template #title>
-                <span>{{ courseModule.moduleName }}</span>
-              </template>
+              </el-collapse-item>
+            </el-collapse>
+          </PageFeedback>
+        </aside>
+
+        <section class="course-reader" aria-live="polite">
+          <PageFeedback
+            :loading="courseLoading"
+            :empty="!courseLoading && !courseError && !courseData"
+            :error="courseError"
+            empty-title="选择一门课程开始学习"
+            empty-description="从左侧课程目录中选择想要阅读的内容。"
+            @retry="retryCourse"
+          >
+            <header class="course-reader__heading">
               <div>
-                <el-menu-item v-for="(course, key2) in courseModule.courseList" :index="key1 + '-' + key2"
-                  @click="flyTo(course)">
-                  {{ course }}
-                </el-menu-item>
+                <p class="page-heading__eyebrow">{{ courseData.languageName || mainLang }}</p>
+                <h2>{{ courseData.courseName }}</h2>
               </div>
-            </el-sub-menu>
-          </el-menu>
-        </el-col>
-        <!-- 课程内容 -->
-        <el-col :span="14"
-          style="height:auto;  padding:0px 30px 0px 30px; background-color: white;border-radius: 5px;border: solid 1px rgb(220,223,230); margin: 0px 10px 0px 10px;">
-          <md-editor v-model="text" :editorId="state.id" :previewOnly="true" style="height: auto" />
-        </el-col>
-        <!-- 课程目录 -->
-        <el-col :span="4">
-          <el-row>
-            <el-col
-              style="height:auto; padding: 0px 30px 30px 30px; margin: 0px 0px 30px 0px;  background-color: white;border: solid 1px rgb(220,223,230);border-radius: 5px;;">
-              <h2>文章目录</h2>
-              <md-catalog :editorId="state.id" :scroll-element="scrollElement" />
-            </el-col>
-          </el-row>
-          <!-- 三个按钮 -->
-          <el-row v-show="canStar == true">
-            <el-col
-              style="height:100px; padding: 20px 0px 30px 0px; background-color: white;border: solid 1px rgb(220,223,230); text-align: center;">
-              <!-- <el-button style="height: 50px; width:50px" @click="thumbUpCourse()">
-                <el-image v-show='isThumbUp != true' src="src\assets\ThumbUp.png"
-                  style="height: 30px; width:30px"></el-image>
-                <el-image v-show='isThumbUp == true' src="src\assets\ThumbUpFilled.png"
-                  style="height: 30px; width:30px"></el-image>
-              </el-button> -->
-
-
-              <el-button style="height: 50px; width:50px" @click="starCourse()">
-                <el-image v-show='isFavor != true' :src="assets.actions.star"
-                  style="height: 30px; width:30px"></el-image>
-                <el-image v-show='isFavor == true' :src="assets.actions.starFilled"
-                  style="height: 30px; width:30px"></el-image>
-              </el-button>
-
-              <el-button style="height: 50px; width:50px" @click="isCommentOpen = !isCommentOpen">
-                <el-image v-show='isCommentOpen != true' :src="assets.actions.comment"
-                  style="height: 30px; width:30px"></el-image>
-                <el-image v-show='isCommentOpen == true' :src="assets.actions.commentFilled"
-                  style="height: 30px; width:30px"></el-image>
-              </el-button>
-
-            </el-col>
-          </el-row>
-
-        </el-col>
-        <!-- 评论区 -->
-        <el-drawer v-model="isCommentOpen">
-          <template #header="{ titleId, titleClass }">
-            <h4 :id="titleId" :class="titleClass" style="font-size:30px">评论</h4>
-          </template>
-
-          <!-- 发布评论框 -->
-          <el-row
-            style="margin:0px 0px 0px 0px; padding:15px 10px 10px 10px;border-radius: 10px; background-color:antiquewhite;">
-            <el-col :span="2">
-              <el-image :src="this.$store.state.user.avatar" style="height: 10px width: 10px; border-radius: 50%">
-              </el-image>
-            </el-col>
-            <el-col :span="22">
-              <el-row style=" padding: 0px 30px 0px 30px;">
-                <el-input :rows="10" type="textarea" v-model="commentText" maxlength="1000" show-word-limit
-                  resize="none" placeholder="发表评论">
-                </el-input>
-                <el-button size="small" style="background-color: rgb(252,85,49); color:white; margin: 5px 0px 0px 0px;"
-                  @click="comment()">
-                  发布
+              <div class="course-actions" aria-label="课程操作">
+                <el-button :type="isFavor ? 'warning' : 'default'" @click="starCourse">
+                  {{ isFavor ? '已收藏' : '收藏课程' }}
                 </el-button>
-              </el-row>
-            </el-col>
-          </el-row>
+                <el-button type="primary" plain @click="isCommentOpen = true">查看评论</el-button>
+              </div>
+            </header>
+            <div class="course-reader__article">
+              <md-editor v-model="text" :editor-id="editorState.id" preview-only />
+            </div>
+            <details class="course-reader__catalog">
+              <summary>文章目录</summary>
+              <md-catalog :editor-id="editorState.id" :scroll-element="scrollElement" />
+            </details>
+          </PageFeedback>
+        </section>
+      </section>
+    </section>
 
-          <!-- 回复列表 -->
-          <el-row v-for="(comment, key) in commentList"
-            style="margin:10px 0px 0px 0px; padding:10px 10px 10px 10px;border-radius: 10px; background-color:antiquewhite;">
-            <el-col :span="2">
-              <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
-              </el-image>
-            </el-col>
-            <el-col :span="18" style="padding: 0px 0px 0px 20px;">
-              <el-row style="margin: 0px 0px 5px 0px; font-size:medium; font-weight: bolder;">
-                <span>{{ comment.userName }}</span>
-              </el-row>
-              <el-row>
-                <span>{{ comment.content }}</span>
-              </el-row>
+    <el-drawer v-model="isCommentOpen" size="min(92vw, 520px)" direction="rtl" title="课程评论">
+      <section class="comments" aria-label="课程评论">
+        <div class="comment-compose">
+          <el-avatar :size="36" :src="store.state.user.avatar || assets.defaultAvatar" />
+          <div class="comment-compose__input">
+            <label class="sr-only" for="course-comment">发表评论</label>
+            <el-input id="course-comment" v-model="commentText" :rows="4" type="textarea" maxlength="1000" show-word-limit resize="none" placeholder="发表你的看法" />
+            <el-button type="primary" :disabled="!courseData" @click="comment">发布评论</el-button>
+          </div>
+        </div>
 
-              <!-- 子评论回复框 -->
-              <el-row v-show="isReplyOpen == key" style="margin: 10px 0px 0px 0px; ">
-                <el-input :rows="4" type="textarea" v-model="replyText" maxlength="1000" show-word-limit resize="none">
-                </el-input>
-                <el-button size="small" style="background-color: rgb(252,85,49); color:white; margin: 5px 0px 0px 0px;"
-                  @click="reply(comment.commentId)">发布</el-button>
-              </el-row>
-
-              <!-- 子评论 -->
-              <el-row v-for="subcomment in comment.subCommentList"
-                style="margin:0px 0px 0px 0px; padding:10px 0px 0px 0px;border-radius: 10px; background-color:antiquewhite; ">
-                <el-col :span="2">
-                  <el-image :src="assets.defaultAvatar" style="height: 10px width: 10px; border-radius:50%">
-                  </el-image>
-                </el-col>
-                <el-col :span="22" style="padding: 0px 0px 0px 20px;">
-                  <el-row style="margin: 0px 0px 0px 0px; font-size:small; font-weight: bolder;">
-                    <span>{{ subcomment.userName }}</span>
-                  </el-row>
-                  <el-row style=" font-size:small;">
-                    <span>{{ subcomment.content }}</span>
-                  </el-row>
-                </el-col>
-              </el-row>
-            </el-col>
-
-            <el-col :span="4" style="text-align: center;">
-              <el-button size="small" style="background-color: rgb(252,85,49); color: white" @click="replyOpen(key)">
-                回复
-              </el-button>
-            </el-col>
-          </el-row>
-        </el-drawer>
-
-      </el-row>
-    </div>
-
-  </div>
+        <p v-if="commentsError" class="comments__error">{{ commentsError }}</p>
+        <div v-if="!commentsError && commentList.length === 0" class="comments__empty">还没有评论，来说说你的想法吧。</div>
+        <article v-for="commentItem in commentList" :key="commentItem.commentId" class="comment-item">
+          <el-avatar :size="34" :src="assets.defaultAvatar" />
+          <div class="comment-item__body">
+            <strong>{{ commentItem.userName || '用户' }}</strong>
+            <p>{{ commentItem.content }}</p>
+            <el-button link type="primary" @click="toggleReply(commentItem.commentId)">回复</el-button>
+            <div v-if="replyingTo === commentItem.commentId" class="reply-compose">
+              <label class="sr-only" :for="`reply-${commentItem.commentId}`">回复评论</label>
+              <el-input :id="`reply-${commentItem.commentId}`" v-model="replyText" :rows="3" type="textarea" maxlength="1000" show-word-limit resize="none" placeholder="写下回复" />
+              <el-button type="primary" size="small" @click="reply(commentItem.commentId)">发布回复</el-button>
+            </div>
+            <div v-for="subcomment in commentItem.subCommentList || []" :key="subcomment.commentId" class="reply-item">
+              <strong>{{ subcomment.userName || '用户' }}</strong>
+              <p>{{ subcomment.content }}</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </el-drawer>
+  </main>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive } from 'vue';
+<script setup>
+import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
-import MdEditor from "md-editor-v3";
-import "md-editor-v3/lib/style.css";
+import MdEditor from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
+import PageFeedback from '@/components/common/PageFeedback.vue';
 
+axios.defaults.withCredentials = true;
 
-// 验证用户的登陆状态
-axios.defaults.withCredentials = true;//这样全局设置允许
-axios.get("http://localhost:4080/users/verify").then((resp) => {
-  if (resp.data.data == false) {
-    alert(resp.data.msg);
-    window.location.href = "/login";
-    return;
-  }
-});
-
-
-// 当前选择的语言
-const mainLang = ref('java');
-// 语言选择
-const langs = [
-  {
-    no: '1',
-    name: 'java',
-    icon: assets.languageIcons.java
-  },
-  {
-    no: '2',
-    name: 'c++',
-    icon: assets.languageIcons['c++']
-  },
-  {
-    no: '3',
-    name: 'python',
-    icon: assets.languageIcons.python
-  },
-  {
-    no: '4',
-    name: 'c',
-    icon: assets.languageIcons.c
-  }]
-// 选择语言
-function selectLang(lang) {
-  axios.get("http://localhost:4080/courses/recommend/" + lang.no + '/' + store.state.user.major).then((resp) => {
-    courseModules.value = resp.data.data;
-  });
-}
-
-// md-editor
-var text = ref("## 这是课程资源 \n 您可以在左侧的菜单栏选择您想要学习的课程");
+const router = useRouter();
 const MdCatalog = MdEditor.MdCatalog;
 const scrollElement = document.documentElement;
-const state = reactive({
-  text: '标题',
-  id: 'my-editor',
-  catalogList: []
-});
-// const isThumbUp = ref(false);
+const editorState = reactive({ id: 'course-browser-editor' });
+const mainLang = ref('java');
+const courseModules = ref([]);
+const courseData = ref(null);
+const text = ref('');
+const modulesLoading = ref(false);
+const courseLoading = ref(false);
+const modulesError = ref('');
+const courseError = ref('');
+const isFavor = ref(false);
+const isCommentOpen = ref(false);
+const commentText = ref('');
+const replyText = ref('');
+const replyingTo = ref(null);
+const commentList = ref([]);
+const commentsError = ref('');
+const langs = [
+  { no: '1', name: 'java', icon: assets.languageIcons.java },
+  { no: '2', name: 'c++', icon: assets.languageIcons['c++'] },
+  { no: '3', name: 'python', icon: assets.languageIcons.python },
+  { no: '4', name: 'c', icon: assets.languageIcons.c },
+];
 
-// 收藏课程
-const canStar = ref(false);
-async function starCourse() {
-  if (!courseData.value.courseId) {
-    ElMessage.warning('请先选择课程');
+function selectedLanguage() {
+  return langs.find((lang) => lang.name === mainLang.value) || langs[0];
+}
+
+async function verifyUser() {
+  try {
+    const resp = await axios.get('http://localhost:4080/users/verify');
+    if (resp.data.data === false) {
+      ElMessage.warning(resp.data.msg || '请先登录');
+      await router.push('/login');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    ElMessage.error('登录状态验证失败，请重新登录');
+    await router.push('/login');
+    return false;
+  }
+}
+
+async function loadCourseModules() {
+  const language = selectedLanguage();
+  modulesLoading.value = true;
+  modulesError.value = '';
+  try {
+    const resp = await axios.get(`http://localhost:4080/courses/recommend/${language.no}/${store.state.user.major}`);
+    courseModules.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+  } catch (error) {
+    courseModules.value = [];
+    modulesError.value = '课程目录加载失败，请检查网络后重试。';
+    console.error(error);
+  } finally {
+    modulesLoading.value = false;
+  }
+}
+
+function selectLang() {
+  courseData.value = null;
+  text.value = '';
+  isFavor.value = false;
+  commentList.value = [];
+  return loadCourseModules();
+}
+
+async function loadComments() {
+  if (!courseData.value?.courseId) {
+    commentList.value = [];
     return;
   }
+  commentsError.value = '';
+  try {
+    const resp = await axios.get(`http://localhost:4080/comments/course/${courseData.value.courseId}`);
+    commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+  } catch (error) {
+    commentList.value = [];
+    commentsError.value = '评论加载失败，请稍后重试。';
+    console.error(error);
+  }
+}
+
+async function openCourse(courseName) {
+  courseLoading.value = true;
+  courseError.value = '';
+  try {
+    const courseResp = await axios.get(`http://localhost:4080/courses/${encodeURIComponent(courseName)}`);
+    if (!courseResp.data.data?.courseId) {
+      courseData.value = null;
+      courseError.value = courseResp.data.msg || '课程加载失败';
+      return;
+    }
+    courseData.value = courseResp.data.data;
+    text.value = courseData.value.description || '';
+    const [favorResult] = await Promise.all([
+      axios.get(`http://localhost:4080/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`).catch(() => null),
+      loadComments(),
+    ]);
+    isFavor.value = favorResult?.data?.data === true;
+  } catch (error) {
+    courseData.value = null;
+    courseError.value = '课程加载失败，请稍后重试。';
+    console.error(error);
+  } finally {
+    courseLoading.value = false;
+  }
+}
+
+function retryCourse() {
+  if (courseData.value?.courseName) return openCourse(courseData.value.courseName);
+}
+
+async function starCourse() {
+  if (!courseData.value?.courseId) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete("http://localhost:4080/courses/deleteFavor/" + store.state.user.id + '/' + courseData.value.courseId)
-      : await axios.get("http://localhost:4080/courses/star/" + store.state.user.id + '/' + courseData.value.courseId);
+      ? await axios.delete(`http://localhost:4080/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
+      : await axios.get(`http://localhost:4080/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -262,11 +272,8 @@ async function starCourse() {
   }
 }
 
-
-// 评论
-const commentText = ref('');
-const isCommentOpen = ref(false);
 async function comment() {
+  if (!courseData.value?.courseId) return;
   if (!commentText.value.trim()) {
     ElMessage.warning('评论内容不能为空');
     return;
@@ -283,24 +290,18 @@ async function comment() {
     }
     commentText.value = '';
     await loadComments();
-    isCommentOpen.value = true;
     ElMessage.success('评论成功');
   } catch (error) {
     ElMessage.error('评论失败，请稍后重试');
     console.error(error);
   }
 }
-// 回复
-const replyText = ref('');
-const isReplyOpen = ref(-1);
-function replyOpen(key) {
-  if (isReplyOpen.value == -1) {
-    isReplyOpen.value = key;
-  }
-  else {
-    isReplyOpen.value = -1;
-  }
+
+function toggleReply(commentId) {
+  replyingTo.value = replyingTo.value === commentId ? null : commentId;
+  replyText.value = '';
 }
+
 async function reply(fatherId) {
   if (!replyText.value.trim()) {
     ElMessage.warning('回复内容不能为空');
@@ -310,16 +311,15 @@ async function reply(fatherId) {
     const resp = await axios.post('http://localhost:4080/comments/indirect', {
       userId: store.state.user.id,
       content: replyText.value.trim(),
-      fatherId: fatherId
+      fatherId,
     });
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '回复失败');
       return;
     }
     replyText.value = '';
-    isReplyOpen.value = -1;
+    replyingTo.value = null;
     await loadComments();
-    isCommentOpen.value = true;
     ElMessage.success('回复成功');
   } catch (error) {
     ElMessage.error('回复失败，请稍后重试');
@@ -327,64 +327,49 @@ async function reply(fatherId) {
   }
 }
 
-// 课程模块数据
-const courseModules = ref([]);
-// 获取 课程模块数据
-axios.get("http://localhost:4080/courses/recommend/" + '1' + '/' + store.state.user.major).then((resp) => {
-  courseModules.value = resp.data.data;
+verifyUser().then((verified) => {
+  if (verified) loadCourseModules();
 });
-
-// 用于接收课程信息
-const courseData = ref({});
-// 用户课程收藏状态
-const isFavor = ref(false);
-// 用于保存评论列表
-const commentList = ref([]);
-
-async function loadComments() {
-  if (!courseData.value.courseId) {
-    commentList.value = [];
-    return;
-  }
-  const resp = await axios.get("http://localhost:4080/comments/course/" + courseData.value.courseId);
-  commentList.value = resp.data.data || [];
-}
-
-// 获取 课程数据 收藏状态 评论区
-async function flyTo(courseName) {
-  try {
-    const courseResp = await axios.get("http://localhost:4080/courses/" + encodeURIComponent(courseName));
-    if (!courseResp.data.data || !courseResp.data.data.courseId) {
-      ElMessage.error(courseResp.data.msg || '课程加载失败');
-      return;
-    }
-    courseData.value = courseResp.data.data;
-    text.value = courseData.value.description || '';
-    canStar.value = true;
-
-    const [favorResp] = await Promise.all([
-      axios.get("http://localhost:4080/courses/ifFavor/" + store.state.user.id + '/' + courseData.value.courseId),
-      loadComments()
-    ]);
-    isFavor.value = favorResp.data.data === true;
-  } catch (error) {
-    ElMessage.error('课程加载失败，请稍后重试');
-    console.error(error);
-  }
-}
 </script>
 
 <style scoped>
-a {
-  text-decoration: none;
-}
+.course-browser { min-width: 0; padding: clamp(16px, 3vw, 32px); }
+.course-browser__content { width: min(100%, var(--cc4c-content-max-width)); margin: 0 auto; }
+.page-heading { margin-bottom: 24px; }
+.page-heading__eyebrow { margin: 0 0 6px; color: var(--cc4c-primary); font-size: .8125rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.page-heading h1 { margin: 0; color: var(--cc4c-text); font-size: clamp(2rem, 4vw, 3rem); }
+.page-heading p:not(.page-heading__eyebrow) { margin: 8px 0 0; color: var(--cc4c-muted); }
+.language-bar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 16px 18px; margin-bottom: 20px; border: 1px solid var(--cc4c-border); border-radius: var(--cc4c-radius); background: var(--cc4c-surface); box-shadow: var(--cc4c-shadow); }
+.language-bar__label { color: var(--cc4c-text); font-weight: 700; }
+.language-picker { display: flex; flex-wrap: wrap; }
+.language-option { display: inline-flex; min-height: 32px; gap: 5px; align-items: center; }
+.language-option :deep(.el-image) { width: 22px; height: 22px; }
+.course-workspace { display: grid; min-width: 0; grid-template-columns: minmax(210px, 280px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.course-directory, .course-reader { min-width: 0; padding: 20px; border: 1px solid var(--cc4c-border); border-radius: var(--cc4c-radius); background: var(--cc4c-surface); box-shadow: var(--cc4c-shadow); }
+.course-directory__heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.course-directory__heading h2, .course-reader__heading h2 { margin: 0; color: var(--cc4c-text); font-size: 1.2rem; }
+.course-directory__heading span { color: var(--cc4c-primary); font-size: .8125rem; font-weight: 700; }
+.course-directory__items { display: grid; gap: 4px; padding: 0 4px 8px; }
+.course-directory__item { width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--cc4c-text); cursor: pointer; text-align: left; }
+.course-directory__item:hover, .course-directory__item--active { background: #eff6ff; color: var(--cc4c-primary); font-weight: 700; }
+.course-reader__heading { display: flex; flex-wrap: wrap; gap: 16px; align-items: start; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--cc4c-border); }
+.course-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.course-reader__article { min-width: 0; padding-top: 16px; }
+.course-reader__article :deep(.md-editor-preview-wrapper) { padding: 0; }
+.course-reader__catalog { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--cc4c-border); }
+.course-reader__catalog summary { color: var(--cc4c-primary); font-weight: 700; cursor: pointer; }
+.comments { display: grid; gap: 16px; }
+.comment-compose, .comment-item { display: flex; gap: 10px; align-items: start; }
+.comment-compose__input, .comment-item__body { min-width: 0; flex: 1; }
+.comment-compose__input .el-button { margin-top: 8px; }
+.comments__error { margin: 0; color: var(--el-color-danger); }
+.comments__empty { padding: 18px; border: 1px dashed var(--cc4c-border); border-radius: 8px; color: var(--cc4c-muted); text-align: center; }
+.comment-item { padding: 14px 0; border-top: 1px solid var(--cc4c-border); }
+.comment-item__body > p, .reply-item p { margin: 6px 0; color: var(--cc4c-text); line-height: 1.6; }
+.reply-compose { display: grid; gap: 8px; margin-top: 8px; }
+.reply-compose .el-button { justify-self: start; }
+.reply-item { padding: 10px 12px; margin-top: 10px; border-left: 3px solid #bfdbfe; background: #f8fafc; }
 
-.el-menu-item {
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  width: 90%;
-}
+@media (max-width: 900px) { .course-workspace { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .course-browser { padding: 12px; } .language-bar { padding: 14px; } .language-picker { width: 100%; } .language-picker :deep(.el-radio-button__inner) { padding-inline: 8px; } .course-directory, .course-reader { padding: 16px; } .course-reader__heading { flex-direction: column; } .course-actions { width: 100%; } .course-actions .el-button { flex: 1; margin: 0; } }
 </style>

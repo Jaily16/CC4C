@@ -1,0 +1,17 @@
+:root {
+  --cc4c-primary: #2563eb;
+  --cc4c-primary-hover: #1d4ed8;
+  --cc4c-bg: #f5f7fb;
+  --cc4c-surface: #ffffff;
+  --cc4c-text: #172033;
+  --cc4c-muted: #64748b;
+  --cc4c-border: #e2e8f0;
+  --cc4c-radius: 12px;
+  --cc4c-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  --cc4c-discovery-hero: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #60a5fa 100%);
+  --cc4c-header-height: 64px;
+  --cc4c-sidebar-width: 200px;
+  --cc4c-sidebar-collapsed-width: 64px;
+  --cc4c-content-max-width: 1440px;
+  --cc4c-transition: 180ms ease;
+}

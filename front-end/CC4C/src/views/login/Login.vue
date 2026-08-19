@@ -1,194 +1,325 @@
 <template>
-    <div style="background-color: rgb(244,246,248);">
-        <el-row justify="center">
-            <el-col :span="6" style="margin: 80px 0px 500px 0px; ">
-                <!-- <h1>{{this.$store.state.user.name}}</h1> -->
-                <div style="text-align: center;">
-                    <el-image style="height: 150px; width: 150px; " :src="assets.logoPart1" />
-                    <el-image style="height: 50px; width: 350px; " :src="assets.logoPart3" />
-                </div>
-                <div
-                    style="background-color: white; padding: 30px 50px 50px 50px; border-radius: 10px;box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)">
-                    <el-input v-model="form.email" style="margin: 0px 0px 10px 0px;" placeholder="请输入邮箱"></el-input>
-                    <el-input v-model="form.password" style="margin: 0px 0px 20px 0px;" type="password"
-                        placeholder="请输入密码"></el-input>
+  <main class="auth-page">
+    <section class="auth-layout" aria-labelledby="login-title">
+      <div class="auth-brand">
+        <el-image class="auth-brand__logo" :src="assets.logoPart1" alt="CC4C" fit="contain" />
+        <el-image class="auth-brand__tagline" :src="assets.logoPart3" alt="CC4C 学习交流平台" fit="contain" />
+        <h1>让学习与交流持续发生</h1>
+        <p>登录后即可浏览课程、参与讨论，并管理自己的学习内容。</p>
+      </div>
 
-                    <el-row justify="center">
-                        <el-button type="primary" style="width: 100%; font-weight: bolder;" :loading="loggingIn"
-                            @click="login()">
-                            登录
-                        </el-button>
-                        <el-divider></el-divider>
-                        <el-button type="success" style="width: 100%; font-weight: bolder;" @click="flyToRegister()">
-                            注册
-                        </el-button>
-                        <el-button link style="margin: 10px 0px 0px 0px;" @click="findPwdDialog = !findPwdDialog">
-                            找回密码
-                        </el-button>
+      <section class="auth-card">
+        <div class="auth-card__heading">
+          <p class="auth-card__eyebrow">欢迎回来</p>
+          <h2 id="login-title">登录 CC4C</h2>
+          <p>使用你的邮箱继续。</p>
+        </div>
 
-                        <el-dialog v-model="findPwdDialog" title="找回密码" width="30%">
+        <el-form class="auth-form" label-position="top" @submit.prevent="login">
+          <el-form-item label="邮箱" :error="fieldErrors.email">
+            <el-input
+              v-model.trim="form.email"
+              type="email"
+              autocomplete="email"
+              placeholder="name@example.com"
+              clearable
+              @blur="validateLoginField('email')"
+            />
+          </el-form-item>
 
-                            <el-input v-model="findForm.email" placeholder="邮箱"
-                                style="margin: 0px 0px 10px 0px;"></el-input>
+          <el-form-item label="密码" :error="fieldErrors.password">
+            <el-input
+              v-model="form.password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="请输入密码"
+              show-password
+              @blur="validateLoginField('password')"
+            />
+          </el-form-item>
 
-                            <el-input v-model="findForm.password" placeholder="新密码" style="margin: 0px 0px 10px 0px;"
-                                type="password"></el-input>
+          <p v-if="formError" class="auth-form__error" role="alert">{{ formError }}</p>
 
-                            <el-row>
-                                <el-input v-model="iCode" placeholder="验证码"
-                                    style="margin: 0px 15px 10px 0px;width: 50%;"></el-input>
-                                <el-button type="primary" @click="getVCode()"
-                                    style="padding: 0px 0px 0px 0px; width: 30%;">
-                                    获取邮箱验证码
-                                </el-button>
-                            </el-row>
+          <el-button class="auth-form__submit" native-type="submit" type="primary" :loading="loggingIn">
+            {{ loggingIn ? '登录中…' : '登录' }}
+          </el-button>
+        </el-form>
 
-                            <template #footer>
-                                <span class="dialog-footer">
-                                    <el-button @click="findPwdDialog = false">取消</el-button>
-                                    <el-button type="success" @click="findPassword()">
-                                        找回密码
-                                    </el-button>
-                                </span>
-                            </template>
-                        </el-dialog>
+        <div class="auth-card__links" aria-label="账户帮助">
+          <router-link to="/register">注册新账户</router-link>
+          <el-button link type="primary" @click="openFindPassword">找回密码</el-button>
+          <router-link to="/adminLogin">管理员登录</router-link>
+        </div>
+      </section>
+    </section>
 
-                    </el-row>
-
-
-                </div>
-
-            </el-col>
-        </el-row>
-    </div>
+    <el-dialog v-model="findPwdDialog" class="recovery-dialog" title="找回密码" width="min(92vw, 460px)">
+      <p class="recovery-dialog__hint">我们会向邮箱发送验证码，用于确认本次密码重置。</p>
+      <el-form label-position="top" @submit.prevent="findPassword">
+        <el-form-item label="邮箱" :error="recoveryErrors.email">
+          <el-input
+            v-model.trim="findForm.email"
+            type="email"
+            autocomplete="email"
+            placeholder="name@example.com"
+            clearable
+            @blur="validateRecoveryField('email')"
+          />
+        </el-form-item>
+        <el-form-item label="新密码" :error="recoveryErrors.password">
+          <el-input
+            v-model="findForm.password"
+            type="password"
+            autocomplete="new-password"
+            placeholder="至少 4 个字符"
+            show-password
+            @blur="validateRecoveryField('password')"
+          />
+        </el-form-item>
+        <el-form-item label="邮箱验证码" :error="recoveryErrors.code">
+          <div class="verification-row">
+            <el-input v-model.trim="iCode" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" />
+            <el-button type="primary" plain :loading="sendingRecoveryCode" @click="getVCode">
+              {{ sendingRecoveryCode ? '发送中…' : '获取验证码' }}
+            </el-button>
+          </div>
+        </el-form-item>
+        <p v-if="recoveryError" class="auth-form__error" role="alert">{{ recoveryError }}</p>
+        <div class="dialog-actions">
+          <el-button @click="findPwdDialog = false">取消</el-button>
+          <el-button native-type="submit" type="primary" :loading="findingPassword">
+            {{ findingPassword ? '提交中…' : '重置密码' }}
+          </el-button>
+        </div>
+      </el-form>
+    </el-dialog>
+  </main>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
-import axios from 'axios'
+import { reactive, ref } from 'vue';
+import axios from 'axios';
 import { useRouter } from 'vue-router';
-import store from '@/store'
 import { ElMessage } from 'element-plus';
+import store from '@/store';
 import { assets } from '@/assets';
 
-axios.defaults.withCredentials = true;//这样全局设置允许
+axios.defaults.withCredentials = true;
 
 const router = useRouter();
-
-function flyToRegister() {
-    router.push({ path: '/register' });
-}
-
-// 用于提交登陆信息
-var form = reactive({
-    email: '',
-    password: ''
-})
+const form = reactive({ email: '', password: '' });
+const fieldErrors = reactive({ email: '', password: '' });
+const formError = ref('');
 const loggingIn = ref(false);
-// 登陆事件
-async function login() {
-    if (!form.email || !form.password) {
-        ElMessage.warning('请输入邮箱和密码');
-        return;
-    }
 
-    loggingIn.value = true;
-    try {
-        const loginResp = await axios.post("http://localhost:4080/users/login", {
-            email: form.email,
-            password: form.password
-        });
+const findPwdDialog = ref(false);
+const findForm = reactive({ email: '', password: '' });
+const recoveryErrors = reactive({ email: '', password: '', code: '' });
+const recoveryError = ref('');
+const iCode = ref('');
+const sendingRecoveryCode = ref(false);
+const findingPassword = ref(false);
+let vCode = '';
+let rEmail = '';
 
-        if (loginResp.data.data !== true) {
-            ElMessage.error(loginResp.data.msg || '登录失败');
-            return;
-        }
-
-        // 必须等用户信息写入 Vuex 后再进入业务页面，避免首屏接口使用空用户 ID。
-        const infoResp = await axios.get("http://localhost:4080/users/info");
-        const currentUser = infoResp.data.data;
-        if (!currentUser || !currentUser.id) {
-            ElMessage.error(infoResp.data.msg || '获取用户信息失败');
-            return;
-        }
-        store.commit("SET_ID", currentUser.id);
-        store.commit("SET_NAME", currentUser.name);
-        store.commit("SET_EMAIL", currentUser.email);
-        store.commit("SET_MAJOR", currentUser.major);
-        store.commit("SET_LANGUAGE", currentUser.language);
-        store.commit("SET_AVATAR", currentUser.avatar);
-        await router.push({ path: '/home' });
-    } catch (error) {
-        ElMessage.error('登录服务暂时不可用，请稍后重试');
-        console.error(error);
-    } finally {
-        loggingIn.value = false;
-    }
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-// 找回密码
-var findPwdDialog = ref(false)
-// 找回密码表单
-var findForm = reactive({
-    email: '',
-    password: ''
-})
-// 用于存储获取到的验证码
-var vCode = '';
-// 输入的邮箱验证码
-var iCode = ref('');
-// 接收resp
-var resVCode = reactive({
-    data: "",
-    code: "",
-    msg: ""
-});
-//用于存储发送验证码的邮箱
-var rEmail = '';
-// 获取邮箱验证码
-function getVCode() {
-    if (findForm.email == '') {
-        ElMessage({ type: 'warning', message: "请先输入邮箱" });
-        return;
+function validateLoginField(field) {
+  if (field === 'email') {
+    fieldErrors.email = !form.email ? '请输入邮箱' : (!isEmail(form.email) ? '请输入正确的邮箱地址' : '');
+  }
+  if (field === 'password') {
+    fieldErrors.password = form.password ? '' : '请输入密码';
+  }
+}
+
+function validateLoginForm() {
+  validateLoginField('email');
+  validateLoginField('password');
+  return !fieldErrors.email && !fieldErrors.password;
+}
+
+async function login() {
+  formError.value = '';
+  if (!validateLoginForm()) {
+    formError.value = '请检查邮箱和密码后重试';
+    return;
+  }
+
+  loggingIn.value = true;
+  try {
+    const loginResp = await axios.post('http://localhost:4080/users/login', {
+      email: form.email,
+      password: form.password,
+    });
+
+    if (loginResp.data.data !== true) {
+      formError.value = loginResp.data.msg || '登录失败';
+      ElMessage.error(formError.value);
+      return;
+    }
+
+    const infoResp = await axios.get('http://localhost:4080/users/info');
+    const currentUser = infoResp.data.data;
+    if (!currentUser || !currentUser.id) {
+      formError.value = infoResp.data.msg || '获取用户信息失败';
+      ElMessage.error(formError.value);
+      return;
+    }
+
+    store.commit('SET_ID', currentUser.id);
+    store.commit('SET_NAME', currentUser.name);
+    store.commit('SET_EMAIL', currentUser.email);
+    store.commit('SET_MAJOR', currentUser.major);
+    store.commit('SET_LANGUAGE', currentUser.language);
+    store.commit('SET_AVATAR', currentUser.avatar);
+    await router.push({ path: '/home' });
+  } catch (error) {
+    formError.value = '登录服务暂时不可用，请稍后重试';
+    ElMessage.error(formError.value);
+    console.error(error);
+  } finally {
+    loggingIn.value = false;
+  }
+}
+
+function openFindPassword() {
+  recoveryError.value = '';
+  findPwdDialog.value = true;
+}
+
+function validateRecoveryField(field) {
+  if (field === 'email') {
+    recoveryErrors.email = !findForm.email ? '请输入邮箱' : (!isEmail(findForm.email) ? '请输入正确的邮箱地址' : '');
+  }
+  if (field === 'password') {
+    recoveryErrors.password = !findForm.password ? '请输入新密码' : (findForm.password.length < 4 ? '密码至少需要 4 个字符' : '');
+  }
+}
+
+async function getVCode() {
+  recoveryError.value = '';
+  validateRecoveryField('email');
+  if (recoveryErrors.email) return;
+
+  sendingRecoveryCode.value = true;
+  try {
+    const resp = await axios.get(`http://localhost:4080/users/email/${encodeURIComponent(findForm.email)}`);
+    if (!resp.data.data) {
+      recoveryError.value = resp.data.msg || '未能成功获取邮箱验证码';
+      ElMessage.error(recoveryError.value);
+      return;
     }
     rEmail = findForm.email;
-    axios.get('http://localhost:4080/users/email/' + findForm.email).then((resp) => {
-        resVCode = resp.data;
-        vCode = resVCode.data;
-        if (resVCode.data == false) {
-            ElMessage({ type: 'warning', message: "未能成功获取邮箱验证码" });
-        }
-    }).catch(function (error) {
-        console.log(error);
-    });
+    vCode = resp.data.data;
+    ElMessage.success('验证码已发送');
+  } catch (error) {
+    recoveryError.value = '验证码发送失败，请稍后重试';
+    ElMessage.error(recoveryError.value);
+    console.error(error);
+  } finally {
+    sendingRecoveryCode.value = false;
+  }
 }
-// 找回密码
-function findPassword() {
-    if (iCode.value != vCode || rEmail != findForm.email) {
-        alert("验证码错误")
-        return;
-    }
-    if (findForm.password == '') {
-        alert("新密码不能为空")
-        return;
 
-    }
-    else {
-        axios.put('http://localhost:4080/users/password/forget', {
-            email: findForm.email,
-            newPassword: findForm.password
-        }).then((resp) => {
-            if (resp.data.data == true) {
-                ElMessage.success("密码修改成功")
-                // alert("密码修改成功")
-                return;
+async function findPassword() {
+  recoveryError.value = '';
+  validateRecoveryField('email');
+  validateRecoveryField('password');
+  recoveryErrors.code = !iCode.value ? '请输入邮箱验证码' : '';
 
-            }
+  if (recoveryErrors.email || recoveryErrors.password || recoveryErrors.code) return;
+  if (iCode.value !== vCode || rEmail !== findForm.email) {
+    recoveryErrors.code = '验证码错误或邮箱已变更，请重新验证';
+    return;
+  }
 
-        })
-        findPwdDialog.value = false
+  findingPassword.value = true;
+  try {
+    const resp = await axios.put('http://localhost:4080/users/password/forget', {
+      email: findForm.email,
+      newPassword: findForm.password,
+    });
+    if (resp.data.data !== true) {
+      recoveryError.value = resp.data.msg || '密码修改失败';
+      ElMessage.error(recoveryError.value);
+      return;
     }
 
+    ElMessage.success('密码修改成功');
+    findForm.password = '';
+    iCode.value = '';
+    findPwdDialog.value = false;
+  } catch (error) {
+    recoveryError.value = '密码修改失败，请稍后重试';
+    ElMessage.error(recoveryError.value);
+    console.error(error);
+  } finally {
+    findingPassword.value = false;
+  }
 }
 </script>
 
+<style scoped>
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(24px, 5vw, 72px) 20px;
+  background: linear-gradient(135deg, #eff6ff 0%, var(--cc4c-bg) 48%, #f8fafc 100%);
+}
+
+.auth-layout {
+  display: grid;
+  width: min(100%, 980px);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
+  gap: clamp(32px, 7vw, 92px);
+  align-items: center;
+}
+
+.auth-brand { color: var(--cc4c-text); }
+.auth-brand__logo { width: 112px; height: 112px; }
+.auth-brand__tagline { width: min(100%, 360px); height: 54px; margin: 12px 0 20px; }
+.auth-brand h1 { margin: 0; font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.18; }
+.auth-brand p { max-width: 460px; color: var(--cc4c-muted); font-size: 1.05rem; }
+
+.auth-card {
+  padding: clamp(24px, 4vw, 42px);
+  border: 1px solid var(--cc4c-border);
+  border-radius: calc(var(--cc4c-radius) + 4px);
+  background: var(--cc4c-surface);
+  box-shadow: var(--cc4c-shadow);
+}
+
+.auth-card__heading { margin-bottom: 24px; }
+.auth-card__eyebrow { margin: 0 0 4px; color: var(--cc4c-primary); font-size: 0.875rem; font-weight: 700; }
+.auth-card__heading h2 { margin: 0; color: var(--cc4c-text); }
+.auth-card__heading > p:last-child { margin: 8px 0 0; color: var(--cc4c-muted); }
+.auth-form__submit { width: 100%; min-height: 42px; margin-top: 4px; font-weight: 700; }
+.auth-form__error { margin: -4px 0 12px; color: var(--el-color-danger); font-size: 0.875rem; }
+.auth-card__links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 22px; font-size: 0.9rem; }
+.auth-card__links a { color: var(--cc4c-primary); text-decoration: none; }
+.auth-card__links a:hover { text-decoration: underline; }
+
+.recovery-dialog__hint { margin: 0 0 18px; color: var(--cc4c-muted); }
+.verification-row { display: flex; width: 100%; gap: 10px; }
+.verification-row .el-input { min-width: 0; }
+.verification-row .el-button { flex: 0 0 auto; min-height: 40px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 760px) {
+  .auth-page { align-items: start; }
+  .auth-layout { grid-template-columns: 1fr; gap: 28px; }
+  .auth-brand { text-align: center; }
+  .auth-brand p { margin-inline: auto; }
+}
+
+@media (max-width: 420px) {
+  .auth-page { padding: 20px 14px; }
+  .auth-card { padding: 22px 18px; }
+  .verification-row { flex-wrap: wrap; }
+  .verification-row .el-button { width: 100%; }
+}
+</style>

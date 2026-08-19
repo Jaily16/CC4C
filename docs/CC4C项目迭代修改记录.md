@@ -228,6 +228,8 @@
 | `CC4C_SAVE_AVATAR_PATH` | 用户头像保存目录 |
 | `CC4C_REQUEST_AVATAR_PATH` | 用户头像公网访问前缀 |
 
+> 说明：上述内容记录的是本轮安全配置治理的设计目标。V1 发布基线已进一步调整为“本机真实 `application.yml` 被 Git 忽略、仓库跟踪脱敏 `application-example.yml`”的形式；当前实际约定以第 11.2 节为准。
+
 ### 4.6 后端功能测试体系
 
 本轮删除了原先分散、依赖运行环境且覆盖有限的默认上下文、DAO 和 Service 测试，重新建立面向完整接口行为的功能测试。
@@ -522,3 +524,110 @@ npm run build
 ## 10. 相关文档
 
 - [前端功能性测试报告](../front-end/CC4C/FUNCTIONAL_TEST_REPORT.md)
+
+---
+
+## 11. 第一轮迭代（V1）发布基线归档
+
+### 11.1 基线定义
+
+从 2026-08-18 起，将当前已经推送到 GitHub 的“前后端功能稳定性迭代”视为 **CC4C 第一次迭代（V1）** 的功能基线。
+
+| 项目 | 基线内容 |
+| --- | --- |
+| Git 分支 | `codex/cc4c-functional-stability-iteration` |
+| 基线提交 | `bf810a63985a92160210e004d4ebd6094791cbdf`（`chore: keep local backend config untracked`） |
+| 前序核心提交 | `060c1bd5a1d17ed94f944a586f8be10a957e5cda`（功能稳定性修复） |
+| GitHub PR | [#4 稳定 CC4C 前后端核心功能流程](https://github.com/Jaily16/CC4C/pull/4)；记录时为草稿状态 |
+| 后端验证 | `mvn clean test`：17/17 通过 |
+| 前端验证 | `npm run build` 通过；核心浏览器功能回归通过 |
+| 运行验证 | 后端默认启动可访问 `http://localhost:4080`，课程首页接口返回成功 |
+
+V2 只允许在该基线之上进行页面视觉与用户友好性迭代；不应回退、删除或改变 V1 已验收的认证、课程、博客、评论、收藏、审核等功能行为，除非后续任务明确记录了修复原因和回归用例。
+
+### 11.2 V1 后的本地运行与安全配置约定
+
+为同时满足本机直接运行与 GitHub 安全上传，V1 基线后的配置文件约定如下：
+
+| 文件 | 用途 | Git 状态 |
+| --- | --- | --- |
+| `back-end/CC4C/src/main/resources/application.yml` | 本机真实开发配置；Spring Boot 直接启动时默认读取 | 已由 `.gitignore` 忽略，禁止暂存或上传 |
+| `back-end/CC4C/src/main/resources/application-example.yml` | 与本机配置结构一致的脱敏示例；数据库、邮件等敏感项使用环境变量占位符 | 必须提交并维护 |
+| `front-end/CC4C/node_modules/`、`front-end/CC4C/dist/`、`back-end/CC4C/target/`、`temp/` | 本机依赖、构建或临时产物 | 已忽略，禁止提交 |
+
+本机后端可直接执行：
+
+```powershell
+cd back-end/CC4C
+mvn spring-boot:run
+```
+
+后续任何人修改配置结构时，必须同步更新 `application-example.yml`，但不得通过 Git 覆盖、删除或上传本机 `application.yml`。发布前必须通过显式暂存和暂存区敏感信息检查，详见《CC4C 第二次迭代开发计划》。
+
+### 11.3 V2 交接入口
+
+- [CC4C 第二次迭代开发计划](CC4C第二次迭代开发计划.md)
+
+---
+
+## 12. 第二次迭代（V2）：页面视觉与用户友好性
+
+### 12.1 迭代范围
+
+V2 以 V1 提交 `bf810a63985a92160210e004d4ebd6094791cbdf` 为功能基线，聚焦页面视觉一致性、响应式布局、操作反馈和可访问性。认证、课程、博客、评论、收藏、审核等 V1 前后端行为和 API 契约保持不变；没有新增后端接口，也没有重置 Vuex 登录状态。
+
+### 12.2 Task 1–8 实际完成内容
+
+| 任务 | 主要页面/组件 | 实际完成内容 |
+| --- | --- | --- |
+| Task 1 | `App.vue`、全局样式、用户端壳层、页头、侧栏、`PageFeedback` | 建立设计令牌、全局焦点样式、响应式壳层和统一加载/空数据/失败反馈 |
+| Task 2 | `/login`、`/register`、`/adminLogin` | 重排认证页视觉层级，补齐字段提示、提交状态、找回密码与移动端布局 |
+| Task 3 | `/home`、`/allCourses`、`/allBlogs`、课程/博客发现列表 | 统一发现页横幅、筛选搜索和卡片系统；增加悬浮/焦点响应，修复导航激活态、语言图标排列、侧栏头像与折叠布局 |
+| Task 4 | `/courseDetail`、课程内容与评论区、通用内容操作栏 | 优化阅读区、收藏/评论操作和评论层级；修复 Markdown 星级显示；将课程目录改为随页面固定的浮动按钮及上方弹出目录 |
+| Task 5 | `/allBlogs`、`/blogDetail`、`/blogWrite`、`/blogmanage`、博客浏览页 | 统一博客发现、详情、写作和管理体验，补齐正文目录、表单反馈、文章状态和空/失败状态 |
+| Task 6 | `/userinfo`、`/favorite`、`UserInfo.vue` | 重构个人资料概览、编辑资料、修改密码和头像反馈；统一收藏课程/博客卡片及空状态 |
+| Task 7 | 管理端壳层、`/admin/CoursesAndBlogs`、`/admin/addCourse`、`/admin/checkBlog` | 统一管理员导航、数据总览、课程发布分区和博客审核工作台；补齐加载、确认、禁用与失败反馈 |
+| Task 8 | Task 1–7 全部目标页、两份回归文档 | 完成源码级响应式/可访问性/反馈审计、前端生产构建和后端 17 项测试；未发现需继续修改的页面回归 |
+
+### 12.3 Task 8 验证记录
+
+| 验证项 | 结果 |
+| --- | --- |
+| 活动路由原生 `alert`、内联 `style`、`window.location`、错误 `this.$...` 扫描 | 未发现 |
+| 全局可见焦点、原生按钮/链接语义、整卡 Enter 操作 | 源码审计通过 |
+| 数据页加载、空数据、失败、重试与提交禁用态 | 源码审计通过 |
+| `git diff --check` | 通过，仅有 LF/CRLF 工作区提示 |
+| 前端生产构建 | 通过；Vite 3.2.4 转换 1480 个模块 |
+| 后端测试 | 17/17 通过，0 失败、0 错误、0 跳过 |
+
+前端构建命令为：
+
+```powershell
+cd front-end/CC4C
+npm run build -- --outDir ..\..\temp\cc4c-task8-build-20260819
+```
+
+后端验证命令为：
+
+```powershell
+cd back-end/CC4C
+mvn test
+```
+
+Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记录中，涉及 `/home`、`/allCourses`、`/allBlogs`、`/courseDetail`、`/userinfo`、`/favorite` 和 `/admin/addCourse`；未向仓库写入截图。完整 V2 回归明细见 [CC4C 前端功能性测试报告](../front-end/CC4C/FUNCTIONAL_TEST_REPORT.md)。
+
+### 12.4 待人工确认与遗留项
+
+按当前协作约定，项目由用户在本机启动后完成浏览器验收。Task 8 交付后仍需在 1440px、1024px、768px、375px 下覆盖用户端目标路由和三个管理员子页，检查页面级横向溢出、按钮/文字重叠、Tab/Shift+Tab/Enter、空数据/失败重试以及控制台 `error`/`warn`。该项在用户确认前不记录为自动通过。
+
+以下为非阻塞遗留项：
+
+1. Vite 仍提示入口 JavaScript 包约 874 KiB，建议后续拆分 Element Plus、Markdown 编辑器和公共依赖。
+2. Maven 测试仍输出部分关联实体缺少 `@TableId` 的既有 MyBatis-Plus 警告；本轮没有修改后端模型或返回结构。
+3. Task 8 未执行 Git 暂存、提交、推送或 PR；安全发布继续留给 Task 9 或用户后续明确指令。
+
+### 12.5 本地配置与发布安全状态
+
+- `back-end/CC4C/src/main/resources/application.yml` 未修改、未暂存，继续由 Git 忽略。
+- 前端构建产物位于已忽略的 `temp/`；`node_modules/`、`dist/`、`target/` 和 `temp/` 均不得提交。
+- 本轮没有启动或停止前后端服务，没有创建提交、推送分支或创建 PR。

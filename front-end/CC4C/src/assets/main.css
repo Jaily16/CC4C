@@ -1,39 +1,204 @@
-/* @import "./base.css"; */
+@import '../styles/design-tokens.css';
 
-/* #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-
-  font-weight: normal;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+html {
+  background: var(--cc4c-bg);
 }
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
-} */
 
 body {
-  margin: 0px;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--cc4c-bg);
+  color: var(--cc4c-text);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+img,
+svg,
+video,
+canvas,
+.el-image {
+  max-width: 100%;
+}
+
+img,
+video,
+canvas {
+  display: block;
+  height: auto;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--cc4c-primary) 70%, white);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Discovery-page layout guardrails: these also cover Element Plus generated markup. */
+#app .discovery-page {
+  min-width: 0;
+}
+
+#app .discovery-hero {
+  background: var(--cc4c-discovery-hero) !important;
+}
+
+/* Element Plus collapses menu entries with built-in offsets; neutralize them at the global layer. */
+#app .sidebar .sidebar__menu.el-menu--collapse {
+  width: 100% !important;
+}
+
+#app .sidebar .sidebar__menu.el-menu--collapse > .el-menu-item,
+#app .sidebar .sidebar__menu.el-menu--collapse > .el-sub-menu > .el-sub-menu__title {
+  display: flex !important;
+  width: 100% !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#app .sidebar .sidebar__menu.el-menu--collapse > .el-menu-item .el-icon,
+#app .sidebar .sidebar__menu.el-menu--collapse > .el-sub-menu > .el-sub-menu__title .el-icon {
+  margin: 0 !important;
+}
+
+#app .language-picker {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+#app .language-picker .el-radio-button {
+  flex: 0 0 auto !important;
+}
+
+#app .language-picker .el-radio-button__inner {
+  display: flex !important;
+  align-items: center !important;
+  padding: 8px 11px !important;
+  border: 1px solid var(--cc4c-border) !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+#app .language-option {
+  display: inline-flex !important;
+  min-height: 24px !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+#app img.language-option__icon {
+  display: block !important;
+  width: 22px !important;
+  height: 22px !important;
+  max-width: 22px !important;
+  object-fit: contain !important;
+}
+
+#app .course-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 24px !important;
+}
+
+#app .course-card__visual {
+  height: 172px !important;
+}
+
+#app img.course-card__image {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+}
+
+#app .blog-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 24px !important;
+}
+
+#app .blog-card {
+  min-width: 0 !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f1f6ff 100%) !important;
+  text-align: left !important;
+}
+
+#app .blog-card__body {
+  width: 100% !important;
+  text-align: left !important;
+}
+
+#app .blog-card__meta,
+#app .blog-card__footer {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+#app .blog-card__footer {
+  justify-content: space-between !important;
+}
+
+@media (max-width: 1024px) {
+  #app .course-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #app .language-picker {
+    width: 100% !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding-bottom: 4px;
+  }
+
+  #app .language-picker .el-radio-button__inner {
+    padding: 7px 8px !important;
+  }
+
+  #app .course-grid,
+  #app .blog-grid {
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
 }

@@ -83,3 +83,42 @@
 ## 边界说明
 
 邮箱验证码的空值与格式校验已通过浏览器测试；真实邮件到达依赖 SMTP 服务和外部邮箱，本轮未读取外部邮箱验证实际投递。图片上传需要本地选择文件，代码路径已修复，但未在自动化浏览器中读取用户本地文件。
+
+---
+
+## V2 Task 8：页面体验回归（2026-08-19）
+
+### 回归范围与结论
+
+本节是在 V1 基线提交 `bf810a63985a92160210e004d4ebd6094791cbdf` 之上，对 V2 Task 1–7 的视觉、响应式、反馈与可访问性改动进行统一回归。V1 的认证、课程、博客、评论、收藏和审核接口契约没有调整。
+
+本轮源码审计未发现需要继续修改的 Task 1–7 页面，因此 Task 8 只补充验证记录，没有扩大页面改动范围。自动验证结果如下：
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 活动路由源码静态检查 | 通过 | 未发现重新引入的原生 `alert`、内联 `style`、`window.location` 或 `<script setup>` 中的 `this.$...` |
+| 键盘与焦点语义检查 | 通过（源码级） | 全局提供 `:focus-visible`；收藏页签、收藏卡片、审核队列使用原生按钮；整卡链接提供 `role="link"`、`tabindex="0"` 和 Enter 响应 |
+| 加载、空状态与失败反馈 | 通过（源码级） | 数据页沿用 `PageFeedback`、`el-empty`、重试按钮和提交加载/禁用态，没有恢复空白容器或浏览器原生弹窗 |
+| 响应式保护 | 通过（源码级） | 壳层与目标页保留 `min-width: 0`、媒体查询、可换行布局和移动端单列规则；表格仅在自身容器内横向滚动 |
+| 前端生产构建 | 通过 | `npm run build -- --outDir ..\..\temp\cc4c-task8-build-20260819`；Vite 3.2.4 转换 1480 个模块 |
+| 后端功能测试 | 通过 | `mvn test`：17 项通过，0 失败、0 错误、0 跳过 |
+| `git diff --check` | 通过 | 无空白错误；仅有 Git 的 LF/CRLF 工作区提示 |
+
+生产构建产物写入已被 Git 忽略的 `temp/cc4c-task8-build-20260819/`，没有覆盖或暂存 `dist/`。构建仍有主 JavaScript 包大于 500 KiB 的既有性能提示，不影响本次功能验收。
+
+### 浏览器人工验收状态
+
+Task 1–7 的页面效果与交互已由用户逐项确认。过程中截图保存在当前 Codex 任务的浏览器注释记录中，覆盖 `/home`、`/allCourses`、`/allBlogs`、`/courseDetail`、`/userinfo`、`/favorite` 和 `/admin/addCourse`；仓库内没有新增截图文件。
+
+按协作约定，Task 8 的全路由四宽度检查由用户在本机启动项目后完成。下列项目在本报告更新时仍标记为“待人工确认”，不能由源码审计替代：
+
+- 在 1440px、1024px、768px、375px 下依次访问 `/login`、`/register`、`/home`、`/allCourses`、`/courseDetail`、`/allBlogs`、`/blogDetail`、`/userinfo`、`/favorite`、`/blogWrite`、`/blogmanage`、`/admin/CoursesAndBlogs`、`/admin/addCourse`、`/admin/checkBlog`，确认无页面级横向溢出、文字截断、按钮重叠或不可点击元素。
+- 使用 Tab/Shift+Tab 和 Enter 检查导航、搜索、表单、对话框、目录浮动按钮与主要操作，确认焦点可见且顺序符合阅读顺序。
+- 使用不存在的课程名、无匹配搜索词、空收藏账号或浏览器离线模式，确认加载、空数据、失败与重试反馈。
+- 打开浏览器控制台完成上述关键路径，确认没有新增 `error` 或 `warn`。
+
+### 已知非阻塞项
+
+1. Vite 仍提示入口 JavaScript 包约 874 KiB，后续可按 Element Plus、Markdown 编辑器和公共依赖拆包。
+2. Maven 测试启动时仍会输出部分关联实体缺少 `@TableId` 的 MyBatis-Plus 警告；17 项功能测试全部通过，本轮没有改动后端模型。
+3. 本轮未执行 Task 9，没有暂存、提交、推送或创建 PR；本机真实 `application.yml` 未修改。
