@@ -11,7 +11,6 @@ import com.cc4c.entity.User;
 import com.cc4c.service.CommentService;
 import com.cc4c.service.UserService;
 import com.cc4c.utility.CommentType;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,7 +103,7 @@ public class CommentServiceImpl implements CommentService {
         return new Result(Code.COMMENT_GET_SUCCESS.getCode(), blogComments);
     }
 
-    public void getIndirectComments(@NotNull List<Comment> commentList){
+    public void getIndirectComments(List<Comment> commentList){
         for(Comment comment : commentList){
             List<Comment> indirectComments = commentDao.getIndirectComments(comment.getCommentId());
             getUserInfo(indirectComments);
@@ -117,7 +116,7 @@ public class CommentServiceImpl implements CommentService {
         }
     }
 
-    public void getUserInfo(@NotNull List<Comment> commentList){
+    public void getUserInfo(List<Comment> commentList){
         for(Comment comment : commentList){
             User user = userService.getUserById(comment.getUserId());
             if (user != null) {

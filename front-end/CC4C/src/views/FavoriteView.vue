@@ -95,7 +95,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import UserInfo from '@/components/UserInfo.vue';
@@ -103,7 +103,6 @@ import PageFeedback from '@/components/common/PageFeedback.vue';
 import store from '@/store';
 import { assets } from '@/assets';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const activeTab = ref('courses');
@@ -132,7 +131,7 @@ function formatDate(value) {
 }
 
 async function verifyUser() {
-  const response = await axios.get('http://localhost:4080/users/verify');
+  const response = await axios.get('/users/verify');
   if (response.data.data === false) {
     ElMessage.warning(response.data.msg || '请先登录');
     await router.push('/login');
@@ -147,8 +146,8 @@ async function loadFavorites() {
   try {
     if (!await verifyUser()) return;
     const [courseResponse, blogResponse] = await Promise.all([
-      axios.get(`http://localhost:4080/courses/favorList/${store.state.user.id}`),
-      axios.get(`http://localhost:4080/blogs/collectList/${store.state.user.id}`),
+      axios.get(`/courses/favorList/${store.state.user.id}`),
+      axios.get(`/blogs/collectList/${store.state.user.id}`),
     ]);
     favoriteCourses.value = Array.isArray(courseResponse.data.data) ? courseResponse.data.data : [];
     favoriteBlogs.value = Array.isArray(blogResponse.data.data) ? blogResponse.data.data : [];
@@ -165,7 +164,7 @@ function openCourse(courseName) {
 }
 
 function openBlog(blogId) {
-  axios.put(`http://localhost:4080/blogs/click/${blogId}`).catch((error) => console.error(error));
+  axios.put(`/blogs/click/${blogId}`).catch((error) => console.error(error));
   router.push({ path: '/blogDetail', query: { blogId } });
 }
 

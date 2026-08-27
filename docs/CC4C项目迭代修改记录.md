@@ -631,3 +631,119 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 - `back-end/CC4C/src/main/resources/application.yml` 未修改、未暂存，继续由 Git 忽略。
 - 前端构建产物位于已忽略的 `temp/`；`node_modules/`、`dist/`、`target/` 和 `temp/` 均不得提交。
 - 本轮没有启动或停止前后端服务，没有创建提交、推送分支或创建 PR。
+
+---
+
+## 13. 第三次迭代（V3）：生产级 Java 后端工程化规划
+
+### 13.1 当前状态
+
+截至 2026-08-27，V3 方面一“基础版本与依赖现代化”已完成实现、自动验证、脱敏环境运行和用户浏览器验收。升级保持了 V2 业务、URL、Cookie、JSON 和前端路由契约；方面二至方面七尚未实施。
+
+| 项目 | 当前记录 |
+| --- | --- |
+| 规划基线 | `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`） |
+| 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
+| 预计规模 | 6–8 周，按七个方面依次推进 |
+| 当前阶段 | 方面一已完成并通过用户浏览器验收 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、HikariCP、Jackson、Axios 1.19.0 |
+| 下一方面 | 模块化单体、API 与数据治理；尚未规划或实施 |
+
+### 13.2 已确定的总体路线
+
+1. 基础版本与依赖现代化。
+2. 模块化单体、API 与数据治理。
+3. Spring Security 与 Spring Session Redis 身份体系。
+4. Redis 缓存、数据库和性能优化。
+5. RabbitMQ、事务事件与异步可靠性。
+6. Actuator、Micrometer、Prometheus、Grafana 与 Gatling 性能证据。
+7. Docker Compose、Testcontainers 和 GitHub Actions 持续交付。
+
+Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地。Spring Modulith 1.4.12 以及其余后续技术仍是拟实施内容，不能在代码、README 或对外说明中表述为已经完成。
+
+### 13.3 安全与实施边界
+
+- V3 每个方面均需在新的计划对话中独立检查、设计、实施和验收，不因规划文档建立而自动开始。
+- `back-end/CC4C/src/main/resources/application.yml` 继续由 Git 忽略，禁止读取、覆盖、暂存或上传。
+- 只允许提交脱敏示例配置；`node_modules/`、`dist/`、`target/`、`temp/`、日志和本机凭据不得提交。
+- README 只有在相关能力真实落地并产生可复核证据后才允许更新，且不得展示虚构性能结果。
+
+### 13.4 方面一实际变更
+
+#### 后端基础版本与依赖
+
+- 通过 Spring Boot 2.7.18 兼容桥，最终升级到 Java 21 和 Spring Boot 3.5.16。
+- 切换到 `mybatis-plus-spring-boot3-starter:3.5.17`，MySQL 驱动版本交由 Spring Boot 管理，数据源使用默认 HikariCP。
+- 删除重复 MyBatis Starter，以及无实际调用依据的 MPJ、Druid、Fastjson 和未使用分页配置；没有提前引入方面二的数据治理能力。
+- 完成 Servlet API 的 Jakarta 迁移，测试模拟注解切换为 `@MockitoBean`；全仓不再保留 `javax.*` 兼容依赖。
+- 用 Java 集合和 Jackson 保持原 JSON 字段；文件工具改用 `Path.resolve` 和 `Files.createDirectories`，移除硬编码 Windows 保存路径。
+- 保留 `/test` 路由并将控制器类规范为 `TestController`，上传接口继续返回既有字段。
+
+#### 配置与测试安全网
+
+- Maven 测试固定加载 `application-test.yml`，测试数据库仅接受无默认值的 `CC4C_TEST_DB_URL`、`CC4C_TEST_DB_USERNAME`、`CC4C_TEST_DB_PASSWORD`。
+- 新增脱敏 `.env.test.example` 和 `run-tests.ps1`；本机 `.env.test.local` 缺失或变量为空时快速失败，不回退到开发数据库。
+- Maven Resources 排除本机 `application.yml`，最终 JAR 只保留脱敏 `application-example.yml`。
+- 新增 V2 兼容测试和 `/test` 上传测试，固定 Cookie、CORS、收藏摘要、HTTP 200 业务失败、上传响应和 HikariCP 等行为。
+
+#### 前端最小适配
+
+- Axios 移入运行时依赖并锁定 1.19.0，删除无运行引用的 `vue-cli-plugin-axios` 和旧 `src/api/user.js`。
+- 20 个活动页面/组件统一复用 `src/plugins/axiosInstance.js`，移除分散的绝对 API 地址和重复 `withCredentials` 设置。
+- 新增公开的 `VITE_API_BASE_URL`，默认仍为 `http://localhost:4080`；前端路由、Vuex 数据模型、视觉和业务交互未调整。
+
+### 13.5 自动验证证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 工具链 | Maven 3.9.16；Eclipse Temurin Java 21.0.12.1 |
+| 后端 `./run-tests.ps1 clean verify` | 23/23 通过，0 失败、0 错误、0 跳过；JAR 构建成功 |
+| 有效 POM | Parent 3.5.16、Java 21、MyBatis-Plus 3.5.17 |
+| 依赖树 | 存在 Boot 3 MyBatis-Plus Starter、HikariCP、MySQL 驱动；不存在旧 Starter、MPJ、Druid、Fastjson |
+| JAR 配置清单 | 不含 `BOOT-INF/classes/application.yml`；包含脱敏 `application-example.yml` |
+| 源码静态扫描 | 未发现 `javax.*`、Fastjson、MPJ、Druid、旧 Starter、`@MockBean` 或硬编码 Windows 保存路径 |
+| 前端 `npm ci` | 通过 |
+| 前端生产构建 | 两次通过，均转换 1495 个模块；第二次确认 `VITE_API_BASE_URL` 覆盖生效 |
+| `git diff --check` | 通过 |
+
+后端最终验证命令：
+
+```powershell
+cd back-end/CC4C
+.\run-tests.ps1 clean verify
+```
+
+前端最终验证命令：
+
+```powershell
+cd front-end/CC4C
+npm ci
+npm run build -- --outDir ../../temp/cc4c-v3-aspect1-build
+$env:VITE_API_BASE_URL = 'http://127.0.0.1:4080/'
+npm run build -- --outDir ../../temp/cc4c-v3-aspect1-build-override
+```
+
+### 13.6 运行与浏览器验收
+
+- 后端以 `SPRING_CONFIG_NAME=application-example` 和显式环境变量启动，运行时确认 Java 21、Spring Boot 3.5.16 和 Tomcat 10.1.55；未加载本机 `application.yml`。
+- 在线契约回归覆盖用户正确/错误登录、Cookie、资料、头像、密码修改与恢复，课程首页/搜索/详情/收藏/评论/回复，博客草稿/上传/提交/审核/公开详情/收藏/评论/回复，以及管理员登录、课程发布和 CORS。
+- 在线契约全部通过；后端与前端运行日志未发现新增错误，`/`、`/blogsdetail`、`/blogDetail`、`/admin`、`/test` 均可访问。
+- 2026-08-27 用户确认方面一浏览器验收通过。
+- 验收结束后仅停止本次启动的 V3 前后端进程，端口 4080 和 5173 已释放；MySQL 未停止。
+
+### 13.7 兼容性结论
+
+- `/users`、`/admin`、`/courses`、`/blogs`、`/comments`、`/test` 的路径和 HTTP 方法保持不变。
+- `Result` 继续使用 `code/data/msg`，既有业务失败继续返回 HTTP 200。
+- `user_email` 和 `admin` Cookie 的名称、值、路径、HttpOnly、有效期和退出删除行为保持不变。
+- Long ID 继续序列化为字符串，密码字段不出现在响应；课程收藏摘要和博客上传响应字段保持不变。
+- `/blogsdetail`、`/blogDetail` 等前端路由未修改，默认 API 地址及环境变量覆盖均已验证。
+
+### 13.8 已知非阻塞项与发布安全
+
+1. `npm audit --omit=dev` 仍报告 7 个既有生产依赖漏洞（3 个中等、4 个高危），涉及编辑器、Element Plus 及其传递依赖；Axios 1.19.0 不在报告中。修复需要升级方面一明确冻结的前端框架/编辑器依赖，未在本方面越界处理。
+2. Vite 仍报告主包大于 500 KiB 的既有提示；本方面没有开展拆包或性能优化。
+3. MyBatis-Plus 仍输出部分关联实体缺少 `@TableId` 的既有警告；数据模型治理留待方面二。
+4. Windows 工作区中的 `testController.java` 属于仅大小写重命名。未来获得暂存授权后，应使用两步 `git mv` 确保 Git 正确记录为 `TestController.java`；本方面未执行暂存。
+5. 本机 `application.yml` 未读取、未修改、未暂存；凭据和本机绝对路径未写入变更文件。
+6. `node_modules/`、`dist/`、`target/`、`temp/` 和日志仍处于忽略范围。本方面未暂存、提交或推送。

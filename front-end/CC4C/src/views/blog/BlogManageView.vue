@@ -68,14 +68,13 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Document, EditPen, View } from '@element-plus/icons-vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import UserInfo from '@/components/UserInfo.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import store from '@/store';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const blogList = ref([]);
@@ -106,7 +105,7 @@ function formatDate(value) {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('http://localhost:4080/users/verify');
+    const resp = await axios.get('/users/verify');
     if (resp.data.data === false) {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
@@ -126,7 +125,7 @@ async function loadBlogs() {
   try {
     const verified = await verifyUser();
     if (!verified) return;
-    const resp = await axios.get(`http://localhost:4080/blogs/myBlogs/${store.state.user.id}`);
+    const resp = await axios.get(`/blogs/myBlogs/${store.state.user.id}`);
     blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     blogList.value = [];

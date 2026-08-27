@@ -123,13 +123,12 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { Loading, Plus } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 
-axios.defaults.withCredentials = true;
 
 const languages = [
   { value: 1, name: 'java', label: 'Java' },
@@ -188,7 +187,7 @@ async function loadModules() {
   moduleLoading.value = true;
   moduleError.value = '';
   try {
-    const responses = await Promise.all(languages.map((language) => axios.get(`http://localhost:4080/courses/module/${language.value}`)));
+    const responses = await Promise.all(languages.map((language) => axios.get(`/courses/module/${language.value}`)));
     modules.value = languages.map((language, index) => {
       const children = (responses[index].data.data || []).map((module) => ({
         label: module.moduleName,
@@ -223,7 +222,7 @@ async function addModule() {
   if (moduleNameError.value || moduleSubmitting.value) return;
   moduleSubmitting.value = true;
   try {
-    const response = await axios.post('http://localhost:4080/courses/module', {
+    const response = await axios.post('/courses/module', {
       languageId: moduleForm.languageId,
       moduleName: moduleForm.moduleName.trim(),
       level: moduleForm.level,
@@ -260,7 +259,7 @@ async function publishCourse() {
   }
   publishing.value = true;
   try {
-    const response = await axios.post('http://localhost:4080/courses/add', {
+    const response = await axios.post('/courses/add', {
       languageName: language.name,
       languageId: language.value,
       courseName: courseForm.courseName.trim(),
@@ -295,7 +294,7 @@ async function onUploadImg(files, callback) {
     const responses = await Promise.all(files.map(async (file) => {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await axios.post('http://localhost:4080/blogs/uploadImg', formData, {
+      const response = await axios.post('/blogs/uploadImg', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (!response.data.url) throw new Error(response.data.MSG || '图片上传失败');

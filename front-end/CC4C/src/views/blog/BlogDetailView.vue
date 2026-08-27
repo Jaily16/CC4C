@@ -132,7 +132,7 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { ArrowLeft, Calendar, CollectionTag, Reading, User, View } from '@element-plus/icons-vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
@@ -141,7 +141,6 @@ import store from '@/store';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const route = useRoute();
 const router = useRouter();
@@ -213,7 +212,7 @@ async function loadComments() {
   commentsLoading.value = true;
   commentsError.value = '';
   try {
-    const resp = await axios.get(`http://localhost:4080/comments/blog/${blogData.value.blogId}`);
+    const resp = await axios.get(`/comments/blog/${blogData.value.blogId}`);
     commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     commentList.value = [];
@@ -238,7 +237,7 @@ async function loadBlog() {
 
   loading.value = true;
   try {
-    const resp = await axios.get(`http://localhost:4080/blogs/${encodeURIComponent(blogId)}`);
+    const resp = await axios.get(`/blogs/${encodeURIComponent(blogId)}`);
     if (!resp.data.data?.blogId) {
       errorMessage.value = resp.data.msg || '未找到该博客。';
       return;
@@ -249,7 +248,7 @@ async function loadBlog() {
     if (blogData.value.state === 1) requests.push(loadComments());
     if (blogData.value.state === 1 && loggedIn.value) {
       requests.push(
-        axios.get(`http://localhost:4080/blogs/ifCollect/${store.state.user.id}/${blogData.value.blogId}`)
+        axios.get(`/blogs/ifCollect/${store.state.user.id}/${blogData.value.blogId}`)
           .then((favorResp) => { isFavor.value = favorResp.data.data === true; })
           .catch((error) => console.error(error))
       );
@@ -267,8 +266,8 @@ async function toggleCollect() {
   if (!blogData.value?.blogId || !loggedIn.value) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete(`http://localhost:4080/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`)
-      : await axios.get(`http://localhost:4080/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`);
+      ? await axios.delete(`/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`)
+      : await axios.get(`/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`);
     if (!resp.data.data) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -289,7 +288,7 @@ async function comment() {
   }
   commentSubmitting.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/comments/blog', {
+    const resp = await axios.post('/comments/blog', {
       userId: store.state.user.id,
       content: commentText.value.trim(),
       blogId: blogData.value.blogId,
@@ -323,7 +322,7 @@ async function reply(fatherId) {
   }
   replySubmitting.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/comments/indirect', {
+    const resp = await axios.post('/comments/indirect', {
       userId: store.state.user.id,
       content: replyText.value.trim(),
       fatherId,

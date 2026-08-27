@@ -98,13 +98,12 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const form = reactive({ email: '', password: '' });
@@ -150,7 +149,7 @@ async function login() {
 
   loggingIn.value = true;
   try {
-    const loginResp = await axios.post('http://localhost:4080/users/login', {
+    const loginResp = await axios.post('/users/login', {
       email: form.email,
       password: form.password,
     });
@@ -161,7 +160,7 @@ async function login() {
       return;
     }
 
-    const infoResp = await axios.get('http://localhost:4080/users/info');
+    const infoResp = await axios.get('/users/info');
     const currentUser = infoResp.data.data;
     if (!currentUser || !currentUser.id) {
       formError.value = infoResp.data.msg || '获取用户信息失败';
@@ -206,7 +205,7 @@ async function getVCode() {
 
   sendingRecoveryCode.value = true;
   try {
-    const resp = await axios.get(`http://localhost:4080/users/email/${encodeURIComponent(findForm.email)}`);
+    const resp = await axios.get(`/users/email/${encodeURIComponent(findForm.email)}`);
     if (!resp.data.data) {
       recoveryError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(recoveryError.value);
@@ -238,7 +237,7 @@ async function findPassword() {
 
   findingPassword.value = true;
   try {
-    const resp = await axios.put('http://localhost:4080/users/password/forget', {
+    const resp = await axios.put('/users/password/forget', {
       email: findForm.email,
       newPassword: findForm.password,
     });

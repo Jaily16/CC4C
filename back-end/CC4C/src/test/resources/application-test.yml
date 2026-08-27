@@ -1,4 +1,8 @@
 spring:
+  datasource:
+    url: ${CC4C_TEST_DB_URL}
+    username: ${CC4C_TEST_DB_USERNAME}
+    password: ${CC4C_TEST_DB_PASSWORD}
   mail:
     username: test-sender@example.com
 

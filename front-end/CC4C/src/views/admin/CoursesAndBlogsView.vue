@@ -90,7 +90,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
@@ -126,9 +126,9 @@ async function loadOverview() {
   errorMessage.value = '';
   try {
     const [coursesResponse, blogsResponse, pendingResponse] = await Promise.all([
-      axios.get('http://localhost:4080/courses/home'),
-      axios.get('http://localhost:4080/blogs/all'),
-      axios.get('http://localhost:4080/blogs/examine'),
+      axios.get('/courses/home'),
+      axios.get('/blogs/all'),
+      axios.get('/blogs/examine'),
     ]);
     courseList.value = Array.isArray(coursesResponse.data.data) ? coursesResponse.data.data : [];
     blogList.value = Array.isArray(blogsResponse.data.data) ? blogsResponse.data.data : [];

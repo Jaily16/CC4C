@@ -17,8 +17,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,25 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @ActiveProfiles("test")
 @Transactional
 abstract class FunctionalTestSupport {
+
+    @DynamicPropertySource
+    static void registerTestDatabaseProperties(DynamicPropertyRegistry registry) {
+        String url = requiredEnvironmentVariable("CC4C_TEST_DB_URL");
+        String username = requiredEnvironmentVariable("CC4C_TEST_DB_USERNAME");
+        String password = requiredEnvironmentVariable("CC4C_TEST_DB_PASSWORD");
+
+        registry.add("spring.datasource.url", () -> url);
+        registry.add("spring.datasource.username", () -> username);
+        registry.add("spring.datasource.password", () -> password);
+    }
+
+    private static String requiredEnvironmentVariable(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Required test database environment variable is missing: " + name);
+        }
+        return value;
+    }
 
     @Autowired
     protected MockMvc mockMvc;
@@ -55,7 +76,7 @@ abstract class FunctionalTestSupport {
     @Autowired
     protected BlogDao blogDao;
 
-    @MockBean
+    @MockitoBean
     protected EmailSender emailSender;
 
     protected String unique(String prefix) {

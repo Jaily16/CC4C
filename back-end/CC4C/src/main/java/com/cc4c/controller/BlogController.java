@@ -1,6 +1,5 @@
 package com.cc4c.controller;
 
-import com.alibaba.fastjson.JSONObject;
 import com.cc4c.dao.BlogDao;
 import com.cc4c.entity.Blog;
 import com.cc4c.entity.BlogDraft;
@@ -15,7 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @RestController
@@ -31,8 +32,8 @@ public class BlogController {
   private BlogService blogService;
 
   @PostMapping("/uploadImg")
-  public JSONObject img(@RequestParam(value = "file") MultipartFile file){
-    JSONObject json = new JSONObject();
+  public Map<String, String> img(@RequestParam(value = "file") MultipartFile file){
+    Map<String, String> json = new LinkedHashMap<>();
     try{
       String s = FileUtils.uploadImg(file,
               saveImgPath,

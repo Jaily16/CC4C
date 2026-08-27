@@ -50,12 +50,11 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { assets } from '@/assets';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const form = reactive({ id: '', password: '' });
@@ -83,7 +82,7 @@ async function login() {
 
   loggingIn.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/admin/login', {
+    const resp = await axios.post('/admin/login', {
       adminId: form.id,
       adminPassword: form.password,
     });

@@ -79,7 +79,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
@@ -113,7 +113,7 @@ async function loadPendingBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const response = await axios.get('http://localhost:4080/blogs/examine');
+    const response = await axios.get('/blogs/examine');
     blogList.value = Array.isArray(response.data.data) ? response.data.data : [];
     if (selectedBlog.value && !blogList.value.some((blog) => blog.blogId === selectedBlog.value.blogId)) resetSelection();
   } catch (error) {
@@ -131,7 +131,7 @@ async function selectBlog(blog) {
   detailError.value = '';
   text.value = '';
   try {
-    const response = await axios.get(`http://localhost:4080/blogs/${blog.blogId}`);
+    const response = await axios.get(`/blogs/${blog.blogId}`);
     if (!response.data.data?.blogId) {
       detailError.value = response.data.msg || '博客正文读取失败。';
       return;
@@ -176,7 +176,7 @@ async function submitDecision(action) {
   operationAction.value = action;
   try {
     const endpoint = action === 'approve' ? 'approve' : 'deny';
-    const response = await axios.put(`http://localhost:4080/blogs/${endpoint}/${selectedBlog.value.blogId}`);
+    const response = await axios.put(`/blogs/${endpoint}/${selectedBlog.value.blogId}`);
     if (!response.data.data) {
       ElMessage.error(response.data.msg || '审核操作失败');
       return;

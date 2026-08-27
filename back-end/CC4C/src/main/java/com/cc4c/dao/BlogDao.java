@@ -1,8 +1,7 @@
 package com.cc4c.dao;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cc4c.entity.Blog;
-import com.cc4c.entity.Course;
-import com.github.yulichang.base.MPJBaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -11,7 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 @Mapper
-public interface BlogDao extends MPJBaseMapper<Blog> {
+public interface BlogDao extends BaseMapper<Blog> {
     //table blog_draft
     @Insert("insert into blog_draft(user_id,content) values(#{userId},#{content})")
     public int addDraft(Long userId, String content);

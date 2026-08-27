@@ -128,7 +128,7 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
@@ -136,7 +136,6 @@ import store from '@/store';
 import { assets } from '@/assets';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const MdCatalog = MdEditor.MdCatalog;
@@ -170,7 +169,7 @@ function selectedLanguage() {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('http://localhost:4080/users/verify');
+    const resp = await axios.get('/users/verify');
     if (resp.data.data === false) {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
@@ -189,7 +188,7 @@ async function loadCourseModules() {
   modulesLoading.value = true;
   modulesError.value = '';
   try {
-    const resp = await axios.get(`http://localhost:4080/courses/recommend/${language.no}/${store.state.user.major}`);
+    const resp = await axios.get(`/courses/recommend/${language.no}/${store.state.user.major}`);
     courseModules.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     courseModules.value = [];
@@ -215,7 +214,7 @@ async function loadComments() {
   }
   commentsError.value = '';
   try {
-    const resp = await axios.get(`http://localhost:4080/comments/course/${courseData.value.courseId}`);
+    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`);
     commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     commentList.value = [];
@@ -228,7 +227,7 @@ async function openCourse(courseName) {
   courseLoading.value = true;
   courseError.value = '';
   try {
-    const courseResp = await axios.get(`http://localhost:4080/courses/${encodeURIComponent(courseName)}`);
+    const courseResp = await axios.get(`/courses/${encodeURIComponent(courseName)}`);
     if (!courseResp.data.data?.courseId) {
       courseData.value = null;
       courseError.value = courseResp.data.msg || '课程加载失败';
@@ -237,7 +236,7 @@ async function openCourse(courseName) {
     courseData.value = courseResp.data.data;
     text.value = courseData.value.description || '';
     const [favorResult] = await Promise.all([
-      axios.get(`http://localhost:4080/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`).catch(() => null),
+      axios.get(`/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`).catch(() => null),
       loadComments(),
     ]);
     isFavor.value = favorResult?.data?.data === true;
@@ -258,8 +257,8 @@ async function starCourse() {
   if (!courseData.value?.courseId) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete(`http://localhost:4080/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.get(`http://localhost:4080/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
+      : await axios.get(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -279,7 +278,7 @@ async function comment() {
     return;
   }
   try {
-    const resp = await axios.post('http://localhost:4080/comments/course', {
+    const resp = await axios.post('/comments/course', {
       userId: store.state.user.id,
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
@@ -308,7 +307,7 @@ async function reply(fatherId) {
     return;
   }
   try {
-    const resp = await axios.post('http://localhost:4080/comments/indirect', {
+    const resp = await axios.post('/comments/indirect', {
       userId: store.state.user.id,
       content: replyText.value.trim(),
       fatherId,

@@ -123,7 +123,7 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { ArrowLeft, Reading } from '@element-plus/icons-vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
@@ -132,7 +132,6 @@ import store from '@/store';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
 
-axios.defaults.withCredentials = true;
 
 const route = useRoute();
 const router = useRouter();
@@ -191,7 +190,7 @@ async function loadComments() {
   commentsLoading.value = true;
   commentsError.value = '';
   try {
-    const resp = await axios.get(`http://localhost:4080/comments/course/${courseData.value.courseId}`);
+    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`);
     commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     commentList.value = [];
@@ -217,7 +216,7 @@ async function loadCourse() {
 
   courseLoading.value = true;
   try {
-    const resp = await axios.get(`http://localhost:4080/courses/${encodeURIComponent(courseName)}`);
+    const resp = await axios.get(`/courses/${encodeURIComponent(courseName)}`);
     if (!resp.data.data?.courseId) {
       courseError.value = resp.data.msg || '未找到该课程内容。';
       return;
@@ -228,7 +227,7 @@ async function loadCourse() {
     const requests = [loadComments()];
     if (loggedIn.value) {
       requests.push(
-        axios.get(`http://localhost:4080/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`)
+        axios.get(`/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`)
           .then((favorResp) => { isFavor.value = favorResp.data.data === true; })
           .catch((error) => console.error(error))
       );
@@ -246,8 +245,8 @@ async function toggleCollect() {
   if (!courseData.value?.courseId || !loggedIn.value) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete(`http://localhost:4080/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.get(`http://localhost:4080/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
+      : await axios.get(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -268,7 +267,7 @@ async function comment() {
   }
   commentSubmitting.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/comments/course', {
+    const resp = await axios.post('/comments/course', {
       userId: store.state.user.id,
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
@@ -302,7 +301,7 @@ async function reply(fatherId) {
   }
   replySubmitting.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/comments/indirect', {
+    const resp = await axios.post('/comments/indirect', {
       userId: store.state.user.id,
       content: replyText.value.trim(),
       fatherId,

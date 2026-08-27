@@ -55,7 +55,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { View } from '@element-plus/icons-vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
 const router = useRouter();
@@ -69,7 +69,7 @@ function blogSummary(blog) {
 
 async function openBlog(blogId) {
   try {
-    await axios.put(`http://localhost:4080/blogs/click/${blogId}`);
+    await axios.put(`/blogs/click/${blogId}`);
   } catch (error) {
     console.error(error);
   }
@@ -80,7 +80,7 @@ async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const resp = await axios.get('http://localhost:4080/blogs/all');
+    const resp = await axios.get('/blogs/all');
     blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     blogList.value = [];

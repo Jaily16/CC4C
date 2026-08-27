@@ -45,7 +45,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Position, SwitchButton } from '@element-plus/icons-vue';
@@ -63,7 +63,7 @@ const navItems = [
 
 async function logout() {
   try {
-    const resp = await axios.get('http://localhost:4080/users/logout');
+    const resp = await axios.get('/users/logout');
 
     if (resp.data.data === true) {
       store.commit('RESET_STATE');

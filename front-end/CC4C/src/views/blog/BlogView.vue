@@ -48,12 +48,11 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { View } from '@element-plus/icons-vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const blogList = ref([]);
@@ -66,7 +65,7 @@ function blogSummary(blog) {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('http://localhost:4080/users/verify');
+    const resp = await axios.get('/users/verify');
     if (resp.data.data === false) {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
@@ -82,7 +81,7 @@ async function verifyUser() {
 
 async function openBlog(blogId) {
   try {
-    await axios.put(`http://localhost:4080/blogs/click/${blogId}`);
+    await axios.put(`/blogs/click/${blogId}`);
   } catch (error) {
     console.error(error);
   }
@@ -93,7 +92,7 @@ async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const resp = await axios.get('http://localhost:4080/blogs/list/1');
+    const resp = await axios.get('/blogs/list/1');
     blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     blogList.value = [];

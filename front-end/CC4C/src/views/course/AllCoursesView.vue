@@ -69,7 +69,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { assets } from '@/assets';
@@ -134,13 +134,13 @@ async function requestCourses(url) {
 function loadLanguageCourses() {
   isSearching.value = false;
   searchInfo.value = '';
-  return requestCourses(`http://localhost:4080/courses/language/${encodeURIComponent(mainLang.value)}`);
+  return requestCourses(`/courses/language/${encodeURIComponent(mainLang.value)}`);
 }
 
 function searchCourses() {
   if (!searchInfo.value) return loadLanguageCourses();
   isSearching.value = true;
-  return requestCourses(`http://localhost:4080/courses/search/${encodeURIComponent(searchInfo.value)}`);
+  return requestCourses(`/courses/search/${encodeURIComponent(searchInfo.value)}`);
 }
 
 function clearSearch() {

@@ -88,7 +88,7 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { assets } from '@/assets';
 
 const router = useRouter();
@@ -144,7 +144,7 @@ async function getVCode() {
 
   sendingCode.value = true;
   try {
-    const resp = await axios.get(`http://localhost:4080/users/email/${encodeURIComponent(user.email)}`);
+    const resp = await axios.get(`/users/email/${encodeURIComponent(user.email)}`);
     if (!resp.data.data) {
       formError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(formError.value);
@@ -179,7 +179,7 @@ async function register() {
 
   registering.value = true;
   try {
-    const response = await axios.post('http://localhost:4080/users/register', {
+    const response = await axios.post('/users/register', {
       name: user.userName,
       email: user.email,
       password: user.password,

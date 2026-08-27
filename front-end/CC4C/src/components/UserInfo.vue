@@ -135,12 +135,11 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { EditPen, Loading, Lock, Notebook, Plus, StarFilled, UserFilled } from '@element-plus/icons-vue';
 import store from '@/store';
 
-axios.defaults.withCredentials = true;
 
 const props = defineProps({
   activeIndex: { type: [String, Number], default: 1 },
@@ -242,7 +241,7 @@ function resetPasswordDialog() {
 }
 
 async function syncCurrentUser() {
-  const response = await axios.get('http://localhost:4080/users/info');
+  const response = await axios.get('/users/info');
   const user = response.data.data;
   if (!user || !user.id) throw new Error(response.data.msg || '用户信息刷新失败');
   store.commit('SET_ID', user.id);
@@ -282,7 +281,7 @@ async function uploadAvatar({ file }) {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await axios.post('http://localhost:4080/users/uploadAvatar', formData, {
+    const response = await axios.post('/users/uploadAvatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     const requestPath = response.data.data?.requestPath;
@@ -306,7 +305,7 @@ async function saveProfile() {
 
   profileSaving.value = true;
   try {
-    const response = await axios.put('http://localhost:4080/users/update', {
+    const response = await axios.put('/users/update', {
       id: infoForm.id,
       name: infoForm.name.trim(),
       major: infoForm.major,
@@ -342,7 +341,7 @@ async function changePassword() {
 
   passwordSaving.value = true;
   try {
-    const response = await axios.put('http://localhost:4080/users/password/change', {
+    const response = await axios.put('/users/password/change', {
       id: currentUser.value.id,
       password: passwordForm.password,
       newPassword: passwordForm.newPassword,

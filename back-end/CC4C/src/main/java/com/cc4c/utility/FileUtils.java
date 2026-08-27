@@ -3,11 +3,15 @@ package com.cc4c.utility;
 
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 //文件工具类
 public class FileUtils {
@@ -20,27 +24,10 @@ public class FileUtils {
      * @return 文件存储是否成功，若成功返回图片的url请求路径，用于md编辑器的回显
      */
     public static String uploadImg(MultipartFile file, String path1, String name, String path2){
-        // 通过uuid产生一个图片名字
-        String uuid = UUID.randomUUID().toString().trim().replaceAll("-","");
-        String imgName = uuid + name;
-        // 随机选择了一文件夹
-        String code = Integer.toString(new Random().nextInt(5) + 1);
-        // 拼接路径
-        String imgPath = path1 + "img" + code + "\\";
-        String requestPath = path2 + "img" + code + "/";
-
-        try {
-            // 上传操作
-            File imgFile = new File(imgPath, imgName);
-            if (!imgFile.getParentFile().exists()) { //注意，判断父级路径是否存在
-                imgFile.getParentFile().mkdirs();
-            }
-            file.transferTo(imgFile);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        // 返回图片的路径
-        return requestPath + imgName;
+        String imgName = createImageName(name);
+        String directoryName = randomImageDirectory();
+        store(file, Path.of(path1).resolve(directoryName).resolve(imgName));
+        return requestPath(path2, directoryName, imgName);
     }
 
     /**
@@ -52,29 +39,37 @@ public class FileUtils {
      * @return 文件存储是否成功，若成功返回图片的url请求路径以及绝对路径，用于用户信息的存储以及前端图片的回显
      */
     public static Map<String, String> uploadAvatar(MultipartFile file, String path1, String name, String path2){
-        // 通过uuid产生一个图片名字
-        String uuid = UUID.randomUUID().toString().trim().replaceAll("-","");
-        String imgName = uuid + name;
-        // 随机选择了一文件夹
-        String code = Integer.toString(new Random().nextInt(5) + 1);
-        // 拼接路径
-        String imgPath = path1 + "img" + code + "\\";
-        String requestPath = path2 + "img" + code + "/";
+        String imgName = createImageName(name);
+        String directoryName = randomImageDirectory();
+        Path storedFile = Path.of(path1).resolve(directoryName).resolve(imgName);
+        store(file, storedFile);
 
-        try {
-            // 上传操作
-            File imgFile = new File(imgPath, imgName);
-            if (!imgFile.getParentFile().exists()) { //注意，判断父级路径是否存在
-                imgFile.getParentFile().mkdirs();
-            }
-            file.transferTo(imgFile);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        // 返回图片的路径
         Map<String, String> paths = new HashMap<>();
-        paths.put("imgPath", imgPath + imgName);
-        paths.put("requestPath", requestPath + imgName);
+        paths.put("imgPath", storedFile.toString());
+        paths.put("requestPath", requestPath(path2, directoryName, imgName));
         return paths;
+    }
+
+    private static String createImageName(String originalName) {
+        return UUID.randomUUID().toString().replace("-", "") + originalName;
+    }
+
+    private static String randomImageDirectory() {
+        return "img" + ThreadLocalRandom.current().nextInt(1, 6);
+    }
+
+    private static void store(MultipartFile file, Path targetFile) {
+        try {
+            Files.createDirectories(targetFile.getParent());
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to store uploaded file", exception);
+        }
+    }
+
+    private static String requestPath(String basePath, String directoryName, String imageName) {
+        return basePath.replaceAll("/+$", "") + "/" + directoryName + "/" + imageName;
     }
 }

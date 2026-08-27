@@ -113,11 +113,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { assets } from '@/assets';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const langDisplay = assets.languageDisplays;
@@ -153,7 +152,7 @@ async function loadCourses() {
   coursesLoading.value = true;
   coursesError.value = '';
   try {
-    const resp = await axios.get('http://localhost:4080/courses/home');
+    const resp = await axios.get('/courses/home');
     courses.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     courses.value = [];
@@ -168,7 +167,7 @@ async function loadBlogs() {
   blogsLoading.value = true;
   blogsError.value = '';
   try {
-    const resp = await axios.get('http://localhost:4080/blogs/home');
+    const resp = await axios.get('/blogs/home');
     blogs.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     blogs.value = [];
@@ -185,7 +184,7 @@ function openCourse(courseName) {
 
 async function openBlog(blogId) {
   try {
-    await axios.put(`http://localhost:4080/blogs/click/${blogId}`);
+    await axios.put(`/blogs/click/${blogId}`);
   } catch (error) {
     console.error(error);
   }

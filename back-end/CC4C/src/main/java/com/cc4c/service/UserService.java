@@ -4,8 +4,6 @@ import com.cc4c.entity.Result;
 import com.cc4c.entity.User;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-
 public interface UserService {
   /**
    * 用户注册

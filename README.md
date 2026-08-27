@@ -7,8 +7,8 @@
     <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.2-42b883?logo=vuedotjs&logoColor=white" />
     <img alt="Element Plus" src="https://img.shields.io/badge/Element_Plus-2.2-409eff" />
     <img alt="Vite" src="https://img.shields.io/badge/Vite-3.0-646cff?logo=vite&logoColor=white" />
-    <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-2.6-6db33f?logo=springboot&logoColor=white" />
-    <img alt="Java" src="https://img.shields.io/badge/Java-17-ed8b00?logo=openjdk&logoColor=white" />
+    <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.16-6db33f?logo=springboot&logoColor=white" />
+    <img alt="Java" src="https://img.shields.io/badge/Java-21-ed8b00?logo=openjdk&logoColor=white" />
     <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.x-4479a1?logo=mysql&logoColor=white" />
   </p>
 </div>
@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本在保持既有前后端功能与 REST API 契约不变的前提下，进一步统一了视觉语言、页面反馈、响应式布局和键盘焦点体验。
+当前版本在保持既有前后端功能与 REST API 契约不变的前提下，已完成 V3 方面一“基础版本与依赖现代化”：后端运行基线升级到 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，前端 API 请求集中到 Axios 1.19.0 客户端。V3 后续六个方面尚未实施。
 
 ## 平台亮点
 
@@ -107,10 +107,10 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 前端框架 | Vue 3、Vue Router、Vuex |
 | UI 与交互 | Element Plus、Element Plus Icons、响应式 CSS |
 | 内容编辑 | md-editor-v3、sanitize-html |
-| 网络与构建 | Axios、Vite |
-| 后端框架 | Spring Boot、Java |
-| 数据访问 | MyBatis-Plus、MyBatis-Plus-Join、Druid |
-| 数据与服务 | MySQL、JavaMail、文件资源读写 |
+| 网络与构建 | Axios 1.19.0、Vite |
+| 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet |
+| 数据访问 | MyBatis-Plus 3.5.17、HikariCP、MySQL |
+| 序列化与服务 | Jackson、JavaMail、文件资源读写 |
 
 ## 系统架构
 
@@ -119,7 +119,7 @@ flowchart LR
     U[用户 / 管理员] --> V[Vue 3 SPA]
     V -->|Axios · REST API| C[Spring Boot Controller]
     C --> S[Service 业务层]
-    S --> M[MyBatis-Plus / MPJ]
+    S --> M[MyBatis-Plus / HikariCP]
     M --> D[(MySQL)]
     S --> E[JavaMail]
     S --> F[头像与内容图片资源]
@@ -155,8 +155,8 @@ CC4C/
 
 ### 1. 环境要求
 
-- JDK 17
-- Maven 3.8+
+- JDK 21
+- Maven 3.6.3+
 - Node.js 18+ 与 npm
 - MySQL 8.x
 
@@ -175,23 +175,11 @@ cd CC4C
 mysql -u <username> -p <database_name> < database/cc4c.sql
 ```
 
-### 4. 创建本机后端配置
+### 4. 配置后端运行环境
 
-真实配置文件必须仅保留在本机。先复制脱敏模板：
+仓库只跟踪脱敏的 `application-example.yml`。使用环境变量提供本机参数，并在启动时显式选择该配置；不要读取、复制或提交本机 `application.yml`。
 
-```bash
-cp back-end/CC4C/src/main/resources/application-example.yml \
-   back-end/CC4C/src/main/resources/application.yml
-```
-
-Windows PowerShell：
-
-```powershell
-Copy-Item back-end/CC4C/src/main/resources/application-example.yml `
-  back-end/CC4C/src/main/resources/application.yml
-```
-
-按本机环境设置模板中引用的环境变量：
+可用环境变量：
 
 | 环境变量 | 用途 |
 | --- | --- |
@@ -205,12 +193,16 @@ Copy-Item back-end/CC4C/src/main/resources/application-example.yml `
 | `CC4C_SAVE_AVATAR_PATH` | 本机头像保存目录 |
 | `CC4C_SAVE_IMG_PATH` | 本机内容图片保存目录 |
 
-> 不要把真实值写回 `application-example.yml`，也不要提交生成的 `application.yml`。
+> 不要把真实值写回 `application-example.yml`、README、日志或源码。数据库连接变量应显式设置；邮件变量仅在需要真实邮件投递时设置。
 
 ### 5. 启动后端
 
-```bash
+```powershell
 cd back-end/CC4C
+$env:SPRING_CONFIG_NAME = 'application-example'
+$env:CC4C_DB_URL = 'jdbc:mysql://127.0.0.1:3306/<database_name>'
+$env:CC4C_DB_USERNAME = '<username>'
+$env:CC4C_DB_PASSWORD = '<password>'
 mvn spring-boot:run
 ```
 
@@ -220,11 +212,17 @@ mvn spring-boot:run
 
 ### 6. 启动前端
 
-在另一个终端中执行：
+先创建本机前端环境文件：
+
+```powershell
+cd front-end/CC4C
+Copy-Item .env.example .env.local
+```
+
+按需修改其中公开的 `VITE_API_BASE_URL`；默认值仍为 `http://localhost:4080`，该文件不得存放秘密。然后执行：
 
 ```bash
-cd front-end/CC4C
-npm install
+npm ci
 npm run dev
 ```
 
@@ -236,19 +234,24 @@ npm run dev
 
 ```bash
 cd front-end/CC4C
+npm ci
 npm run build
 ```
 
-后端测试：
+后端测试必须连接已由 `database/cc4c.sql` 初始化的专用测试库。Windows PowerShell 推荐使用受控脚本；`.env.test.local` 缺失或三个变量任一为空时会快速失败，不会回退到开发库：
 
-```bash
+```powershell
 cd back-end/CC4C
-mvn test
+Copy-Item .env.test.example .env.test.local
+# 只在 .env.test.local 中填写 CC4C_TEST_DB_URL、CC4C_TEST_DB_USERNAME、CC4C_TEST_DB_PASSWORD
+.\run-tests.ps1 clean verify
 ```
 
 ## 安全说明
 
 - `back-end/CC4C/src/main/resources/application.yml` 是本机真实配置，已被 Git 忽略，禁止提交。
+- Maven 构建显式排除 `application.yml`；最终 JAR 只允许包含脱敏的 `application-example.yml`。
+- `.env.test.local` 与前端 `.env.local` 仅限本机使用，禁止提交；`.env.example` 文件不得包含秘密。
 - 不要在源码、README、截图、Issue 或日志中放入 Token、Cookie、数据库密码、SMTP 授权码等敏感信息。
 - GitHub 只应保留脱敏的 `application-example.yml`；如怀疑密钥泄露，请先轮换密钥，再清理历史记录。
 - `node_modules/`、`dist/`、`target/`、`temp/` 和运行日志均属于本地产物，不应提交。

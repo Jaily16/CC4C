@@ -1,6 +1,5 @@
 package com.cc4c.controller;
 
-import com.alibaba.fastjson.JSONObject;
 import com.cc4c.entity.Code;
 import com.cc4c.entity.Course;
 import com.cc4c.entity.CourseModule;
@@ -10,7 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/courses")
@@ -66,10 +67,10 @@ public class CourseController {
 
     @GetMapping("/favorList/{id}")
     private Result getFavorCourseList(@PathVariable("id") Long userId){
-        List<JSONObject> courseList = new ArrayList<>();
+        List<Map<String, String>> courseList = new ArrayList<>();
         List<Course> favorCourseList = courseService.getFavorCourseList(userId);
         for(Course course : favorCourseList){
-            JSONObject json = new JSONObject();
+            Map<String, String> json = new LinkedHashMap<>();
             json.put("courseName", course.getCourseName());
             json.put("languageName", course.getLanguageName());
             courseList.add(json);

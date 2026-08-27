@@ -79,13 +79,12 @@ import { computed, ref, watch } from 'vue';
 import { Loading } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import store from '@/store';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const title = ref('');
@@ -122,7 +121,7 @@ function backendMessage(error, fallback) {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('http://localhost:4080/users/verify');
+    const resp = await axios.get('/users/verify');
     if (resp.data.data === false) {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
@@ -138,7 +137,7 @@ async function verifyUser() {
 
 async function loadDraft() {
   try {
-    const resp = await axios.get(`http://localhost:4080/blogs/draft/${store.state.user.id}`);
+    const resp = await axios.get(`/blogs/draft/${store.state.user.id}`);
     if (resp.data.data != null) {
       text.value = resp.data.data;
       ElMessage.info('已恢复上次保存的草稿正文');
@@ -172,7 +171,7 @@ async function publish() {
   if (!validatePublish() || publishSubmitting.value || uploading.value) return;
   publishSubmitting.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/blogs/submit', {
+    const resp = await axios.post('/blogs/submit', {
       writerId: store.state.user.id,
       title: title.value.trim(),
       languageList: langList.value,
@@ -203,7 +202,7 @@ async function draft() {
   if (draftSaving.value || uploading.value) return;
   draftSaving.value = true;
   try {
-    const resp = await axios.post('http://localhost:4080/blogs/draft', {
+    const resp = await axios.post('/blogs/draft', {
       userId: store.state.user.id,
       content: text.value,
     });
@@ -227,7 +226,7 @@ async function onUploadImg(files, callback) {
     const responses = await Promise.all(files.map(async (file) => {
       const form = new FormData();
       form.append('file', file);
-      const resp = await axios.post('http://localhost:4080/blogs/uploadImg', form, {
+      const resp = await axios.post('/blogs/uploadImg', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (!resp.data?.url) {

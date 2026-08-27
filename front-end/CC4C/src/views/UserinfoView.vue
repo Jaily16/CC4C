@@ -64,14 +64,13 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import UserInfo from '@/components/UserInfo.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import store from '@/store';
 
-axios.defaults.withCredentials = true;
 
 const router = useRouter();
 const loading = ref(false);
@@ -104,13 +103,13 @@ async function loadProfile() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const verifyResponse = await axios.get('http://localhost:4080/users/verify');
+    const verifyResponse = await axios.get('/users/verify');
     if (verifyResponse.data.data === false) {
       ElMessage.warning(verifyResponse.data.msg || '请先登录');
       await router.push('/login');
       return;
     }
-    const infoResponse = await axios.get('http://localhost:4080/users/info');
+    const infoResponse = await axios.get('/users/info');
     if (!infoResponse.data.data?.id) {
       errorMessage.value = infoResponse.data.msg || '个人信息加载失败，请重试。';
       return;

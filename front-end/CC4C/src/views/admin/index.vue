@@ -49,13 +49,12 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import axios from 'axios';
+import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { Checked, DataAnalysis, Plus } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 
-axios.defaults.withCredentials = true;
 
 const route = useRoute();
 const router = useRouter();
@@ -71,7 +70,7 @@ const activePath = computed(() => route.path);
 async function verifyAdmin() {
   verifying.value = true;
   try {
-    const response = await axios.get('http://localhost:4080/admin/verify');
+    const response = await axios.get('/admin/verify');
     if (response.data.data === false) {
       ElMessage.warning(response.data.msg || '请先登录管理端');
       await router.replace('/adminLogin');
@@ -89,7 +88,7 @@ async function verifyAdmin() {
 
 async function logout() {
   try {
-    await axios.get('http://localhost:4080/admin/logout');
+    await axios.get('/admin/logout');
   } catch (error) {
     console.error(error);
   } finally {
