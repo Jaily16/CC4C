@@ -24,6 +24,11 @@ spring:
     username: test-sender@example.com
 
 cc4c:
+  cache:
+    enabled: true
+    redis-url: ${CC4C_TEST_CACHE_REDIS_URL}
+    namespace: ${CC4C_TEST_CACHE_REDIS_NAMESPACE:cc4c:test:cache:manual}
+    test-cleanup-enabled: true
   security:
     pepper: cc4c-functional-test-pepper-not-a-production-secret
     cookie-secure: false

@@ -64,6 +64,7 @@ public class InteractionService {
             throw new BusinessException(HttpStatus.CONFLICT, BusinessCode.CONFLICT, "课程已收藏");
         }
         mapper.insertCourseFavorite(userId, courseId);
+        catalogLookup.invalidateCoursePopularity();
         return true;
     }
 
@@ -73,6 +74,7 @@ public class InteractionService {
         if (mapper.deleteCourseFavorite(userId, courseId) == 0) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "课程收藏不存在");
         }
+        catalogLookup.invalidateCoursePopularity();
         return true;
     }
 

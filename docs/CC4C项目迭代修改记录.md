@@ -638,16 +638,16 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 
 ### 13.1 当前状态
 
-截至 2026-08-27，V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”和方面三“安全与身份体系”均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面三以方面二提交 `57d769b` 为基线，已用 Spring Security、Spring Session Redis、BCrypt、CSRF、服务端角色及所有权校验替换旧业务 Cookie 和明文密码比较；方面四至方面七尚未实施。
+截至 2026-08-28，V3 方面一至方面四均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面四以方面三提交 `ca628e1` 为唯一基线，在不改变 URL、DTO、状态码、安全 Cookie、CSRF 和模块边界的前提下加入 Redis Cache-Aside、批量查询、Flyway V5 复合索引及可重复性能基准；方面五至方面七尚未实施。
 
 | 项目 | 当前记录 |
 | --- | --- |
 | 规划基线 | `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`） |
 | 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
 | 预计规模 | 6–8 周，按七个方面依次推进 |
-| 当前阶段 | 方面三已完成并通过用户浏览器验收 |
-| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V4、Spring Security、Spring Session Data Redis、BCrypt、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
-| 下一方面 | 缓存、数据库与性能优化；尚未规划或实施 |
+| 当前阶段 | 方面四已完成并通过自动、性能与用户浏览器验收 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V5、Spring Security、Spring Session Data Redis、BCrypt、Redis Cache-Aside、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
+| 下一方面 | 异步事件与可靠性；尚未规划或实施 |
 
 ### 13.2 已确定的总体路线
 
@@ -659,7 +659,7 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 6. Actuator、Micrometer、Prometheus、Grafana 与 Gatling 性能证据。
 7. Docker Compose、Testcontainers 和 GitHub Actions 持续交付。
 
-Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway V1–V3 已在方面二落地；Spring Security、Spring Session Redis、BCrypt、CSRF、安全限流和 Flyway V4 已在方面三落地。Redis 业务缓存、RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
+Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway V1–V3 已在方面二落地；Spring Security、Spring Session Redis、BCrypt、CSRF、安全限流和 Flyway V4 已在方面三落地；Redis 业务缓存、批量查询、Flyway V5 及隔离性能基准已在方面四落地。RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
 
 ### 13.3 安全与实施边界
 
@@ -889,8 +889,59 @@ flowchart LR
 ### 13.14 当前契约、已知项与发布安全
 
 - 认证 Cookie 已从 `user_email`/`admin` 明确升级为单一 `CC4C_SESSION`，升级后旧会话必须重新登录。Cookie、CSRF、角色和所有权变化属于方面三公开安全契约，不再保持方面一的旧 Cookie 兼容性。
-- Redis 当前只承载 Session、验证码摘要和安全限流，不包含课程、博客等业务缓存。方面四尚未规划或实施，也没有缓存命中率或性能提升数字。
+- 在方面三验收时，Redis 只承载 Session、验证码摘要和安全限流，尚无课程、博客业务缓存或性能提升数字；该历史状态已由下文方面四实现与实测证据替换。
 - `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），且 Vite 保留主包大于 500 KiB 的提示；方面三未越界升级 Vue、Vite、Vuex、Element Plus 或编辑器，也未执行 `npm audit fix`。
 - 本次本地验收使用临时 Redis 容器，但没有形成 Docker Compose 或容器化交付；容器编排属于方面七。
 - 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件。`.env.runtime.local`、`.env.test.local`、数据库备份、日志、Redis 数据、`target`、`node_modules`、`dist` 和 `temp` 均保持忽略。
 - 方面三代码、测试和文档作为一个独立本地提交收口；不执行推送，任何推送仍需进一步明确授权。
+
+### 13.15 方面四实际变更
+
+#### 缓存基础设施与边界
+
+- 方面四以本地提交 `ca628e1` 为唯一基线，没有修改公开 URL、请求/响应 DTO、HTTP 状态、安全 Cookie、CSRF、前端路由或六模块依赖方向。
+- 新增独立业务缓存配置 `CC4C_BUSINESS_CACHE_ENABLED`、`CC4C_CACHE_REDIS_URL` 和 `CC4C_CACHE_NAMESPACE`。本地允许与安全 Redis 使用同一实例，但 namespace 必须不同；生产环境要求独立实例。
+- `shared` 模块实现显式 Cache-Aside 门面：缓存 key 包含 namespace、版本、region generation 和参数摘要；值使用无多态类型信息的 UTF-8 JSON 信封，单项超过 1 MiB 跳过，不使用 JDK 原生序列化。
+- TTL 支持 ±15% 抖动和 30 秒负缓存。同 JVM 使用 per-key 单飞，多实例使用 `SET NX PX` 短锁与带 token 的 Lua 解锁；锁失败或超时直接回源，不阻塞业务。
+- Redis 连续异常 3 次后进入 30 秒本地旁路，恢复探测成功后退出。损坏 JSON 只删除当前 key 并回源；公开查询缓存故障不阻止启动或读取，Session、验证码和限流仍保持安全失败。
+- 写操作只在事务提交后增加 region generation，以 O(1) 方式失效；回滚事务不失效缓存。测试清理仅允许 `SCAN` 精确测试 namespace 后逐键删除，禁止 `KEYS`、`FLUSHDB`、`FLUSHALL` 和无前缀删除。
+
+#### Catalog、Community 与 SQL 治理
+
+- Catalog 缓存课程首页、语言列表、公开详情、模块树和推荐结果；课程/模块创建以及课程收藏变化在事务提交后失效相关 generation。
+- 模块树和推荐课程从逐模块查询改为“模块一次、课程关系一次”的两次批量查询，查询次数不随模块数量增长。
+- Community 只缓存已审核博客首页、全部、语言列表和公开详情；搜索、个人博客、草稿、收藏、待审核、评论与回复均不缓存。作者或管理员读取非公开内容始终查库并重新执行所有权判断。
+- 审核、驳回和作者删除博客在事务提交后失效公开列表及详情；点击仍同步写入 MySQL 且不逐次清缓存，公开读数由约 15 秒 TTL 收敛。
+- 新增 `V5__add_interaction_query_indexes.sql`，为 `user_favors_course(user_id, time DESC, course_id)` 与 `user_collects_blog(user_id, time DESC, blog_id DESC)` 增加复合索引。大数据性能库的只读 `EXPLAIN FORMAT=JSON` 确认两个 V5 索引均存在并被相应查询选择。
+
+#### 独立性能基准
+
+- 新增显式 Maven `aspect4-benchmark` profile 和 `run-aspect4-benchmark.ps1`；标准 `clean verify` 不执行大数据基准。
+- 工具只接受名称精确以 `_perf_test` 结尾且确认变量完全匹配的数据库。固定随机种子 `20260827`，生成 2,000 用户、1,000 课程、20,000 博客以及合计 200,000 条收藏、评论与回复关系；只清理工具保留的有限 ID 区间，不执行 `DROP DATABASE`、Flyway `clean` 或 `repair`。
+- 同一提交、数据库、Redis 和硬件上以并发 16、固定公开课程/博客请求组合执行无缓存基线及三轮热缓存。三轮中位数：HTTP 错误 0，命中率 100%，MyBatis SELECT 从 10,995 降至 0，p50 从 14.727 ms 降至 3.224 ms，p95 从 182.514 ms 降至 5.177 ms，p99 从 207.472 ms 降至 6.720 ms。
+- 冷路径 p95 从 96.047 ms 变为 96.279 ms，约退化 0.24%，满足不超过 15% 的门禁。吞吐从 464.458 req/s 变为 4,633.079 req/s；该结果只表示本机受控对照，不声明生产容量。
+- 原始 Markdown、JSON 和 EXPLAIN 保存在已忽略的 `temp/cc4c-v3-aspect4-*`，未进入跟踪范围。
+
+### 13.16 方面四验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 后端 `./run-tests.ps1 clean verify` | 80/80 通过，0 失败、0 错误、0 跳过；JAR 构建成功 |
+| 缓存与并发 | 命中、TTL 抖动、负缓存、单飞、Redis 故障旁路、损坏 JSON、事务提交/回滚和 namespace 清理通过 |
+| 模块与查询 | 六个 Spring Modulith 模块验证通过；Catalog 批量查询固定为两次，跨模块收藏失效和 Community 审核/驳回/删除失效通过 |
+| Flyway 与索引 | 空库 V1–V5、已有库升级、重复迁移零新增、`validate` 和 V5 结构断言通过；性能库实际选择两个新索引 |
+| 性能门禁 | 0 HTTP 错误、100% 热命中、100% 目标 SELECT 减少、p95 改善 97.16%、冷路径 p95 退化约 0.24%，全部通过 |
+| 故障演练 | 业务缓存 Redis 不可连接时公开课程回源 MySQL，`/auth/session` 仍由安全 Redis 正常返回 |
+| 前端 | `npm ci` 和 Vite 生产构建通过；方面四未修改前端源码 |
+| 配置与 JAR | JAR 不含 `application.yml`；运行、测试和性能本机 env 文件及 `temp/` 保持忽略 |
+
+2026-08-28，用户逐项确认课程缓存失效、博客审核缓存失效、非公开内容隔离、管理员审核页身份切换，以及控制台、网络请求和页面显示均正常。运行检查同时确认公开响应冷/热一致、点击量在 15 秒内收敛、业务缓存故障回源且安全会话不受影响。
+
+### 13.17 当前契约、已知项与发布安全
+
+- 方面四没有新增前端博客删除入口；现有作者删除后端契约和缓存失效由自动测试覆盖。页面对预期 401/403/404 仍使用既有“加载失败/重新加载”通用反馈，同浏览器登录另一身份会按方面三契约替换当前会话，这两项均不是缓存泄露。
+- `CC4C_BUSINESS_CACHE_ENABLED=false` 是最快运行回滚方式，关闭后公开查询直接使用 MySQL；安全 Redis 不受该开关影响。
+- Flyway 11.7.2 在 MySQL 8.4 上仍提示官方测试至 8.1，但 V1–V5、重复迁移、`validate` 和结构断言实际通过。V5 只增加索引，不伪造 down migration。
+- `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），Vite 仍提示主包超过 500 KiB；方面四未越界升级或拆分前端依赖。
+- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件；env 本机文件、性能数据、备份、日志、`target`、`node_modules`、`dist` 和 `temp` 均保持忽略。
+- 方面四尚未暂存、提交或推送；任何 Git 收口需用户另行明确授权。RabbitMQ、Actuator、容器、Testcontainers 和 CI 仍属于方面五至七。

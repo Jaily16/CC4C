@@ -49,7 +49,7 @@ if (-not (Test-Path -LiteralPath $mysql -PathType Leaf)) {
 $outputDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path (Split-Path $PSScriptRoot -Parent) '..\temp'))
 [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
-$outputPath = Join-Path $outputDirectory "cc4c-v3-aspect2-explain-$($Phase.ToLowerInvariant()).txt"
+$outputPath = Join-Path $outputDirectory "cc4c-v3-aspect4-explain-$($Phase.ToLowerInvariant()).txt"
 $queries = [ordered]@{
     course_home = @'
 SELECT c.course_id, c.course_name, c.language_name, COUNT(ufc.user_id) AS favors_num
@@ -71,6 +71,37 @@ SELECT b.* FROM blog b
 WHERE b.state = 1 AND b.deleted = 0
 ORDER BY b.click DESC, b.blog_id DESC
 LIMIT 20
+'@
+    blog_by_language = @'
+SELECT b.*
+FROM blog b
+JOIN blog_involves_language bil ON bil.blog_id = b.blog_id
+WHERE bil.language_id = 1 AND b.state = 1 AND b.deleted = 0
+ORDER BY b.publish_time DESC, b.blog_id DESC
+LIMIT 20
+'@
+    course_favorites = @'
+SELECT c.course_id, c.course_name, c.language_name
+FROM user_favors_course ufc
+JOIN course c ON c.course_id = ufc.course_id
+WHERE ufc.user_id = 1 AND c.deleted = 0
+ORDER BY ufc.time DESC, c.course_id ASC
+LIMIT 20
+'@
+    blog_favorites = @'
+SELECT b.blog_id, b.writer_id, b.title, b.publish_time, b.click, b.state
+FROM user_collects_blog ucb
+JOIN blog b ON b.blog_id = ucb.blog_id
+WHERE ucb.user_id = 1 AND b.deleted = 0 AND b.state = 1
+ORDER BY ucb.time DESC, b.blog_id DESC
+LIMIT 20
+'@
+    module_courses_bulk = @'
+SELECT mc.priority, c.course_name
+FROM module_course mc
+JOIN course c ON c.course_id = mc.course_id
+WHERE mc.language_id = 1 AND c.deleted = 0
+ORDER BY mc.priority ASC, c.course_id ASC
 '@
     comment_top_level = @'
 SELECT c.comment_id, c.user_id, c.content, c.time, c.`like`
@@ -103,7 +134,7 @@ try {
         '--raw',
         '--skip-column-names'
     )
-    $indexCountSql = @"
+    $baseIndexCountSql = @"
 SELECT COUNT(*) FROM (
     SELECT DISTINCT table_name, index_name
     FROM information_schema.statistics
@@ -111,15 +142,33 @@ SELECT COUNT(*) FROM (
       AND index_name IN ('idx_blog_state_time', 'idx_blog_state_click', 'idx_indirect_comment_father')
 ) query_indexes;
 "@
-    $indexCount = [int] (& $mysql @commonArguments "--execute=$indexCountSql")
+    $baseIndexCount = [int] (& $mysql @commonArguments "--execute=$baseIndexCountSql")
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to inspect query indexes."
     }
-    if ($Phase -eq 'Before' -and $indexCount -ne 0) {
-        throw "Before plans require the pre-V3 schema."
+    if ($baseIndexCount -ne 3) {
+        throw "Aspect four plans require all three V3 query indexes."
     }
-    if ($Phase -eq 'After' -and $indexCount -ne 3) {
-        throw "After plans require all three V3 query indexes."
+
+    $aspect4IndexCountSql = @"
+SELECT COUNT(*) FROM (
+    SELECT DISTINCT table_name, index_name
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND index_name IN (
+        'idx_user_favors_course_user_time_course',
+        'idx_user_collects_blog_user_time_blog')
+) query_indexes;
+"@
+    $aspect4IndexCount = [int] (& $mysql @commonArguments "--execute=$aspect4IndexCountSql")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to inspect aspect four query indexes."
+    }
+    if ($Phase -eq 'Before' -and $aspect4IndexCount -ne 0) {
+        throw "Before plans require the pre-V5 schema."
+    }
+    if ($Phase -eq 'After' -and $aspect4IndexCount -ne 2) {
+        throw "After plans require both V5 query indexes."
     }
 
     $sections = [System.Collections.Generic.List[string]]::new()

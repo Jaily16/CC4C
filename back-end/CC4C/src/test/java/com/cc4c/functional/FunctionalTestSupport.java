@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cc4c.identity.internal.EmailSender;
 import com.cc4c.identity.internal.VerificationCodeGenerator;
 import com.cc4c.identity.internal.VerificationCodeService;
+import com.cc4c.shared.BusinessCache;
 import com.cc4c.identity.IdentityDtos.VerificationPurpose;
 import com.cc4c.identity.api.AccountRole;
 import com.cc4c.identity.api.Cc4cPrincipal;
@@ -50,6 +51,8 @@ abstract class FunctionalTestSupport {
         registry.add("spring.datasource.username", () -> requiredEnvironmentVariable("CC4C_TEST_DB_USERNAME"));
         registry.add("spring.datasource.password", () -> requiredEnvironmentVariable("CC4C_TEST_DB_PASSWORD"));
         registry.add("spring.data.redis.url", () -> requiredEnvironmentVariable("CC4C_TEST_REDIS_URL"));
+        registry.add("cc4c.cache.redis-url", () -> requiredEnvironmentVariable("CC4C_TEST_CACHE_REDIS_URL"));
+        registry.add("cc4c.cache.namespace", () -> TEST_REDIS_NAMESPACE + ":cache");
         registry.add("spring.session.redis.namespace", () -> TEST_REDIS_NAMESPACE);
         registry.add("cc4c.security.key-prefix", () -> TEST_REDIS_NAMESPACE + ":security");
     }
@@ -76,6 +79,9 @@ abstract class FunctionalTestSupport {
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    protected BusinessCache businessCache;
 
     @Autowired
     private FindByIndexNameSessionRepository<? extends Session> sessionRepository;
@@ -106,6 +112,7 @@ abstract class FunctionalTestSupport {
 
     @AfterEach
     void removeOnlyThisTestNamespaceFromRedis() {
+        businessCache.clearNamespaceForTests();
         String sessionPrefix = TEST_REDIS_NAMESPACE + ":sessions:";
         List<String> sessionIds = new ArrayList<>();
         try (RedisConnection connection = redisTemplate.getConnectionFactory().getConnection();

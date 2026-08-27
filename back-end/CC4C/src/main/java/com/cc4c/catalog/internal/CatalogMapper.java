@@ -47,27 +47,25 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             @Param("maximum") int maximum);
 
     @Select("""
-            SELECT c.course_name
+            SELECT mc.priority, c.course_name
             FROM module_course mc
             JOIN course c ON c.course_id = mc.course_id
-            WHERE mc.language_id = #{languageId} AND mc.priority = #{priority} AND c.deleted = 0
-            ORDER BY c.course_id ASC
+            WHERE mc.language_id = #{languageId} AND c.deleted = 0
+            ORDER BY mc.priority ASC, c.course_id ASC
             """)
-    List<String> selectCourseNames(@Param("languageId") int languageId, @Param("priority") int priority);
+    List<ModuleCourseNameRow> selectCourseNamesByLanguage(int languageId);
 
     @Select("""
-            SELECT c.course_name
+            SELECT mc.priority, c.course_name
             FROM module_course mc
             JOIN course c ON c.course_id = mc.course_id
             WHERE mc.language_id = #{languageId}
-              AND mc.priority = #{priority}
               AND (c.level BETWEEN #{minimum} AND #{maximum} OR c.level = 66)
               AND c.deleted = 0
-            ORDER BY c.course_id ASC
+            ORDER BY mc.priority ASC, c.course_id ASC
             """)
-    List<String> selectRecommendedCourseNames(
+    List<ModuleCourseNameRow> selectRecommendedCourseNamesByLanguage(
             @Param("languageId") int languageId,
-            @Param("priority") int priority,
             @Param("minimum") int minimum,
             @Param("maximum") int maximum);
 

@@ -55,11 +55,19 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
 
         long currentVersion = scalar(url,
                 "SELECT COALESCE(MAX(CAST(version AS UNSIGNED)), 0) FROM flyway_schema_history");
-        int expectedMigrations = Math.toIntExact(Math.max(0, 4 - currentVersion));
+        int expectedMigrations = Math.toIntExact(Math.max(0, 5 - currentVersion));
         assertEquals(expectedMigrations, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(4, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
+        assertEquals(5, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
+        assertEquals(2, scalar(url, """
+                SELECT COUNT(DISTINCT index_name)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND index_name IN (
+                    'idx_user_favors_course_user_time_course',
+                    'idx_user_collects_blog_user_time_blog')
+                """));
         assertEquals(255, scalar(url, """
                 SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND table_name = 'user' AND column_name = 'password'

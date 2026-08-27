@@ -12,6 +12,7 @@
 /back-end/CC4C/src/main/resources/application.yml
 /back-end/CC4C/.env.test.local
 /back-end/CC4C/.env.runtime.local
+/back-end/CC4C/.env.performance.local
 
 # Local scratch files
 /temp/

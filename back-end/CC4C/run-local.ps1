@@ -11,6 +11,9 @@ $requiredNames = @(
     'CC4C_DB_PASSWORD',
     'CC4C_REDIS_URL',
     'CC4C_SESSION_NAMESPACE',
+    'CC4C_BUSINESS_CACHE_ENABLED',
+    'CC4C_CACHE_REDIS_URL',
+    'CC4C_CACHE_NAMESPACE',
     'CC4C_SECURITY_PEPPER',
     'CC4C_SESSION_COOKIE_SECURE',
     'CC4C_ALLOWED_ORIGINS',
@@ -66,6 +69,12 @@ if ($values['CC4C_SESSION_COOKIE_SECURE'] -notin @('true', 'false')) {
 }
 if ($values['CC4C_API_DOCS_ENABLED'] -notin @('true', 'false')) {
     throw 'CC4C_API_DOCS_ENABLED must be true or false.'
+}
+if ($values['CC4C_BUSINESS_CACHE_ENABLED'] -notin @('true', 'false')) {
+    throw 'CC4C_BUSINESS_CACHE_ENABLED must be true or false.'
+}
+if ($values['CC4C_CACHE_NAMESPACE'] -eq $values['CC4C_SESSION_NAMESPACE']) {
+    throw 'CC4C_CACHE_NAMESPACE must differ from CC4C_SESSION_NAMESPACE.'
 }
 if ($values['CC4C_ALLOWED_ORIGINS'].Contains('*')) {
     throw 'CC4C_ALLOWED_ORIGINS must contain exact origins and cannot contain wildcards.'

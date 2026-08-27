@@ -4,4 +4,6 @@ public interface CatalogLookup {
     boolean languageExists(int languageId);
 
     boolean courseExists(int courseId);
+
+    void invalidateCoursePopularity();
 }

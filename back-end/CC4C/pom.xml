@@ -153,4 +153,44 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>aspect4-benchmark</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>seed-aspect4-performance-data</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <classpathScope>test</classpathScope>
+                                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                                    <mainClass>com.cc4c.performance.Aspect4PerformanceDataSeeder</mainClass>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>run-aspect4-performance-gate</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <classpathScope>test</classpathScope>
+                                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                                    <mainClass>com.cc4c.performance.Aspect4BenchmarkApplication</mainClass>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>

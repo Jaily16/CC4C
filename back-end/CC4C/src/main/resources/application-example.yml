@@ -54,6 +54,11 @@ springdoc:
 
 #自定义配置属性
 cc4c:
+  cache:
+    enabled: "${CC4C_BUSINESS_CACHE_ENABLED}"
+    redis-url: "${CC4C_CACHE_REDIS_URL:}"
+    namespace: "${CC4C_CACHE_NAMESPACE:}"
+    test-cleanup-enabled: false
   security:
     pepper: "${CC4C_SECURITY_PEPPER}"
     cookie-secure: "${CC4C_SESSION_COOKIE_SECURE}"

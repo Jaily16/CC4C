@@ -16,6 +16,7 @@ import com.cc4c.identity.api.AccountRole;
 import com.cc4c.identity.api.ActorIdentity;
 import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.shared.BusinessCode;
+import com.cc4c.shared.BusinessCache;
 import com.cc4c.shared.BusinessException;
 import com.cc4c.shared.PageQuery;
 import com.cc4c.shared.PageResult;
@@ -23,56 +24,77 @@ import com.cc4c.shared.RedisRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.core.type.TypeReference;
 
+import java.time.Duration;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Service
 public class CommunityService implements CommunityLookup, BlogModerationUseCase {
     private static final int DENIED = -1;
     private static final int PENDING = 0;
     private static final int VERIFIED = 1;
+    private static final String HOME_REGION = "community:home";
+    private static final String ALL_REGION = "community:all";
+    private static final String LANGUAGE_REGION = "community:language";
+    private static final String DETAIL_REGION = "community:detail";
+    private static final Duration PUBLIC_TTL = Duration.ofSeconds(15);
+    private static final Duration NEGATIVE_TTL = Duration.ofSeconds(30);
+    private static final TypeReference<PageResult<BlogResponse>> BLOG_PAGE_TYPE = new TypeReference<>() { };
+    private static final TypeReference<BlogResponse> BLOG_TYPE = new TypeReference<>() { };
 
     private final BlogMapper mapper;
     private final IdentityLookup identityLookup;
     private final CatalogLookup catalogLookup;
     private final CurrentActor currentActor;
     private final RedisRateLimiter rateLimiter;
+    private final BusinessCache cache;
 
     CommunityService(
             BlogMapper mapper,
             IdentityLookup identityLookup,
             CatalogLookup catalogLookup,
             CurrentActor currentActor,
-            RedisRateLimiter rateLimiter) {
+            RedisRateLimiter rateLimiter,
+            BusinessCache cache) {
         this.mapper = mapper;
         this.identityLookup = identityLookup;
         this.catalogLookup = catalogLookup;
         this.currentActor = currentActor;
         this.rateLimiter = rateLimiter;
+        this.cache = cache;
     }
 
     public PageResult<BlogResponse> home(PageQuery query) {
-        LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
-                .eq(BlogEntity::getState, VERIFIED)
-                .orderByDesc(BlogEntity::getClick)
-                .orderByDesc(BlogEntity::getBlogId);
-        return toResponsePage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper), false);
+        return cachedPage(HOME_REGION, pageKey(query), () -> {
+            LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
+                    .eq(BlogEntity::getState, VERIFIED)
+                    .orderByDesc(BlogEntity::getClick)
+                    .orderByDesc(BlogEntity::getBlogId);
+            return toResponsePage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper), false);
+        });
     }
 
     public PageResult<BlogResponse> all(PageQuery query) {
-        LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
-                .eq(BlogEntity::getState, VERIFIED)
-                .orderByDesc(BlogEntity::getPublishTime)
-                .orderByDesc(BlogEntity::getBlogId);
-        return toResponsePage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper), false);
+        return cachedPage(ALL_REGION, pageKey(query), () -> {
+            LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
+                    .eq(BlogEntity::getState, VERIFIED)
+                    .orderByDesc(BlogEntity::getPublishTime)
+                    .orderByDesc(BlogEntity::getBlogId);
+            return toResponsePage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper), false);
+        });
     }
 
     public PageResult<BlogResponse> byLanguage(int languageId, PageQuery query) {
-        return toResponsePage(
-                mapper.selectByLanguage(new Page<>(query.page(), query.size()), languageId), false);
+        return cachedPage(
+                LANGUAGE_REGION,
+                languageId + ":" + pageKey(query),
+                () -> toResponsePage(
+                        mapper.selectByLanguage(new Page<>(query.page(), query.size()), languageId), false));
     }
 
     public PageResult<BlogResponse> byCurrentWriter(PageQuery query) {
@@ -93,6 +115,21 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     public BlogResponse detail(long blogId) {
+        Optional<BlogResponse> publicDetail = cache.getOrLoad(
+                DETAIL_REGION,
+                Long.toString(blogId),
+                BLOG_TYPE,
+                PUBLIC_TTL,
+                NEGATIVE_TTL,
+                () -> Optional.ofNullable(mapper.selectById(blogId))
+                        .filter(blog -> blog.getState() == VERIFIED)
+                        .map(blog -> toResponse(blog, true)));
+        if (publicDetail.isPresent()) {
+            return publicDetail.get();
+        }
+        if (currentActor.current().isEmpty()) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
+        }
         BlogEntity blog = requiredBlog(blogId);
         if (blog.getState() != VERIFIED && !canReadNonPublic(blog)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
@@ -133,6 +170,7 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
             throw new BusinessException(HttpStatus.FORBIDDEN, BusinessCode.FORBIDDEN, "无权删除该博客");
         }
         mapper.deleteById(blogId);
+        invalidatePublicBlogs();
         return true;
     }
 
@@ -206,6 +244,7 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
             blog.setPublishTime(new Date());
         }
         mapper.updateById(blog);
+        invalidatePublicBlogs();
         return toSummary(blog);
     }
 
@@ -231,6 +270,26 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                 Math.toIntExact(page.getCurrent()),
                 Math.toIntExact(page.getSize()),
                 page.getTotal());
+    }
+
+    private PageResult<BlogResponse> cachedPage(
+            String region, String key, Supplier<PageResult<BlogResponse>> loader) {
+        return cache.getOrLoad(
+                        region,
+                        key,
+                        BLOG_PAGE_TYPE,
+                        PUBLIC_TTL,
+                        NEGATIVE_TTL,
+                        () -> Optional.of(loader.get()))
+                .orElseThrow();
+    }
+
+    private String pageKey(PageQuery query) {
+        return query.page() + ":" + query.size();
+    }
+
+    private void invalidatePublicBlogs() {
+        cache.invalidateAfterCommit(HOME_REGION, ALL_REGION, LANGUAGE_REGION, DETAIL_REGION);
     }
 
     private BlogResponse toResponse(BlogEntity blog, boolean includeContent) {

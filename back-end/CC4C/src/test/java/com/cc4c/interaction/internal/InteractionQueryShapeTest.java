@@ -5,12 +5,14 @@ import com.cc4c.catalog.api.CatalogLookup;
 import com.cc4c.community.api.CommunityLookup;
 import com.cc4c.identity.api.IdentityLookup;
 import com.cc4c.identity.api.CurrentActor;
+import com.cc4c.identity.api.UserSnapshot;
 import com.cc4c.shared.PageQuery;
 import com.cc4c.shared.RedisRateLimiter;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -20,6 +22,27 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class InteractionQueryShapeTest {
+
+    @Test
+    void courseFavoriteInvalidatesPopularityOnlyAfterServiceWrite() {
+        InteractionMapper mapper = mock(InteractionMapper.class);
+        IdentityLookup identityLookup = mock(IdentityLookup.class);
+        CatalogLookup catalogLookup = mock(CatalogLookup.class);
+        CommunityLookup communityLookup = mock(CommunityLookup.class);
+        CurrentActor currentActor = mock(CurrentActor.class);
+        RedisRateLimiter rateLimiter = mock(RedisRateLimiter.class);
+        InteractionService service = new InteractionService(
+                mapper, identityLookup, catalogLookup, communityLookup, currentActor, rateLimiter);
+        when(currentActor.requiredUserId()).thenReturn(11L);
+        when(identityLookup.findUser(11L)).thenReturn(Optional.of(new UserSnapshot(11L, "user", null)));
+        when(catalogLookup.courseExists(7)).thenReturn(true);
+        when(mapper.courseFavoriteExists(11L, 7)).thenReturn(false);
+
+        service.favoriteCourse(7);
+
+        verify(mapper).insertCourseFavorite(11L, 7);
+        verify(catalogLookup).invalidateCoursePopularity();
+    }
 
     @Test
     void commentTreeUsesOneTopLevelPageAndTwoBulkReplyQueries() {

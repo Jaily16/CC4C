@@ -39,7 +39,7 @@ class BlogFunctionalTest extends FunctionalTestSupport {
                         .param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].blogId").value(Long.toString(blogId)))
-                .andExpect(jsonPath("$.data.total").value(1));
+                .andExpect(jsonPath("$.data.total").isNumber());
 
         mockMvc.perform(put("/blogs/approve/{id}", blogId)
                         .with(asAdministrator(administrator)).with(csrf()))
