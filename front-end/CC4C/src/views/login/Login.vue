@@ -103,6 +103,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
@@ -176,7 +177,7 @@ async function login() {
     store.commit('SET_AVATAR', currentUser.avatar);
     await router.push({ path: '/home' });
   } catch (error) {
-    formError.value = '登录服务暂时不可用，请稍后重试';
+    formError.value = apiErrorMessage(error, '登录服务暂时不可用，请稍后重试');
     ElMessage.error(formError.value);
     console.error(error);
   } finally {
@@ -205,7 +206,7 @@ async function getVCode() {
 
   sendingRecoveryCode.value = true;
   try {
-    const resp = await axios.get(`/users/email/${encodeURIComponent(findForm.email)}`);
+    const resp = await axios.post(`/users/email/${encodeURIComponent(findForm.email)}`);
     if (!resp.data.data) {
       recoveryError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(recoveryError.value);
@@ -215,7 +216,7 @@ async function getVCode() {
     vCode = resp.data.data;
     ElMessage.success('验证码已发送');
   } catch (error) {
-    recoveryError.value = '验证码发送失败，请稍后重试';
+    recoveryError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
     ElMessage.error(recoveryError.value);
     console.error(error);
   } finally {
@@ -252,7 +253,7 @@ async function findPassword() {
     iCode.value = '';
     findPwdDialog.value = false;
   } catch (error) {
-    recoveryError.value = '密码修改失败，请稍后重试';
+    recoveryError.value = apiErrorMessage(error, '密码修改失败，请稍后重试');
     ElMessage.error(recoveryError.value);
     console.error(error);
   } finally {

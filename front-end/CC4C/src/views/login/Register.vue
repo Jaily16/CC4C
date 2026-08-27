@@ -90,6 +90,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import axios from '@/plugins/axiosInstance';
 import { assets } from '@/assets';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const majorList = [
@@ -144,7 +145,7 @@ async function getVCode() {
 
   sendingCode.value = true;
   try {
-    const resp = await axios.get(`/users/email/${encodeURIComponent(user.email)}`);
+    const resp = await axios.post(`/users/email/${encodeURIComponent(user.email)}`);
     if (!resp.data.data) {
       formError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(formError.value);
@@ -154,7 +155,7 @@ async function getVCode() {
     vCode = resp.data.data;
     ElMessage.success('验证码已发送');
   } catch (error) {
-    formError.value = '验证码发送失败，请稍后重试';
+    formError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
     ElMessage.error(formError.value);
     console.error(error);
   } finally {
@@ -195,7 +196,7 @@ async function register() {
     ElMessage.success(response.data.msg || '注册成功');
     await router.push({ path: '/login' });
   } catch (error) {
-    formError.value = '注册失败，请稍后重试';
+    formError.value = apiErrorMessage(error, '注册失败，请稍后重试');
     ElMessage.error(formError.value);
     console.error(error);
   } finally {

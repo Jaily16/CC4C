@@ -139,6 +139,7 @@ import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { EditPen, Loading, Lock, Notebook, Plus, StarFilled, UserFilled } from '@element-plus/icons-vue';
 import store from '@/store';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const props = defineProps({
@@ -187,10 +188,6 @@ const editAvatarPreview = computed(() => uploadedAvatar.value || infoForm.avatar
 watch(() => currentUser.value.avatar, () => {
   avatarLoadFailed.value = false;
 });
-
-function backendMessage(error, fallback) {
-  return error?.response?.data?.msg || error?.response?.data?.MSG || fallback;
-}
 
 function handleAvatarError() {
   avatarLoadFailed.value = true;
@@ -292,7 +289,7 @@ async function uploadAvatar({ file }) {
     uploadedAvatar.value = requestPath;
     ElMessage.success('头像已上传，请保存资料完成更新');
   } catch (error) {
-    editErrors.avatar = backendMessage(error, '头像上传失败，请稍后重试。');
+    editErrors.avatar = apiErrorMessage(error, '头像上传失败，请稍后重试。');
     console.error(error);
   } finally {
     avatarUploading.value = false;
@@ -327,7 +324,7 @@ async function saveProfile() {
     if (refreshed) ElMessage.success('个人资料已更新');
     else ElMessage.warning('资料已保存，但最新信息自动刷新失败');
   } catch (error) {
-    ElMessage.error(backendMessage(error, '用户信息修改失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '用户信息修改失败，请稍后重试'));
     console.error(error);
   } finally {
     profileSaving.value = false;
@@ -356,7 +353,7 @@ async function changePassword() {
     if (refreshed) ElMessage.success('密码修改成功');
     else ElMessage.warning('密码已修改，但个人信息自动刷新失败');
   } catch (error) {
-    ElMessage.error(backendMessage(error, '密码修改失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '密码修改失败，请稍后重试'));
     console.error(error);
   } finally {
     passwordSaving.value = false;

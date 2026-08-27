@@ -69,6 +69,7 @@ import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import UserInfo from '@/components/UserInfo.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 import store from '@/store';
 
 
@@ -116,7 +117,7 @@ async function loadProfile() {
     }
     syncStore(infoResponse.data.data);
   } catch (error) {
-    errorMessage.value = error?.response?.data?.msg || '个人信息加载失败，请检查服务状态后重试。';
+    errorMessage.value = apiErrorMessage(error, '个人信息加载失败，请检查服务状态后重试。');
     console.error(error);
   } finally {
     loading.value = false;

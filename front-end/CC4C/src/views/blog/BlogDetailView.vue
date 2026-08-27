@@ -71,7 +71,7 @@
       <template #header>
         <div class="comments-drawer__title">
           <span>博客评论</span>
-          <small>{{ commentList.length }} 条讨论</small>
+          <small>{{ commentTotal }} 条讨论</small>
         </div>
       </template>
 
@@ -101,7 +101,7 @@
           <div class="comment-item__body">
             <div class="comment-item__meta">
               <strong>{{ commentItem.userName || '用户' }}</strong>
-              <span v-if="commentItem.publishTime">{{ formatDate(commentItem.publishTime) }}</span>
+              <span v-if="commentItem.time">{{ formatDate(commentItem.time) }}</span>
             </div>
             <p>{{ commentItem.content }}</p>
             <el-button v-if="loggedIn" link type="primary" @click="toggleReply(commentItem.commentId)">
@@ -117,13 +117,24 @@
               <article v-for="subcomment in commentItem.subCommentList || []" :key="subcomment.commentId" class="reply-item">
                 <div class="comment-item__meta">
                   <strong>{{ subcomment.userName || '用户' }}</strong>
-                  <span v-if="subcomment.publishTime">{{ formatDate(subcomment.publishTime) }}</span>
+                  <span v-if="subcomment.time">{{ formatDate(subcomment.time) }}</span>
                 </div>
                 <p>{{ subcomment.content }}</p>
               </article>
             </div>
           </div>
         </article>
+        <el-pagination
+          v-if="commentTotal > commentPageSize"
+          class="comments-pagination"
+          background
+          small
+          layout="prev, pager, next"
+          :current-page="commentPage"
+          :page-size="commentPageSize"
+          :total="commentTotal"
+          @current-change="changeCommentPage"
+        />
       </section>
     </el-drawer>
   </main>
@@ -140,6 +151,7 @@ import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const route = useRoute();
@@ -164,6 +176,9 @@ const replyingTo = ref(null);
 const replyText = ref('');
 const replyInputError = ref('');
 const replySubmitting = ref(false);
+const commentPage = ref(1);
+const commentPageSize = 10;
+const commentTotal = ref(0);
 
 const loggedIn = computed(() => Boolean(store.state.user.id));
 const userInitial = computed(() => commentInitial(store.state.user.name));
@@ -212,11 +227,15 @@ async function loadComments() {
   commentsLoading.value = true;
   commentsError.value = '';
   try {
-    const resp = await axios.get(`/comments/blog/${blogData.value.blogId}`);
-    commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get(`/comments/blog/${blogData.value.blogId}`, {
+      params: { page: commentPage.value, size: commentPageSize },
+    });
+    commentList.value = resp.data.data?.items || [];
+    commentTotal.value = resp.data.data?.total || 0;
   } catch (error) {
     commentList.value = [];
-    commentsError.value = '评论加载失败，请检查网络后重试。';
+    commentTotal.value = 0;
+    commentsError.value = apiErrorMessage(error, '评论加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     commentsLoading.value = false;
@@ -229,6 +248,8 @@ async function loadBlog() {
   text.value = '';
   isFavor.value = false;
   commentList.value = [];
+  commentPage.value = 1;
+  commentTotal.value = 0;
   errorMessage.value = '';
   if (!blogId) {
     errorMessage.value = '缺少博客 ID，请从博客列表中选择文章。';
@@ -255,7 +276,7 @@ async function loadBlog() {
     }
     await Promise.all(requests);
   } catch (error) {
-    errorMessage.value = '博客加载失败，请检查网络后重试。';
+    errorMessage.value = apiErrorMessage(error, '博客加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     loading.value = false;
@@ -267,7 +288,7 @@ async function toggleCollect() {
   try {
     const resp = isFavor.value
       ? await axios.delete(`/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`)
-      : await axios.get(`/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`);
+      : await axios.post(`/blogs/collect/${store.state.user.id}/${blogData.value.blogId}`);
     if (!resp.data.data) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -275,7 +296,7 @@ async function toggleCollect() {
     isFavor.value = !isFavor.value;
     ElMessage.success(isFavor.value ? '收藏成功' : '取消收藏成功');
   } catch (error) {
-    ElMessage.error('收藏操作失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '收藏操作失败，请稍后重试'));
     console.error(error);
   }
 }
@@ -293,15 +314,16 @@ async function comment() {
       content: commentText.value.trim(),
       blogId: blogData.value.blogId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       commentInputError.value = resp.data.msg || '评论发布失败。';
       return;
     }
     commentText.value = '';
+    commentPage.value = 1;
     await loadComments();
     ElMessage.success('评论成功');
   } catch (error) {
-    commentInputError.value = '评论发布失败，请稍后重试。';
+    commentInputError.value = apiErrorMessage(error, '评论发布失败，请稍后重试。');
     console.error(error);
   } finally {
     commentSubmitting.value = false;
@@ -327,7 +349,7 @@ async function reply(fatherId) {
       content: replyText.value.trim(),
       fatherId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       replyInputError.value = resp.data.msg || '回复发布失败。';
       return;
     }
@@ -338,11 +360,17 @@ async function reply(fatherId) {
     document.getElementById(`blog-replies-${fatherId}`)?.focus();
     ElMessage.success('回复成功');
   } catch (error) {
-    replyInputError.value = '回复发布失败，请稍后重试。';
+    replyInputError.value = apiErrorMessage(error, '回复发布失败，请稍后重试。');
     console.error(error);
   } finally {
     replySubmitting.value = false;
   }
+}
+
+function changeCommentPage(page) {
+  commentPage.value = page;
+  replyingTo.value = null;
+  return loadComments();
 }
 
 watch(() => route.query.blogId, loadBlog, { immediate: true });
@@ -392,5 +420,6 @@ watch(() => route.query.blogId, loadBlog, { immediate: true });
 .reply-compose :deep(.el-button) { justify-self: start; }
 .reply-list:focus { outline: 2px solid #93c5fd; outline-offset: 3px; }
 .reply-item { margin-top: 12px; padding: 12px 14px; border-left: 3px solid #bfdbfe; border-radius: 0 8px 8px 0; background: #f8fafc; }
+.comments-pagination { justify-content: center; }
 @media (max-width: 480px) { .blog-detail { padding: 12px; } .blog-reading__header { padding: 24px 18px; } .blog-reading__article { padding: 24px 18px; } .blog-catalog-float { right: 14px; bottom: 18px; } .comment-compose { padding: 12px; } }
 </style>

@@ -54,6 +54,7 @@ import { ElMessage } from 'element-plus';
 import { Checked, DataAnalysis, Plus } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const route = useRoute();
@@ -78,7 +79,7 @@ async function verifyAdmin() {
     }
     verified.value = true;
   } catch (error) {
-    ElMessage.error(error?.response?.data?.msg || '管理员身份验证失败，请重新登录');
+    ElMessage.error(apiErrorMessage(error, '管理员身份验证失败，请重新登录'));
     await router.replace('/adminLogin');
     console.error(error);
   } finally {
@@ -88,7 +89,7 @@ async function verifyAdmin() {
 
 async function logout() {
   try {
-    await axios.get('/admin/logout');
+    await axios.post('/admin/logout');
   } catch (error) {
     console.error(error);
   } finally {

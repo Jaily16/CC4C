@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本在保持既有前后端功能与 REST API 契约不变的前提下，已完成 V3 方面一“基础版本与依赖现代化”：后端运行基线升级到 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，前端 API 请求集中到 Axios 1.19.0 客户端。V3 后续六个方面尚未实施。
+当前版本已完成 V3 方面一“基础版本与依赖现代化”和方面二“模块化单体、API 与数据治理”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V3 管理。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一客户端适配分页和写操作方法。V3 方面三至方面七尚未实施。
 
 ## 平台亮点
 
@@ -108,22 +108,48 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | UI 与交互 | Element Plus、Element Plus Icons、响应式 CSS |
 | 内容编辑 | md-editor-v3、sanitize-html |
 | 网络与构建 | Axios 1.19.0、Vite |
-| 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet |
-| 数据访问 | MyBatis-Plus 3.5.17、HikariCP、MySQL |
+| 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
+| API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
+| 数据访问 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway |
 | 序列化与服务 | Jackson、JavaMail、文件资源读写 |
 
 ## 系统架构
 
 ```mermaid
-flowchart LR
-    U[用户 / 管理员] --> V[Vue 3 SPA]
-    V -->|Axios · REST API| C[Spring Boot Controller]
-    C --> S[Service 业务层]
-    S --> M[MyBatis-Plus / HikariCP]
-    M --> D[(MySQL)]
-    S --> E[JavaMail]
-    S --> F[头像与内容图片资源]
+flowchart TB
+    Browser[用户 / 管理员 · Vue 3 SPA] -->|Axios · REST API| HTTP[DTO · Bean Validation · OpenAPI]
+
+    subgraph Backend[Spring Boot 3.5 模块化单体]
+        Shared[shared<br/>响应、分页、异常、CORS、文件与配置]
+        Identity[identity<br/>用户、管理员、验证码]
+        Catalog[catalog<br/>语言、课程、课程模块]
+        Community[community<br/>博客、草稿]
+        Interaction[interaction<br/>评论、回复、收藏]
+        Moderation[moderation<br/>博客审核]
+
+        Identity --> Shared
+        Catalog --> Shared
+        Community --> Shared
+        Community --> Identity
+        Community --> Catalog
+        Interaction --> Shared
+        Interaction --> Identity
+        Interaction --> Catalog
+        Interaction --> Community
+        Moderation --> Shared
+        Moderation --> Community
+    end
+
+    HTTP --> Identity
+    HTTP --> Catalog
+    HTTP --> Community
+    HTTP --> Interaction
+    HTTP --> Moderation
+    Backend -->|MyBatis-Plus · HikariCP| DB[(MySQL)]
+    Flyway[Flyway V1–V3] -. 结构与基线数据 .-> DB
 ```
+
+Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
 
 ## 仓库结构
 
@@ -140,13 +166,23 @@ CC4C/
 │  │  └─ views/                     # 用户端与管理端页面
 │  └─ package.json
 ├─ back-end/CC4C/                   # Spring Boot 后端应用
-│  ├─ src/main/java/com/cc4c/       # Controller、Service、DAO 与实体
+│  ├─ src/main/java/com/cc4c/
+│  │  ├─ shared/                    # 公共响应、分页、异常与基础设施
+│  │  ├─ identity/                  # 用户、管理员与验证码
+│  │  ├─ catalog/                   # 语言、课程与课程模块
+│  │  ├─ community/                 # 博客与草稿
+│  │  ├─ interaction/               # 评论、回复与收藏
+│  │  └─ moderation/                # 博客审核
 │  ├─ src/main/resources/
-│  │  └─ application-example.yml    # 可提交的脱敏配置模板
+│  │  ├─ application-example.yml    # 可提交的脱敏配置模板
+│  │  └─ db/migration/              # Flyway V1–V3 迁移
 │  ├─ src/test/                     # 后端自动化测试
+│  ├─ run-tests.ps1                 # 测试环境校验与 Maven 门禁
 │  └─ pom.xml
 ├─ database/
-│  └─ cc4c.sql                      # MySQL 表结构与基础数据
+│  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
+│  ├─ test-database-admin-setup.sql # 专用测试库授权模板
+│  └─ README.md                     # Flyway 初始化、备份与恢复说明
 ├─ docs/                            # 迭代文档与 README 图片
 └─ README.md
 ```
@@ -169,11 +205,17 @@ cd CC4C
 
 ### 3. 初始化数据库
 
-在 MySQL 中创建一个空数据库，然后导入仓库内的初始化文件。数据库名需要与后续 `CC4C_DB_URL` 中的名称一致。
+在 MySQL 中创建一个 UTF-8 空数据库，并为应用数据库账号授予业务读写及 Flyway 建表、变更和索引权限。数据库名需要与后续 `CC4C_DB_URL` 中的名称一致。
 
-```bash
-mysql -u <username> -p <database_name> < database/cc4c.sql
+```sql
+CREATE DATABASE <database_name>
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
+  ON <database_name>.* TO '<application_user>'@'127.0.0.1';
 ```
+
+首次启动时 Flyway 会依次执行 V1–V3，创建 16 张表、写入公开课程目录基线并应用关系约束和查询索引。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
 
 ### 4. 配置后端运行环境
 
@@ -192,6 +234,7 @@ mysql -u <username> -p <database_name> < database/cc4c.sql
 | `CC4C_REQUEST_IMG_PATH` | 前端可访问的内容图片地址 |
 | `CC4C_SAVE_AVATAR_PATH` | 本机头像保存目录 |
 | `CC4C_SAVE_IMG_PATH` | 本机内容图片保存目录 |
+| `CC4C_API_DOCS_ENABLED` | 是否公开 OpenAPI JSON 与 Swagger UI；默认 `false` |
 
 > 不要把真实值写回 `application-example.yml`、README、日志或源码。数据库连接变量应显式设置；邮件变量仅在需要真实邮件投递时设置。
 
@@ -209,6 +252,8 @@ mvn spring-boot:run
 后端默认地址：`http://localhost:4080`
 
 课程接口检查：`http://localhost:4080/courses/home`
+
+如需在本机验收 API 文档，可在脱敏环境中显式设置 `CC4C_API_DOCS_ENABLED=true`。启用后访问 `/v3/api-docs` 和 `/swagger-ui/index.html`；生产环境应保持默认关闭。
 
 ### 6. 启动前端
 
@@ -238,14 +283,16 @@ npm ci
 npm run build
 ```
 
-后端测试必须连接已由 `database/cc4c.sql` 初始化的专用测试库。Windows PowerShell 推荐使用受控脚本；`.env.test.local` 缺失或三个变量任一为空时会快速失败，不会回退到开发库：
+后端测试必须连接相互独立的主测试库和空迁移库。先由数据库管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、四个变量任一为空、库名不符合约束或两个 URL 相同时都会快速失败，不会回退到开发库：
 
 ```powershell
 cd back-end/CC4C
 Copy-Item .env.test.example .env.test.local
-# 只在 .env.test.local 中填写 CC4C_TEST_DB_URL、CC4C_TEST_DB_USERNAME、CC4C_TEST_DB_PASSWORD
+# 填写 CC4C_TEST_DB_URL、CC4C_TEST_EMPTY_DB_URL、CC4C_TEST_DB_USERNAME、CC4C_TEST_DB_PASSWORD
 .\run-tests.ps1 clean verify
 ```
+
+主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾。测试门禁会先验证现有库基线和空库 V1–V3 重建，再执行完整测试。当前验收基线为 40 项测试全部通过。
 
 ## 安全说明
 

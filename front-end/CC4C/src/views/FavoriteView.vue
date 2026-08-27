@@ -60,6 +60,16 @@
                   </span>
                 </button>
               </div>
+              <el-pagination
+                v-if="courseTotal > pageSize"
+                class="favorite-pagination"
+                background
+                layout="prev, pager, next"
+                :current-page="coursePage"
+                :page-size="pageSize"
+                :total="courseTotal"
+                @current-change="changeCoursePage"
+              />
               <el-empty v-else description="还没有收藏课程">
                 <el-button type="primary" @click="router.push('/allCourses')">浏览课程</el-button>
               </el-empty>
@@ -83,6 +93,16 @@
                   <i aria-hidden="true">→</i>
                 </button>
               </div>
+              <el-pagination
+                v-if="blogTotal > pageSize"
+                class="favorite-pagination"
+                background
+                layout="prev, pager, next"
+                :current-page="blogPage"
+                :page-size="pageSize"
+                :total="blogTotal"
+                @current-change="changeBlogPage"
+              />
               <el-empty v-else description="还没有收藏博客">
                 <el-button type="primary" @click="router.push('/allBlogs')">浏览博客</el-button>
               </el-empty>
@@ -102,6 +122,7 @@ import UserInfo from '@/components/UserInfo.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import store from '@/store';
 import { assets } from '@/assets';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
@@ -110,14 +131,15 @@ const favoriteCourses = ref([]);
 const favoriteBlogs = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
+const coursePage = ref(1);
+const blogPage = ref(1);
+const courseTotal = ref(0);
+const blogTotal = ref(0);
+const pageSize = 8;
 const tabs = computed(() => [
-  { key: 'courses', label: '收藏课程', count: favoriteCourses.value.length },
-  { key: 'blogs', label: '收藏博客', count: favoriteBlogs.value.length },
+  { key: 'courses', label: '收藏课程', count: courseTotal.value },
+  { key: 'blogs', label: '收藏博客', count: blogTotal.value },
 ]);
-
-function backendMessage(error, fallback) {
-  return error?.response?.data?.msg || error?.response?.data?.MSG || fallback;
-}
 
 function courseImage(languageName) {
   return assets.languageCards[languageName] || assets.languageCards[String(languageName || '').toLowerCase()] || assets.defaultAvatar;
@@ -146,17 +168,29 @@ async function loadFavorites() {
   try {
     if (!await verifyUser()) return;
     const [courseResponse, blogResponse] = await Promise.all([
-      axios.get(`/courses/favorList/${store.state.user.id}`),
-      axios.get(`/blogs/collectList/${store.state.user.id}`),
+      axios.get(`/courses/favorList/${store.state.user.id}`, { params: { page: coursePage.value, size: pageSize } }),
+      axios.get(`/blogs/collectList/${store.state.user.id}`, { params: { page: blogPage.value, size: pageSize } }),
     ]);
-    favoriteCourses.value = Array.isArray(courseResponse.data.data) ? courseResponse.data.data : [];
-    favoriteBlogs.value = Array.isArray(blogResponse.data.data) ? blogResponse.data.data : [];
+    favoriteCourses.value = courseResponse.data.data?.items || [];
+    favoriteBlogs.value = blogResponse.data.data?.items || [];
+    courseTotal.value = courseResponse.data.data?.total || 0;
+    blogTotal.value = blogResponse.data.data?.total || 0;
   } catch (error) {
-    errorMessage.value = backendMessage(error, '收藏内容加载失败，请检查服务状态后重试。');
+    errorMessage.value = apiErrorMessage(error, '收藏内容加载失败，请检查服务状态后重试。');
     console.error(error);
   } finally {
     loading.value = false;
   }
+}
+
+function changeCoursePage(page) {
+  coursePage.value = page;
+  return loadFavorites();
+}
+
+function changeBlogPage(page) {
+  blogPage.value = page;
+  return loadFavorites();
 }
 
 function openCourse(courseName) {
@@ -210,6 +244,7 @@ loadFavorites();
 .favorite-center .blog-card__content small, .favorite-center .blog-card__content > span { color: var(--cc4c-muted); font-size: .78rem; }
 .favorite-center .blog-card__content b { color: var(--cc4c-text); font-size: 1rem; overflow-wrap: anywhere; }
 .favorite-center .blog-card > i { color: var(--cc4c-primary); font-size: 1.25rem; font-style: normal; }
+.favorite-pagination { justify-content: center; margin-top: 24px; }
 
 @media (max-width: 900px) {
   .favorite-center .course-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

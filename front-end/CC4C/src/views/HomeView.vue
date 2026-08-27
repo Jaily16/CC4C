@@ -46,7 +46,7 @@
         >
           <div class="course-grid">
             <article
-              v-for="course in courses.slice(0, 6)"
+              v-for="course in courses"
               :key="course.courseId"
               class="course-card"
               role="link"
@@ -85,7 +85,7 @@
         >
           <div class="blog-list">
             <article
-              v-for="blog in blogs.slice(0, 4)"
+              v-for="blog in blogs"
               :key="blog.blogId"
               class="blog-row"
               role="link"
@@ -116,6 +116,7 @@ import { useRouter } from 'vue-router';
 import axios from '@/plugins/axiosInstance';
 import { assets } from '@/assets';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
@@ -152,11 +153,11 @@ async function loadCourses() {
   coursesLoading.value = true;
   coursesError.value = '';
   try {
-    const resp = await axios.get('/courses/home');
-    courses.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get('/courses/home', { params: { page: 1, size: 8 } });
+    courses.value = resp.data.data?.items || [];
   } catch (error) {
     courses.value = [];
-    coursesError.value = '课程推荐加载失败，请检查网络后重试。';
+    coursesError.value = apiErrorMessage(error, '课程推荐加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     coursesLoading.value = false;
@@ -167,11 +168,11 @@ async function loadBlogs() {
   blogsLoading.value = true;
   blogsError.value = '';
   try {
-    const resp = await axios.get('/blogs/home');
-    blogs.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get('/blogs/home', { params: { page: 1, size: 6 } });
+    blogs.value = resp.data.data?.items || [];
   } catch (error) {
     blogs.value = [];
-    blogsError.value = '博客推荐加载失败，请检查网络后重试。';
+    blogsError.value = apiErrorMessage(error, '博客推荐加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     blogsLoading.value = false;

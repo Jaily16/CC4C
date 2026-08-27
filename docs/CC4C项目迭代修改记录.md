@@ -638,16 +638,16 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 
 ### 13.1 当前状态
 
-截至 2026-08-27，V3 方面一“基础版本与依赖现代化”已完成实现、自动验证、脱敏环境运行和用户浏览器验收。升级保持了 V2 业务、URL、Cookie、JSON 和前端路由契约；方面二至方面七尚未实施。
+截至 2026-08-27，V3 方面一“基础版本与依赖现代化”和方面二“模块化单体、API 与数据治理”均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面二在保留核心业务流程和前端路由的同时，明确调整了写操作 HTTP 方法、分页响应、错误状态和草稿语义；方面三至方面七尚未实施。
 
 | 项目 | 当前记录 |
 | --- | --- |
 | 规划基线 | `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`） |
 | 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
 | 预计规模 | 6–8 周，按七个方面依次推进 |
-| 当前阶段 | 方面一已完成并通过用户浏览器验收 |
-| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、HikariCP、Jackson、Axios 1.19.0 |
-| 下一方面 | 模块化单体、API 与数据治理；尚未规划或实施 |
+| 当前阶段 | 方面二已完成并通过用户浏览器验收 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
+| 下一方面 | 安全与身份体系；尚未规划或实施 |
 
 ### 13.2 已确定的总体路线
 
@@ -659,7 +659,7 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 6. Actuator、Micrometer、Prometheus、Grafana 与 Gatling 性能证据。
 7. Docker Compose、Testcontainers 和 GitHub Actions 持续交付。
 
-Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地。Spring Modulith 1.4.12 以及其余后续技术仍是拟实施内容，不能在代码、README 或对外说明中表述为已经完成。
+Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway 已在方面二落地。Spring Security、Redis、RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
 
 ### 13.3 安全与实施边界
 
@@ -747,3 +747,85 @@ npm run build -- --outDir ../../temp/cc4c-v3-aspect1-build-override
 4. Windows 工作区中的 `testController.java` 属于仅大小写重命名。未来获得暂存授权后，应使用两步 `git mv` 确保 Git 正确记录为 `TestController.java`；本方面未执行暂存。
 5. 本机 `application.yml` 未读取、未修改、未暂存；凭据和本机绝对路径未写入变更文件。
 6. `node_modules/`、`dist/`、`target/`、`temp/` 和日志仍处于忽略范围。本方面未暂存、提交或推送。
+
+### 13.9 方面二实际变更
+
+#### 独立基线与模块化单体
+
+- 先修正 `TestController.java` 的 Git 大小写记录，重新通过方面一门禁，并建立独立检查点提交 `b1b9c1b`（`chore: modernize CC4C foundation`）；未推送。
+- 后端按 `shared`、`identity`、`catalog`、`community`、`interaction`、`moderation` 六个顶级模块重组。每个模块通过 `package-info.java` 声明允许依赖，内部 Mapper、实体和服务不对外暴露。
+- 跨模块能力只通过 `identity::api`、`catalog::api` 和 `community::api` 的查询或审核接口访问。Spring Modulith 验证恰好识别六个模块，无循环依赖、内部包越界或未声明依赖。
+- 控制器和服务统一使用构造器注入与 `private final` 依赖；删除仅为转发而存在的 Service/Impl 二层结构。
+- 复合关系表改用明确的参数化 SQL，不再借用要求单一主键的 `BaseMapper`，方面一记录的关联实体 `@TableId` 警告已消除。
+
+实际模块依赖如下：
+
+```mermaid
+flowchart LR
+    Shared[shared]
+    Identity[identity] --> Shared
+    Catalog[catalog] --> Shared
+    Community[community] --> Shared
+    Community --> IdentityAPI[identity::api]
+    Community --> CatalogAPI[catalog::api]
+    Interaction[interaction] --> Shared
+    Interaction --> IdentityAPI
+    Interaction --> CatalogAPI
+    Interaction --> CommunityAPI[community::api]
+    Moderation[moderation] --> Shared
+    Moderation --> CommunityAPI
+```
+
+#### API、DTO 与分页治理
+
+- 普通响应继续使用泛型 `code/data/msg`，请求体和响应体改为独立 DTO；服务端生成的 ID、时间、点击量和删除状态不再允许由请求覆盖，密码字段不进入响应或 OpenAPI Schema。
+- Bean Validation 覆盖用户名、邮箱、密码、课程/模块/博客标题、枚举值、正文、评论和正数 ID；统一异常处理返回受控业务码及 400/401/404/409/422/500，未捕获异常不泄露堆栈和请求正文。
+- 列表统一返回 `items/page/size/total/totalPages/hasNext/hasPrevious`，页码从 1 开始，默认 20 条、最大 100 条；课程、博客、收藏、审核和顶层评论均在数据库分页，评论页仍批量装配完整的两级回复。
+- 写操作调整为 `POST /users/logout`、`POST /admin/logout`、`POST /users/email/{email}`、`POST /courses/star/{userId}/{courseId}` 和 `POST /blogs/collect/{uid}/{bid}`，不再保留旧 GET 写方法。
+- 草稿使用 `PUT /blogs/draft` 新增或覆盖、`GET /blogs/draft/{id}` 读取、`DELETE /blogs/draft/{id}` 删除；博客提交成功后在同一事务清除用户草稿。
+- Springdoc OpenAPI 2.8.17 显式记录 DTO、分页和错误响应。`CC4C_API_DOCS_ENABLED` 默认 `false`，只在脱敏验收环境显式开启。
+- 修复 Swagger 公共错误响应引用在最终 `components` 中缺少 `ApiErrorResponse` 的问题，并增加契约测试；运行文档共检查 395 个 Schema 引用，悬空引用为 0。
+
+#### Flyway 与查询治理
+
+- Flyway 成为数据库结构的唯一来源：V1 创建现有 16 张表，V2 幂等写入 4 种语言、61 门初始课程、9 个课程模块和 61 条模块关系，V3 统一文本字符集、强化评论归属和父回复完整性，并增加博客及回复查询索引。
+- `baseline-on-migrate` 保持关闭。主测试库在迁移前使用 `mysqldump --single-transaction --skip-lock-tables` 备份并保存 SHA-256；测试脚本强制主库以 `_test` 结尾、空库以 `_flyway_test` 结尾且两者不同。
+- 第一次作用于 `cc4c_test` 的 V3 迁移因外键两侧字符排序规则不一致而停止。未执行 `clean`、`repair` 或覆盖恢复；在用户完成恢复库授权后，将已验证备份恢复到固定的 `cc4c_recovery_test`，再由 V3 同时转换关联表两侧并重建外键，最终迁移成功。原失败库保持不变，便于审计。
+- 空迁移库从 V1 重建、恢复库显式基线到版本 1 后应用 V2/V3、第二次迁移零新增、`validate` 和结构断言全部通过。
+- 课程首页使用聚合收藏计数；博客首页、全部、语言、搜索、个人与收藏查询均使用稳定排序的数据库分页；评论读取批量加载用户和两级回复，避免逐评论 N+1。
+- `EXPLAIN FORMAT=JSON` 证据保存在忽略的 `temp/`。迁移后博客时间排序选择 `idx_blog_state_time`，点击排序选择 `idx_blog_state_click`，回复查询选择 `idx_indirect_comment_father`；未据此编造耗时或性能提升比例。
+- 原 `database/cc4c.sql` 移至 `database/legacy/cc4c.sql` 并移除默认管理员；新环境只允许从 Flyway 初始化。
+
+#### 前端同步
+
+- 首页、全部课程/博客、语言博客、收藏、个人博客、待审核、管理员列表和顶层评论按约定页大小读取 `PageResponse`；首页只取展示条数，不增加分页器。
+- 搜索、语言和筛选切换会回到第一页；删除、审核或取消收藏后空页会回退；新评论回到第一页，回复刷新当前页。
+- 前端同步 POST/PUT/DELETE 和草稿新语义，使用共享 `apiErrorMessage` 读取 4xx/5xx 的后端消息；没有增加把错误转为成功 Promise 的拦截器。
+- 管理员概览使用服务端 `total`，博客标题上限调整为 75；前端路由、Vuex 用户模型和视觉主题未改变。
+
+### 13.10 方面二验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| Spring Modulith | 恰好六个模块，结构验证与六个模块集成测试通过 |
+| Flyway | 空库 V1–V3、现有库版本 1 基线、重复迁移零新增、`validate` 和结构断言通过 |
+| 后端 `./run-tests.ps1 clean verify` | 40/40 通过，0 失败、0 错误、0 跳过；JAR 构建成功 |
+| V2 回归 | 原 23 项功能测试适配后全部通过 |
+| 新增门禁 | HTTP 状态、DTO 校验、分页、草稿、OpenAPI、查询形态和迁移测试通过 |
+| OpenAPI | `/v3/api-docs`、Swagger UI 返回 200；395 个 Schema 引用，0 个悬空引用 |
+| 前端 | `npm ci` 和生产构建通过；路由及 Vuex 文件无改动 |
+| 运行日志 | 脱敏后端标准错误为空，无新增 `ERROR`；Swagger Resolver 错误修复后复验通过 |
+| Git 与配置 | `git diff --check` 通过，暂存区为空，本机 `application.yml` 状态为空 |
+
+运行与浏览器验收覆盖用户/管理员正确和错误登录、Cookie、刷新与 POST 退出，DTO 错误消息，课程/博客/收藏/审核/评论分页及边界页，搜索和筛选重置，草稿保存与发布清除，课程发布、博客提交审核以及 OpenAPI/Swagger。2026-08-27 用户确认方面二浏览器验收通过，并进一步确认 Swagger Resolver 错误已修复。
+
+### 13.11 当前契约、已知项与发布安全
+
+- 核心 `/users`、`/admin`、`/courses`、`/blogs`、`/comments` 和 `/test` 路径及前端路由保留；上文列出的写操作 HTTP 方法和草稿语义属于方面二明确升级的新契约。
+- `code/data/msg`、Long ID 字符串序列化、密码字段隐藏、Cookie 名称/值/路径/HttpOnly/有效期/删除行为，以及博客编辑器上传字符串字段保持兼容。
+- 成功创建返回 201，非法输入、未授权、不存在、冲突和不可处理场景分别返回 400/401/404/409/422；前端已同步读取错误消息。
+- `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），涉及当前冻结的前端框架或编辑器依赖；本方面未越界升级。Vite 仍有主包大于 500 KiB 的提示。
+- Flyway 11.7.2 在当前 MySQL 8.4 环境给出“官方测试至 MySQL 8.1”的兼容提示，但 V1–V3、重复迁移和 `validate` 的实际门禁全部通过。
+- 当前仍使用业务 Cookie 和明文密码比较，未引入 Spring Security、密码哈希、Redis、RabbitMQ、Actuator、容器或 CI；这些属于后续方面。
+- 本机 `application.yml` 未读取、未修改、未暂存；JAR 不包含该文件。备份、EXPLAIN、构建产物和日志均保存在忽略目录。
+- 方面二已在用户独立授权后创建本地 Git 提交；未推送。后续不得在未规划方面三前开始安全体系改造。

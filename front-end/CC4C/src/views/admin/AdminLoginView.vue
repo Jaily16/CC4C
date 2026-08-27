@@ -51,6 +51,7 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import axios from '@/plugins/axiosInstance';
+import { apiErrorMessage } from '@/utils/apiError';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { assets } from '@/assets';
@@ -95,7 +96,7 @@ async function login() {
     ElMessage.success(resp.data.msg || '登录成功');
     await router.push({ path: '/admin/CoursesAndBlogs' });
   } catch (error) {
-    formError.value = '管理员登录服务暂时不可用，请稍后重试';
+    formError.value = apiErrorMessage(error, '管理员登录服务暂时不可用，请稍后重试');
     ElMessage.error(formError.value);
     console.error(error);
   } finally {

@@ -8,7 +8,7 @@
           <p>浏览社区作者分享的学习心得、技术实践和成长记录，找到值得深入阅读的下一篇文章。</p>
         </div>
         <div class="discovery-hero__stat" aria-label="公开博客数量">
-          <strong>{{ blogList.length }}</strong>
+          <strong>{{ total }}</strong>
           <span>篇公开文章</span>
         </div>
       </header>
@@ -47,6 +47,16 @@
           </article>
         </div>
       </PageFeedback>
+      <el-pagination
+        v-if="total > pageSize"
+        class="collection-pagination"
+        background
+        layout="prev, pager, next"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="changePage"
+      />
     </section>
   </main>
 </template>
@@ -57,11 +67,15 @@ import { useRouter } from 'vue-router';
 import { View } from '@element-plus/icons-vue';
 import axios from '@/plugins/axiosInstance';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const blogList = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
+const currentPage = ref(1);
+const pageSize = 12;
+const total = ref(0);
 
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
@@ -80,15 +94,22 @@ async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const resp = await axios.get('/blogs/all');
-    blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get('/blogs/all', { params: { page: currentPage.value, size: pageSize } });
+    blogList.value = resp.data.data?.items || [];
+    total.value = resp.data.data?.total || 0;
   } catch (error) {
     blogList.value = [];
-    errorMessage.value = '博客加载失败，请检查网络后重试。';
+    total.value = 0;
+    errorMessage.value = apiErrorMessage(error, '博客加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     loading.value = false;
   }
+}
+
+function changePage(page) {
+  currentPage.value = page;
+  return loadBlogs();
 }
 
 loadBlogs();
@@ -123,6 +144,7 @@ loadBlogs();
 .blog-card__action { color: var(--cc4c-primary); font-size: .875rem; font-weight: 700; transition: color 180ms ease, transform 180ms ease; }
 .blog-card:hover h3, .blog-card:focus-visible h3, .blog-card:hover .blog-card__action, .blog-card:focus-visible .blog-card__action { color: var(--cc4c-primary-hover); }
 .blog-card:hover .blog-card__action, .blog-card:focus-visible .blog-card__action { transform: translateX(5px); }
+.collection-pagination { justify-content: center; margin-top: 26px; }
 @media (max-width: 768px) { .discovery-hero { align-items: start; flex-direction: column; } }
 @media (max-width: 480px) { .discovery-page { padding: 12px; } .discovery-hero { padding: 24px 20px; border-radius: 16px; } .discovery-hero__stat { width: 100%; grid-template-columns: auto auto; align-items: center; justify-content: center; gap: 8px; } .discovery-hero__stat span { margin: 0; } .collection-heading { align-items: start; flex-direction: column; } .blog-grid { grid-template-columns: 1fr; gap: 18px; } .blog-card__body { min-height: 200px; padding: 20px; } }
 </style>

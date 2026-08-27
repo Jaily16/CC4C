@@ -12,12 +12,12 @@
     <div class="overview-stats" aria-label="内容统计">
       <article>
         <span>课程总数</span>
-        <strong>{{ courseList.length }}</strong>
+        <strong>{{ courseTotal }}</strong>
         <small>已进入学习目录</small>
       </article>
       <article>
         <span>公开博客</span>
-        <strong>{{ blogList.length }}</strong>
+        <strong>{{ blogTotal }}</strong>
         <small>已通过内容审核</small>
       </article>
       <article>
@@ -34,7 +34,7 @@
         <header class="data-panel__heading">
           <div>
             <h2 id="courses-title">已发布课程</h2>
-            <p>共 {{ courseList.length }} 门课程</p>
+            <p>共 {{ courseTotal }} 门课程</p>
           </div>
           <el-tag type="success" effect="light">公开中</el-tag>
         </header>
@@ -63,7 +63,7 @@
         <header class="data-panel__heading">
           <div>
             <h2 id="blogs-title">公开博客</h2>
-            <p>共 {{ blogList.length }} 篇文章</p>
+            <p>共 {{ blogTotal }} 篇文章</p>
           </div>
           <el-tag type="success" effect="light">审核通过</el-tag>
         </header>
@@ -93,11 +93,14 @@ import { ref } from 'vue';
 import axios from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const blogList = ref([]);
 const courseList = ref([]);
 const pendingCount = ref(0);
+const courseTotal = ref(0);
+const blogTotal = ref(0);
 const loading = ref(false);
 const errorMessage = ref('');
 
@@ -126,15 +129,17 @@ async function loadOverview() {
   errorMessage.value = '';
   try {
     const [coursesResponse, blogsResponse, pendingResponse] = await Promise.all([
-      axios.get('/courses/home'),
-      axios.get('/blogs/all'),
-      axios.get('/blogs/examine'),
+      axios.get('/courses/home', { params: { page: 1, size: 10 } }),
+      axios.get('/blogs/all', { params: { page: 1, size: 10 } }),
+      axios.get('/blogs/examine', { params: { page: 1, size: 10 } }),
     ]);
-    courseList.value = Array.isArray(coursesResponse.data.data) ? coursesResponse.data.data : [];
-    blogList.value = Array.isArray(blogsResponse.data.data) ? blogsResponse.data.data : [];
-    pendingCount.value = Array.isArray(pendingResponse.data.data) ? pendingResponse.data.data.length : 0;
+    courseList.value = coursesResponse.data.data?.items || [];
+    blogList.value = blogsResponse.data.data?.items || [];
+    courseTotal.value = coursesResponse.data.data?.total || 0;
+    blogTotal.value = blogsResponse.data.data?.total || 0;
+    pendingCount.value = pendingResponse.data.data?.total || 0;
   } catch (error) {
-    errorMessage.value = error?.response?.data?.msg || '内容数据加载失败，请检查服务状态后重试。';
+    errorMessage.value = apiErrorMessage(error, '内容数据加载失败，请检查服务状态后重试。');
     console.error(error);
   } finally {
     loading.value = false;

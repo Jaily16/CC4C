@@ -62,7 +62,7 @@
       <template #header>
         <div class="comments-drawer__title">
           <span>课程评论</span>
-          <small>{{ commentList.length }} 条讨论</small>
+          <small>{{ commentTotal }} 条讨论</small>
         </div>
       </template>
 
@@ -92,7 +92,7 @@
           <div class="comment-item__body">
             <div class="comment-item__meta">
               <strong>{{ commentItem.userName || '用户' }}</strong>
-              <span v-if="commentItem.publishTime">{{ commentItem.publishTime }}</span>
+              <span v-if="commentItem.time">{{ commentItem.time }}</span>
             </div>
             <p>{{ commentItem.content }}</p>
             <el-button v-if="loggedIn" link type="primary" @click="toggleReply(commentItem.commentId)">
@@ -108,13 +108,24 @@
               <article v-for="subcomment in commentItem.subCommentList || []" :key="subcomment.commentId" class="reply-item">
                 <div class="reply-item__meta">
                   <strong>{{ subcomment.userName || '用户' }}</strong>
-                  <span v-if="subcomment.publishTime">{{ subcomment.publishTime }}</span>
+                  <span v-if="subcomment.time">{{ subcomment.time }}</span>
                 </div>
                 <p>{{ subcomment.content }}</p>
               </article>
             </div>
           </div>
         </article>
+        <el-pagination
+          v-if="commentTotal > commentPageSize"
+          class="comments-pagination"
+          background
+          small
+          layout="prev, pager, next"
+          :current-page="commentPage"
+          :page-size="commentPageSize"
+          :total="commentTotal"
+          @current-change="changeCommentPage"
+        />
       </section>
     </el-drawer>
   </main>
@@ -131,6 +142,7 @@ import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const route = useRoute();
@@ -155,6 +167,9 @@ const replyingTo = ref(null);
 const replyText = ref('');
 const replyInputError = ref('');
 const replySubmitting = ref(false);
+const commentPage = ref(1);
+const commentPageSize = 10;
+const commentTotal = ref(0);
 
 const loggedIn = computed(() => Boolean(store.state.user.id));
 const userInitial = computed(() => commentInitial(store.state.user.name));
@@ -190,11 +205,15 @@ async function loadComments() {
   commentsLoading.value = true;
   commentsError.value = '';
   try {
-    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`);
-    commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`, {
+      params: { page: commentPage.value, size: commentPageSize },
+    });
+    commentList.value = resp.data.data?.items || [];
+    commentTotal.value = resp.data.data?.total || 0;
   } catch (error) {
     commentList.value = [];
-    commentsError.value = '评论加载失败，请检查网络后重试。';
+    commentTotal.value = 0;
+    commentsError.value = apiErrorMessage(error, '评论加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     commentsLoading.value = false;
@@ -207,6 +226,8 @@ async function loadCourse() {
   text.value = '';
   isFavor.value = false;
   commentList.value = [];
+  commentPage.value = 1;
+  commentTotal.value = 0;
   courseError.value = '';
 
   if (!courseName) {
@@ -234,7 +255,7 @@ async function loadCourse() {
     }
     await Promise.all(requests);
   } catch (error) {
-    courseError.value = '课程加载失败，请检查网络后重试。';
+    courseError.value = apiErrorMessage(error, '课程加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     courseLoading.value = false;
@@ -246,7 +267,7 @@ async function toggleCollect() {
   try {
     const resp = isFavor.value
       ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.get(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      : await axios.post(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -254,7 +275,7 @@ async function toggleCollect() {
     isFavor.value = !isFavor.value;
     ElMessage.success(isFavor.value ? '收藏成功' : '取消收藏成功');
   } catch (error) {
-    ElMessage.error('收藏操作失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '收藏操作失败，请稍后重试'));
     console.error(error);
   }
 }
@@ -272,15 +293,16 @@ async function comment() {
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       commentInputError.value = resp.data.msg || '评论发布失败。';
       return;
     }
     commentText.value = '';
+    commentPage.value = 1;
     await loadComments();
     ElMessage.success('评论成功');
   } catch (error) {
-    commentInputError.value = '评论发布失败，请稍后重试。';
+    commentInputError.value = apiErrorMessage(error, '评论发布失败，请稍后重试。');
     console.error(error);
   } finally {
     commentSubmitting.value = false;
@@ -306,7 +328,7 @@ async function reply(fatherId) {
       content: replyText.value.trim(),
       fatherId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       replyInputError.value = resp.data.msg || '回复发布失败。';
       return;
     }
@@ -317,11 +339,17 @@ async function reply(fatherId) {
     document.getElementById(`replies-${fatherId}`)?.focus();
     ElMessage.success('回复成功');
   } catch (error) {
-    replyInputError.value = '回复发布失败，请稍后重试。';
+    replyInputError.value = apiErrorMessage(error, '回复发布失败，请稍后重试。');
     console.error(error);
   } finally {
     replySubmitting.value = false;
   }
+}
+
+function changeCommentPage(page) {
+  commentPage.value = page;
+  replyingTo.value = null;
+  return loadComments();
 }
 
 watch(() => route.query.courseName, loadCourse, { immediate: true });
@@ -372,5 +400,6 @@ watch(() => route.query.courseName, loadCourse, { immediate: true });
 .reply-compose :deep(.el-button) { justify-self: start; }
 .reply-list:focus { outline: 2px solid #93c5fd; outline-offset: 3px; }
 .reply-item { margin-top: 12px; padding: 12px 14px; border-left: 3px solid #bfdbfe; border-radius: 0 8px 8px 0; background: #f8fafc; }
+.comments-pagination { justify-content: center; }
 @media (max-width: 480px) { .course-detail { padding: 12px; } .course-reading__header { padding: 22px 18px; } .course-reading__article { padding: 22px 18px; } .course-catalog-float { right: 14px; bottom: 18px; } .course-catalog-float__button { min-height: 42px; padding-inline: 14px; } .comment-compose { padding: 12px; } }
 </style>

@@ -23,7 +23,7 @@
         </header>
         <div class="basic-grid">
           <el-form-item label="课程标题 *" :error="formErrors.courseName">
-            <el-input v-model="courseForm.courseName" maxlength="100" show-word-limit clearable placeholder="请输入唯一且清晰的课程标题" @input="formErrors.courseName = ''" />
+            <el-input v-model="courseForm.courseName" maxlength="200" show-word-limit clearable placeholder="请输入唯一且清晰的课程标题" @input="formErrors.courseName = ''" />
           </el-form-item>
           <el-form-item label="课程难度 *">
             <el-select v-model="courseForm.level" placeholder="请选择课程难度">
@@ -98,7 +98,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="模块名称 *" :error="moduleNameError">
-            <el-input v-model="moduleForm.moduleName" maxlength="30" placeholder="例如：Java 基础" @input="moduleNameError = ''" />
+            <el-input v-model="moduleForm.moduleName" maxlength="50" placeholder="例如：Java 基础" @input="moduleNameError = ''" />
           </el-form-item>
           <el-form-item label="模块难度 *">
             <el-select v-model="moduleForm.level">
@@ -128,6 +128,7 @@ import { ElMessage } from 'element-plus';
 import { Loading, Plus } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const languages = [
@@ -179,10 +180,6 @@ watch(() => courseForm.description, (value) => {
   if (value.trim()) formErrors.description = '';
 });
 
-function backendMessage(error, fallback) {
-  return error?.response?.data?.msg || error?.response?.data?.MSG || fallback;
-}
-
 async function loadModules() {
   moduleLoading.value = true;
   moduleError.value = '';
@@ -197,7 +194,7 @@ async function loadModules() {
       return { label: language.label, value: language.name, disabled: children.length === 0, children };
     });
   } catch (error) {
-    moduleError.value = backendMessage(error, '课程模块加载失败，请稍后重试。');
+    moduleError.value = apiErrorMessage(error, '课程模块加载失败，请稍后重试。');
     modules.value = languages.map((language) => ({ label: language.label, value: language.name, disabled: true, children: [] }));
     console.error(error);
   } finally {
@@ -228,7 +225,7 @@ async function addModule() {
       level: moduleForm.level,
       priority: moduleForm.priority,
     });
-    if (response.data.data !== true) {
+    if (!response.data.data) {
       ElMessage.error(response.data.msg || '课程模块添加失败');
       return;
     }
@@ -236,7 +233,7 @@ async function addModule() {
     await loadModules();
     ElMessage.success(response.data.msg || '课程模块添加成功');
   } catch (error) {
-    ElMessage.error(backendMessage(error, '课程模块添加失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '课程模块添加失败，请稍后重试'));
     console.error(error);
   } finally {
     moduleSubmitting.value = false;
@@ -260,14 +257,14 @@ async function publishCourse() {
   publishing.value = true;
   try {
     const response = await axios.post('/courses/add', {
-      languageName: language.name,
       languageId: language.value,
       courseName: courseForm.courseName.trim(),
       description: courseForm.description,
       level: courseForm.level,
+      state: 1,
       priority: selectedModule.value[1],
     });
-    if (response.data.data !== true) {
+    if (!response.data.data) {
       ElMessage.error(response.data.msg || '课程发布失败');
       return;
     }
@@ -277,7 +274,7 @@ async function publishCourse() {
     courseForm.level = 0;
     selectedModule.value = [];
   } catch (error) {
-    ElMessage.error(backendMessage(error, '课程发布失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '课程发布失败，请稍后重试'));
     console.error(error);
   } finally {
     publishing.value = false;

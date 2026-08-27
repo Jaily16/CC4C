@@ -6,7 +6,7 @@
         <h1 id="review-title">博客内容审核</h1>
         <span>选择待审核文章，阅读完整内容后给出审核决定。</span>
       </div>
-      <div class="review-heading__count"><strong>{{ blogList.length }}</strong><span>篇待审核</span></div>
+      <div class="review-heading__count"><strong>{{ total }}</strong><span>篇待审核</span></div>
     </header>
 
     <PageFeedback v-if="loading || errorMessage" :loading="loading" :error="errorMessage" @retry="loadPendingBlogs" />
@@ -33,6 +33,17 @@
             <time :datetime="blog.publishTime">{{ formatDateTime(blog.publishTime) }}</time>
           </button>
         </div>
+        <el-pagination
+          v-if="total > pageSize"
+          class="review-pagination"
+          background
+          small
+          layout="prev, pager, next"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          @current-change="changePage"
+        />
       </aside>
 
       <article class="review-preview" aria-labelledby="review-preview-title">
@@ -85,6 +96,7 @@ import { Loading } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const blogList = ref([]);
 const selectedBlog = ref(null);
@@ -95,10 +107,9 @@ const detailLoading = ref(false);
 const detailError = ref('');
 const operationAction = ref('');
 const editorId = 'admin-blog-review-preview';
-
-function backendMessage(error, fallback) {
-  return error?.response?.data?.msg || error?.response?.data?.MSG || fallback;
-}
+const currentPage = ref(1);
+const pageSize = 10;
+const total = ref(0);
 
 function formatDateTime(value) {
   if (!value) return '时间未知';
@@ -113,11 +124,12 @@ async function loadPendingBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const response = await axios.get('/blogs/examine');
-    blogList.value = Array.isArray(response.data.data) ? response.data.data : [];
+    const response = await axios.get('/blogs/examine', { params: { page: currentPage.value, size: pageSize } });
+    blogList.value = response.data.data?.items || [];
+    total.value = response.data.data?.total || 0;
     if (selectedBlog.value && !blogList.value.some((blog) => blog.blogId === selectedBlog.value.blogId)) resetSelection();
   } catch (error) {
-    errorMessage.value = backendMessage(error, '待审核博客加载失败，请稍后重试。');
+    errorMessage.value = apiErrorMessage(error, '待审核博客加载失败，请稍后重试。');
     console.error(error);
   } finally {
     loading.value = false;
@@ -139,7 +151,7 @@ async function selectBlog(blog) {
     selectedBlog.value = { ...blog, ...response.data.data };
     text.value = response.data.data.content || '';
   } catch (error) {
-    detailError.value = backendMessage(error, '博客正文读取失败，请稍后重试。');
+    detailError.value = apiErrorMessage(error, '博客正文读取失败，请稍后重试。');
     console.error(error);
   } finally {
     detailLoading.value = false;
@@ -182,14 +194,21 @@ async function submitDecision(action) {
       return;
     }
     ElMessage.success(action === 'approve' ? '文章已通过审核' : '文章已驳回');
+    if (blogList.value.length === 1 && currentPage.value > 1) currentPage.value -= 1;
     resetSelection();
     await loadPendingBlogs();
   } catch (error) {
-    ElMessage.error(backendMessage(error, '审核操作失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '审核操作失败，请稍后重试'));
     console.error(error);
   } finally {
     operationAction.value = '';
   }
+}
+
+function changePage(page) {
+  currentPage.value = page;
+  resetSelection();
+  return loadPendingBlogs();
 }
 
 loadPendingBlogs();
@@ -210,6 +229,7 @@ loadPendingBlogs();
 .review-queue h2 { margin: 0; font-size: 1rem; }
 .review-queue header p { margin: 3px 0 0; color: var(--cc4c-muted); font-size: .72rem; }
 .review-queue__list { display: grid; max-height: calc(100vh - 260px); min-height: 420px; gap: 9px; padding: 12px; overflow-y: auto; }
+.review-pagination { justify-content: center; padding: 12px; border-top: 1px solid var(--cc4c-border); }
 .review-item { display: grid; gap: 7px; width: 100%; padding: 15px; border: 1px solid transparent; border-radius: 12px; background: #f8fafc; color: inherit; text-align: left; cursor: pointer; transition: border-color var(--cc4c-transition), background var(--cc4c-transition), box-shadow var(--cc4c-transition); }
 .review-item:hover { border-color: #c7d7ef; background: #f2f7ff; }
 .review-item--active { border-color: #9ab8ed; background: #edf4ff; box-shadow: inset 3px 0 var(--cc4c-primary); }

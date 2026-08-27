@@ -21,7 +21,7 @@
             <div class="basic-grid">
               <div class="form-field">
                 <label for="blog-title">文章标题 <b aria-hidden="true">*</b></label>
-                <el-input id="blog-title" v-model="title" maxlength="100" show-word-limit clearable placeholder="用清晰的标题概括文章主题" @input="titleError = ''" />
+                <el-input id="blog-title" v-model="title" maxlength="75" show-word-limit clearable placeholder="用清晰的标题概括文章主题" @input="titleError = ''" />
                 <p v-if="titleError" class="field-error" role="alert">{{ titleError }}</p>
                 <p v-else class="field-help">建议控制在 15–40 个字，便于读者快速理解。</p>
               </div>
@@ -64,6 +64,7 @@
           <footer class="editor-actions">
             <p>草稿只保存当前正文；提交审核需要标题、语言和正文完整填写。</p>
             <div>
+              <el-button v-if="hasDraft" size="large" type="danger" plain :disabled="draftSaving || publishSubmitting || uploading" @click="deleteDraft">删除草稿</el-button>
               <el-button size="large" :loading="draftSaving" :disabled="publishSubmitting || uploading" @click="draft">保存草稿</el-button>
               <el-button native-type="submit" type="primary" size="large" :loading="publishSubmitting" :disabled="draftSaving || uploading">提交审核</el-button>
             </div>
@@ -84,10 +85,12 @@ import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import store from '@/store';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
 const title = ref('');
+const hasDraft = ref(false);
 const langList = ref([]);
 const text = ref('');
 const pageLoading = ref(false);
@@ -115,10 +118,6 @@ watch(text, (value) => {
   if (value.trim()) contentError.value = '';
 });
 
-function backendMessage(error, fallback) {
-  return error?.response?.data?.msg || error?.response?.data?.MSG || fallback;
-}
-
 async function verifyUser() {
   try {
     const resp = await axios.get('/users/verify');
@@ -129,7 +128,7 @@ async function verifyUser() {
     }
     return true;
   } catch (error) {
-    ElMessage.error('登录状态验证失败，请重新登录');
+    ElMessage.error(apiErrorMessage(error, '登录状态验证失败，请重新登录'));
     await router.push('/login');
     return false;
   }
@@ -140,10 +139,13 @@ async function loadDraft() {
     const resp = await axios.get(`/blogs/draft/${store.state.user.id}`);
     if (resp.data.data != null) {
       text.value = resp.data.data;
+      hasDraft.value = true;
       ElMessage.info('已恢复上次保存的草稿正文');
+    } else {
+      hasDraft.value = false;
     }
   } catch (error) {
-    pageError.value = '草稿读取失败，请重试。';
+    pageError.value = apiErrorMessage(error, '草稿读取失败，请重试。');
     console.error(error);
   }
 }
@@ -185,8 +187,9 @@ async function publish() {
     title.value = '';
     langList.value = [];
     text.value = '';
+    hasDraft.value = false;
   } catch (error) {
-    ElMessage.error(backendMessage(error, '博客发布失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '博客发布失败，请稍后重试'));
     console.error(error);
   } finally {
     publishSubmitting.value = false;
@@ -202,7 +205,7 @@ async function draft() {
   if (draftSaving.value || uploading.value) return;
   draftSaving.value = true;
   try {
-    const resp = await axios.post('/blogs/draft', {
+    const resp = await axios.put('/blogs/draft', {
       userId: store.state.user.id,
       content: text.value,
     });
@@ -210,10 +213,30 @@ async function draft() {
       ElMessage.error(resp.data.msg || '草稿保存失败');
       return;
     }
+    hasDraft.value = true;
     ElMessage.success('已保存草稿');
   } catch (error) {
-    ElMessage.error(backendMessage(error, '草稿保存失败，请稍后重试'));
+    ElMessage.error(apiErrorMessage(error, '草稿保存失败，请稍后重试'));
     console.error(error);
+  } finally {
+    draftSaving.value = false;
+  }
+}
+
+async function deleteDraft() {
+  if (!hasDraft.value || draftSaving.value || publishSubmitting.value || uploading.value) return;
+  draftSaving.value = true;
+  try {
+    const resp = await axios.delete(`/blogs/draft/${store.state.user.id}`);
+    if (!resp.data.data) {
+      ElMessage.error(resp.data.msg || '草稿删除失败');
+      return;
+    }
+    text.value = '';
+    hasDraft.value = false;
+    ElMessage.success('草稿已删除');
+  } catch (error) {
+    ElMessage.error(apiErrorMessage(error, '草稿删除失败，请稍后重试'));
   } finally {
     draftSaving.value = false;
   }
@@ -237,7 +260,7 @@ async function onUploadImg(files, callback) {
     callback(responses);
     ElMessage.success(files.length > 1 ? `${files.length} 张图片上传成功` : '图片上传成功');
   } catch (error) {
-    ElMessage.error(backendMessage(error, error.message || '图片上传失败，请检查格式后重试'));
+    ElMessage.error(apiErrorMessage(error, error.message || '图片上传失败，请检查格式后重试'));
     console.error(error);
   } finally {
     uploading.value = false;

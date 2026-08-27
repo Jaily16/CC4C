@@ -7,6 +7,7 @@ param(
 $testEnvironmentPath = Join-Path $PSScriptRoot '.env.test.local'
 $requiredTestVariableNames = @(
     'CC4C_TEST_DB_URL',
+    'CC4C_TEST_EMPTY_DB_URL',
     'CC4C_TEST_DB_USERNAME',
     'CC4C_TEST_DB_PASSWORD'
 )
@@ -43,6 +44,31 @@ foreach ($requiredTestVariableName in $requiredTestVariableNames) {
     }
 }
 
+function Get-DatabaseNameFromJdbcUrl([string] $jdbcUrl, [string] $variableName) {
+    $match = [regex]::Match(
+        $jdbcUrl,
+        '^jdbc:mysql://[^/]+/(?<database>[^?;]+)(?:[?;].*)?$',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+        throw "Variable '$variableName' must be a MySQL JDBC URL with an explicit database name."
+    }
+    return $match.Groups['database'].Value
+}
+
+$mainTestDatabaseName = Get-DatabaseNameFromJdbcUrl $testEnvironmentValues['CC4C_TEST_DB_URL'] 'CC4C_TEST_DB_URL'
+$emptyTestDatabaseName = Get-DatabaseNameFromJdbcUrl $testEnvironmentValues['CC4C_TEST_EMPTY_DB_URL'] 'CC4C_TEST_EMPTY_DB_URL'
+
+if (-not $mainTestDatabaseName.EndsWith('_test', [System.StringComparison]::OrdinalIgnoreCase) -or
+    $mainTestDatabaseName.EndsWith('_flyway_test', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "CC4C_TEST_DB_URL must target a dedicated database whose name ends with '_test' but not '_flyway_test'."
+}
+if (-not $emptyTestDatabaseName.EndsWith('_flyway_test', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "CC4C_TEST_EMPTY_DB_URL must target a dedicated database whose name ends with '_flyway_test'."
+}
+if ($mainTestDatabaseName.Equals($emptyTestDatabaseName, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "CC4C_TEST_DB_URL and CC4C_TEST_EMPTY_DB_URL must target different databases."
+}
+
 if ($MavenArguments.Count -eq 0) {
     $MavenArguments = @('test')
 }
@@ -59,8 +85,39 @@ foreach ($requiredTestVariableName in $requiredTestVariableNames) {
 
 Push-Location -LiteralPath $PSScriptRoot
 try {
-    & mvn @MavenArguments
-    $mavenExitCode = $LASTEXITCODE
+    $lifecycleGoalsThatRunTests = @('test', 'package', 'verify', 'install')
+    $runsTests = $false
+    foreach ($argument in $MavenArguments) {
+        if ($lifecycleGoalsThatRunTests -contains $argument.ToLowerInvariant()) {
+            $runsTests = $true
+            break
+        }
+    }
+    $skipsTests = $MavenArguments -contains '-DskipTests' -or
+        $MavenArguments -contains '-Dmaven.test.skip=true'
+
+    if ($runsTests -and -not $skipsTests) {
+        $migrationGateArguments = @(
+            '-Dtest=AExistingDatabaseMigrationTest,ZEmptyDatabaseMigrationTest',
+            'test'
+        )
+        if ($MavenArguments -contains '-q' -or $MavenArguments -contains '--quiet') {
+            $migrationGateArguments = @('-q') + $migrationGateArguments
+        }
+        if ($MavenArguments -contains '--no-transfer-progress') {
+            $migrationGateArguments = @('--no-transfer-progress') + $migrationGateArguments
+        }
+
+        & mvn @migrationGateArguments
+        $mavenExitCode = $LASTEXITCODE
+    } else {
+        $mavenExitCode = 0
+    }
+
+    if ($mavenExitCode -eq 0) {
+        & mvn @MavenArguments
+        $mavenExitCode = $LASTEXITCODE
+    }
 }
 finally {
     Pop-Location

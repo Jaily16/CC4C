@@ -1,19 +1,12 @@
 package com.cc4c.functional;
 
-import com.cc4c.entity.Administrator;
-import com.cc4c.entity.Code;
-import com.cc4c.entity.Course;
-import com.cc4c.entity.CourseModule;
-import com.cc4c.entity.ProgrammingLanguage;
-import com.cc4c.entity.User;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
-
-import jakarta.servlet.http.Cookie;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -31,25 +24,22 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     private HikariDataSource dataSource;
 
     @Test
-    void userCookieContractRemainsStable() throws Exception {
-        User user = createUser();
-
+    void userCookieContractRemainsStableAcrossPostLogout() throws Exception {
+        UserFixture user = createUser();
         MvcResult login = mockMvc.perform(post("/users/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + user.getEmail() + "\",\"password\":\"secret1\"}"))
+                        .content("{\"email\":\"" + user.email() + "\",\"password\":\"secret1\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
         Cookie cookie = login.getResponse().getCookie("user_email");
         assertNotNull(cookie);
-        assertEquals(user.getEmail(), cookie.getValue());
+        assertEquals(user.email(), cookie.getValue());
         assertEquals("/", cookie.getPath());
         assertTrue(cookie.isHttpOnly());
         assertEquals(7200, cookie.getMaxAge());
 
-        MvcResult logout = mockMvc.perform(get("/users/logout"))
-                .andExpect(status().isOk())
-                .andReturn();
+        MvcResult logout = mockMvc.perform(post("/users/logout")).andExpect(status().isOk()).andReturn();
         Cookie cleared = logout.getResponse().getCookie("user_email");
         assertNotNull(cleared);
         assertEquals("/", cleared.getPath());
@@ -58,25 +48,23 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     }
 
     @Test
-    void administratorCookieContractRemainsStable() throws Exception {
-        Administrator administrator = createAdmin();
-
+    void administratorCookieContractRemainsStableAcrossPostLogout() throws Exception {
+        AdminFixture admin = createAdmin();
         MvcResult login = mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(administrator)))
+                        .content("{\"adminId\":\"" + admin.id()
+                                + "\",\"adminPassword\":\"" + admin.password() + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
         Cookie cookie = login.getResponse().getCookie("admin");
         assertNotNull(cookie);
-        assertEquals(administrator.getAdminId(), cookie.getValue());
+        assertEquals(admin.id(), cookie.getValue());
         assertEquals("/", cookie.getPath());
         assertTrue(cookie.isHttpOnly());
         assertEquals(3600, cookie.getMaxAge());
 
-        MvcResult logout = mockMvc.perform(get("/admin/logout"))
-                .andExpect(status().isOk())
-                .andReturn();
+        MvcResult logout = mockMvc.perform(post("/admin/logout")).andExpect(status().isOk()).andReturn();
         Cookie cleared = logout.getResponse().getCookie("admin");
         assertNotNull(cleared);
         assertEquals("/", cleared.getPath());
@@ -85,7 +73,7 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     }
 
     @Test
-    void corsPreflightAllowsTheExistingFrontendOriginAndCredentials() throws Exception {
+    void corsPreflightAllowsExistingFrontendOriginAndCredentials() throws Exception {
         mockMvc.perform(options("/users/login")
                         .header(HttpHeaders.ORIGIN, "http://localhost:5173")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
@@ -95,24 +83,21 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     }
 
     @Test
-    void favoriteSummaryAndBusinessFailureKeepTheirV2Shape() throws Exception {
-        User user = createUser();
-        ProgrammingLanguage language = createLanguage();
-        CourseModule module = createModule(language);
-        Course course = createCourse(language, module);
+    void favoriteSummaryKeepsNamesInsideTheUnifiedPageObject() throws Exception {
+        UserFixture user = createUser();
+        LanguageFixture language = createLanguage();
+        ModuleFixture module = createModule(language);
+        CourseFixture course = createCourse(language, module);
 
-        mockMvc.perform(get("/courses/star/{userId}/{courseId}", user.getId(), course.getCourseId()))
+        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/courses/favorList/{id}", user.id()).param("page", "1").param("size", "8"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()));
-
-        mockMvc.perform(get("/courses/favorList/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].courseName").value(course.getCourseName()))
-                .andExpect(jsonPath("$.data[0].languageName").value(language.getLanguageName()));
-
-        mockMvc.perform(get("/courses/star/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
+                .andExpect(jsonPath("$.data.items[0].courseName").value(course.name()))
+                .andExpect(jsonPath("$.data.items[0].languageName").value(language.name()))
+                .andExpect(jsonPath("$.data.totalPages").value(1));
+        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.data").value(false));
     }
 

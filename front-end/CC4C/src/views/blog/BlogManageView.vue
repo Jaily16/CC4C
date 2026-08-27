@@ -19,7 +19,7 @@
         </header>
 
         <div v-if="blogList.length" class="status-summary" aria-label="博客状态统计">
-          <span><strong>{{ blogList.length }}</strong> 全部</span>
+          <span><strong>{{ total }}</strong> 全部</span>
           <span><strong>{{ stateCounts.published }}</strong> 已发布</span>
           <span><strong>{{ stateCounts.pending }}</strong> 待审核</span>
           <span><strong>{{ stateCounts.rejected }}</strong> 未通过</span>
@@ -60,6 +60,16 @@
             </article>
           </div>
         </PageFeedback>
+        <el-pagination
+          v-if="total > pageSize"
+          class="manage-pagination"
+          background
+          layout="prev, pager, next"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          @current-change="changePage"
+        />
       </section>
     </div>
   </main>
@@ -74,12 +84,16 @@ import { useRouter } from 'vue-router';
 import UserInfo from '@/components/UserInfo.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import store from '@/store';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
 const blogList = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
+const currentPage = ref(1);
+const pageSize = 10;
+const total = ref(0);
 
 const stateCounts = computed(() => blogList.value.reduce((counts, blog) => {
   if (blog.state === 1) counts.published += 1;
@@ -113,7 +127,7 @@ async function verifyUser() {
     }
     return true;
   } catch (error) {
-    ElMessage.error('登录状态验证失败，请重新登录');
+    ElMessage.error(apiErrorMessage(error, '登录状态验证失败，请重新登录'));
     await router.push('/login');
     return false;
   }
@@ -125,15 +139,22 @@ async function loadBlogs() {
   try {
     const verified = await verifyUser();
     if (!verified) return;
-    const resp = await axios.get(`/blogs/myBlogs/${store.state.user.id}`);
-    blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get(`/blogs/myBlogs/${store.state.user.id}`, { params: { page: currentPage.value, size: pageSize } });
+    blogList.value = resp.data.data?.items || [];
+    total.value = resp.data.data?.total || 0;
   } catch (error) {
     blogList.value = [];
-    errorMessage.value = '个人博客加载失败，请检查网络后重试。';
+    total.value = 0;
+    errorMessage.value = apiErrorMessage(error, '个人博客加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     loading.value = false;
   }
+}
+
+function changePage(page) {
+  currentPage.value = page;
+  return loadBlogs();
 }
 
 function openBlog(blogId) {
@@ -176,6 +197,7 @@ loadBlogs();
 .blog-item__meta span { display: inline-flex; gap: 5px; align-items: center; }
 .blog-item__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: end; }
 .blog-item__actions :deep(.el-button) { margin: 0; }
+.manage-pagination { justify-content: center; margin-top: 24px; }
 @media (max-width: 768px) { .blog-item { grid-template-columns: 5px minmax(0, 1fr); } .blog-item__actions { grid-column: 2; justify-content: start; } }
 @media (max-width: 480px) { .blog-manage { padding: 12px; } .profile-nav { padding: 12px; } .manage-card { padding: 20px 16px; } .manage-heading { align-items: stretch; flex-direction: column; } .manage-heading :deep(.el-button) { width: 100%; } .blog-item { gap: 12px; padding: 16px 13px; } .blog-item__actions { display: grid; grid-template-columns: 1fr; } .blog-item__actions :deep(.el-button) { width: 100%; } }
 </style>

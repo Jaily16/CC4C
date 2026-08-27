@@ -51,6 +51,7 @@ import { ElMessage } from 'element-plus';
 import { Position, SwitchButton } from '@element-plus/icons-vue';
 import store from '@/store';
 import { assets } from '@/assets';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const user = computed(() => store.state.user);
@@ -63,7 +64,7 @@ const navItems = [
 
 async function logout() {
   try {
-    const resp = await axios.get('/users/logout');
+    const resp = await axios.post('/users/logout');
 
     if (resp.data.data === true) {
       store.commit('RESET_STATE');
@@ -74,7 +75,7 @@ async function logout() {
 
     ElMessage.error(resp.data.msg || '退出登录失败');
   } catch (error) {
-    ElMessage.error('退出登录失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '退出登录失败，请稍后重试'));
     console.error(error);
   }
 }

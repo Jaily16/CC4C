@@ -3,6 +3,10 @@ spring:
     url: ${CC4C_TEST_DB_URL}
     username: ${CC4C_TEST_DB_USERNAME}
     password: ${CC4C_TEST_DB_PASSWORD}
+  flyway:
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
   mail:
     username: test-sender@example.com
 
@@ -11,3 +15,9 @@ cc4c:
   request-img-path: http://localhost:5173/test-blog/
   save-avatar-path: ${user.dir}/target/functional-files/avatar/
   request-avatar-path: http://localhost:5173/test-avatar/
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

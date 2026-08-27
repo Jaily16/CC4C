@@ -1,21 +1,13 @@
 package com.cc4c.functional;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc4c.dao.BlogInvolvesLanguageDao;
-import com.cc4c.entity.Blog;
-import com.cc4c.entity.Code;
-import com.cc4c.entity.ProgrammingLanguage;
-import com.cc4c.entity.User;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -26,207 +18,146 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class BlogFunctionalTest extends FunctionalTestSupport {
 
-    @Autowired
-    private BlogInvolvesLanguageDao blogInvolvesLanguageDao;
-
     @Test
-    void submissionModerationDiscoveryClickAndDeleteFlowWorks() throws Exception {
-        User writer = createUser();
-        ProgrammingLanguage language = createLanguage();
+    void submissionModerationAndPagedPublicReadingWork() throws Exception {
+        UserFixture writer = createUser();
+        LanguageFixture language = createLanguage();
         String title = unique("submitted_");
-        Blog payload = new Blog();
-        payload.setWriterId(writer.getId());
-        payload.setTitle(title);
-        payload.setContent("Submitted content");
-        payload.setLanguageList(List.of(language.getLanguageId()));
 
         mockMvc.perform(post("/blogs/submit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(1));
+                        .content(objectMapper.writeValueAsString(blogPayload(writer.id(), title, language.id()))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.title").value(title))
+                .andExpect(jsonPath("$.data.blogId").isString());
 
-        Blog stored = blogDao.selectOne(new LambdaQueryWrapper<Blog>().eq(Blog::getTitle, title));
-        assertNotNull(stored);
-        assertEquals(0, stored.getState());
-        assertEquals(0, stored.getClick());
-
-        mockMvc.perform(get("/blogs/myBlogs/{id}", writer.getId()))
+        Long blogId = jdbcTemplate.queryForObject(
+                "SELECT blog_id FROM blog WHERE title = ?", Long.class, title);
+        mockMvc.perform(get("/blogs/examine").param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].title").value(title));
+                .andExpect(jsonPath("$.data.items[0].blogId").value(Long.toString(blogId)))
+                .andExpect(jsonPath("$.data.total").value(1));
 
-        mockMvc.perform(get("/blogs/examine"))
+        mockMvc.perform(put("/blogs/approve/{id}", blogId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.title == '" + title + "')]").exists());
+                .andExpect(jsonPath("$.data.state").value(1));
 
-        mockMvc.perform(put("/blogs/approve/{id}", stored.getBlogId()))
+        mockMvc.perform(get("/blogs/{id}", blogId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(true));
+                .andExpect(jsonPath("$.data.content").value("Functional blog content"))
+                .andExpect(jsonPath("$.data.languageList[0]").value(language.id()));
 
-        mockMvc.perform(get("/blogs/{id}", stored.getBlogId()))
+        mockMvc.perform(get("/blogs/all").param("page", "1").param("size", "12"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content").value("Submitted content"));
-
-        mockMvc.perform(get("/blogs/list/{languageId}", language.getLanguageId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].title").value(title));
-
-        mockMvc.perform(get("/blogs/search/{info}", title.substring(0, 9)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].title").value(title));
-
-        mockMvc.perform(put("/blogs/click/{id}", stored.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(true));
-        assertEquals(1, blogDao.selectById(stored.getBlogId()).getClick());
-
-        mockMvc.perform(delete("/blogs/delete")
-                        .param("userId", Long.toString(writer.getId() + 1))
-                        .param("blogId", stored.getBlogId().toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(0));
-
-        mockMvc.perform(delete("/blogs/delete")
-                        .param("userId", writer.getId().toString())
-                        .param("blogId", stored.getBlogId().toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()));
-
-        mockMvc.perform(get("/blogs/{id}", stored.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()));
+                .andExpect(jsonPath("$.data.items[0].title").value(title))
+                .andExpect(jsonPath("$.data.items[0].content").doesNotExist());
     }
 
     @Test
-    void publicBlogListsAndDenialFlowWork() throws Exception {
-        User writer = createUser();
-        Blog published = createBlog(writer, 1);
-        Blog pending = createBlog(writer, 0);
+    void moderationRejectsNonPendingStateTransitions() throws Exception {
+        UserFixture writer = createUser();
+        BlogFixture pending = createBlog(writer, 0);
+        BlogFixture denied = createBlog(writer, 0);
 
-        mockMvc.perform(get("/blogs/home"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data[?(@.title == '" + published.getTitle() + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.title == '" + pending.getTitle() + "')]").doesNotExist());
+        mockMvc.perform(put("/blogs/approve/{id}", pending.id()))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/blogs/approve/{id}", pending.id()))
+                .andExpect(status().isUnprocessableEntity());
 
-        mockMvc.perform(get("/blogs/all"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.title == '" + published.getTitle() + "')]").exists());
-
-        mockMvc.perform(put("/blogs/deny/{id}", pending.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(get("/blogs/{id}", pending.getBlogId()))
+        mockMvc.perform(put("/blogs/deny/{id}", denied.id()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.state").value(-1));
-
-        mockMvc.perform(get("/blogs/examine"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.title == '" + pending.getTitle() + "')]").doesNotExist());
+        mockMvc.perform(put("/blogs/deny/{id}", denied.id()))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test
-    void blogCollectionLifecycleIsIdempotentAndQueryable() throws Exception {
-        User user = createUser();
-        Blog blog = createBlog(user, 1);
+    void blogFavoritesUsePostConflictAndIndependentPagination() throws Exception {
+        UserFixture user = createUser();
+        BlogFixture blog = createBlog(user, 1);
 
-        mockMvc.perform(get("/blogs/ifCollect/{uid}/{bid}", user.getId(), blog.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
+        mockMvc.perform(post("/blogs/collect/{uid}/{bid}", user.id(), blog.id()))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/blogs/collect/{uid}/{bid}", user.id(), blog.id()))
+                .andExpect(status().isConflict());
 
-        mockMvc.perform(get("/blogs/collect/{uid}/{bid}", user.getId(), blog.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(get("/blogs/collect/{uid}/{bid}", user.getId(), blog.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-
-        mockMvc.perform(get("/blogs/collectList/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].blogId").value(blog.getBlogId().toString()));
-
-        mockMvc.perform(delete("/blogs/collect/{uid}/{bid}", user.getId(), blog.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()));
-
-        mockMvc.perform(delete("/blogs/collect/{uid}/{bid}", user.getId(), blog.getBlogId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()));
-    }
-
-    @Test
-    void draftLifecycleStoresOnceAndConsumesOnRead() throws Exception {
-        User user = createUser();
-
-        mockMvc.perform(get("/blogs/draft/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").doesNotExist());
-
-        mockMvc.perform(post("/blogs/draft")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.getId() + "\",\"content\":\"draft body\"}"))
+        mockMvc.perform(get("/blogs/ifCollect/{uid}/{bid}", user.id(), blog.id()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
 
-        mockMvc.perform(post("/blogs/draft")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.getId() + "\",\"content\":\"second body\"}"))
+        mockMvc.perform(get("/blogs/collectList/{id}", user.id())
+                        .param("page", "1").param("size", "8"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(false));
+                .andExpect(jsonPath("$.data.items[0].blogId").value(Long.toString(blog.id())))
+                .andExpect(jsonPath("$.data.total").value(1));
 
-        mockMvc.perform(get("/blogs/draft/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("draft body"));
-
-        mockMvc.perform(get("/blogs/draft/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").doesNotExist());
+        mockMvc.perform(delete("/blogs/collect/{uid}/{bid}", user.id(), blog.id()))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/blogs/collect/{uid}/{bid}", user.id(), blog.id()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void invalidBlogReferencesReturnFailuresWithoutPartialWrites() throws Exception {
-        User writer = createUser();
-        ProgrammingLanguage language = createLanguage();
-        String invalidTitle = unique("invalid_language_");
-        Blog invalid = new Blog();
-        invalid.setWriterId(writer.getId());
-        invalid.setTitle(invalidTitle);
-        invalid.setContent("invalid");
-        invalid.setLanguageList(List.of(999999));
+    void draftUpsertIsNonDestructiveAndPublishingClearsIt() throws Exception {
+        UserFixture user = createUser();
+        LanguageFixture language = createLanguage();
+
+        mockMvc.perform(put("/blogs/draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + user.id() + "\",\"content\":\"draft body\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/blogs/draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"" + user.id() + "\",\"content\":\"updated body\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/blogs/draft/{id}", user.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("updated body"));
+        mockMvc.perform(get("/blogs/draft/{id}", user.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("updated body"));
 
         mockMvc.perform(post("/blogs/submit")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalid)))
+                        .content(objectMapper.writeValueAsString(
+                                blogPayload(user.id(), unique("draft_publish_"), language.id()))))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/blogs/draft/{id}", user.id()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-        assertFalse(blogDao.exists(new LambdaQueryWrapper<Blog>().eq(Blog::getTitle, invalidTitle)));
+                .andExpect(jsonPath("$.data").doesNotExist());
 
-        mockMvc.perform(get("/blogs/collect/{uid}/{bid}", writer.getId(), 999999999999L))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-
-        mockMvc.perform(put("/blogs/click/{id}", 999999999999L))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-
-        mockMvc.perform(get("/blogs/list/{languageId}", language.getLanguageId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data").isEmpty());
+        mockMvc.perform(delete("/blogs/draft/{id}", user.id()))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void blogImageUploadReturnsEditorCompatibleResponse() throws Exception {
+    void invalidBlogReferencesNeverCreatePartialWrites() throws Exception {
+        UserFixture writer = createUser();
+        LanguageFixture language = createLanguage();
+        String invalidTitle = unique("invalid_");
+
+        mockMvc.perform(post("/blogs/submit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                blogPayload(writer.id(), invalidTitle, 999999))))
+                .andExpect(status().isUnprocessableEntity());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM blog WHERE title = ?", Integer.class, invalidTitle));
+
+        mockMvc.perform(post("/blogs/collect/{uid}/{bid}", writer.id(), 999999999999L))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/blogs/click/{id}", 999999999999L))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/blogs/list/{languageId}", language.id())
+                        .param("page", "2").param("size", "12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.page").value(2));
+    }
+
+    @Test
+    void blogImageUploadKeepsEditorStringContract() throws Exception {
         MockMultipartFile image = new MockMultipartFile(
                 "file", "article.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3});
 
@@ -235,5 +166,13 @@ class BlogFunctionalTest extends FunctionalTestSupport {
                 .andExpect(jsonPath("$.success").value("1"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.url").isString());
+    }
+
+    private Map<String, Object> blogPayload(long writerId, String title, int languageId) {
+        return Map.of(
+                "writerId", Long.toString(writerId),
+                "title", title,
+                "content", "Functional blog content",
+                "languageList", List.of(languageId));
     }
 }

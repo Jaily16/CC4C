@@ -8,7 +8,7 @@
           <p>按语言浏览，或搜索你想学习的主题。每门课程都从清晰的学习路径开始。</p>
         </div>
         <div class="discovery-hero__stat" aria-label="当前结果数量">
-          <strong>{{ allCourses.length }}</strong>
+          <strong>{{ total }}</strong>
           <span>{{ isSearching ? '个搜索结果' : '门可学课程' }}</span>
         </div>
       </header>
@@ -63,6 +63,16 @@
           </article>
         </div>
       </PageFeedback>
+      <el-pagination
+        v-if="total > pageSize"
+        class="collection-pagination"
+        background
+        layout="prev, pager, next"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="changePage"
+      />
     </section>
   </main>
 </template>
@@ -74,6 +84,7 @@ import { Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { assets } from '@/assets';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const mainLang = ref('java');
@@ -82,6 +93,9 @@ const allCourses = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
 const isSearching = ref(false);
+const currentPage = ref(1);
+const pageSize = 12;
+const total = ref(0);
 const langs = [
   { name: 'java', icon: assets.languageIcons.java },
   { name: 'c++', icon: assets.languageIcons['c++'] },
@@ -120,11 +134,13 @@ async function requestCourses(url) {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const resp = await axios.get(url);
-    allCourses.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get(url, { params: { page: currentPage.value, size: pageSize } });
+    allCourses.value = resp.data.data?.items || [];
+    total.value = resp.data.data?.total || 0;
   } catch (error) {
     allCourses.value = [];
-    errorMessage.value = '课程加载失败，请检查网络后重试。';
+    total.value = 0;
+    errorMessage.value = apiErrorMessage(error, '课程加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     loading.value = false;
@@ -134,12 +150,14 @@ async function requestCourses(url) {
 function loadLanguageCourses() {
   isSearching.value = false;
   searchInfo.value = '';
+  currentPage.value = 1;
   return requestCourses(`/courses/language/${encodeURIComponent(mainLang.value)}`);
 }
 
 function searchCourses() {
   if (!searchInfo.value) return loadLanguageCourses();
   isSearching.value = true;
+  currentPage.value = 1;
   return requestCourses(`/courses/search/${encodeURIComponent(searchInfo.value)}`);
 }
 
@@ -149,7 +167,15 @@ function clearSearch() {
 }
 
 function retryLoad() {
-  return isSearching.value ? searchCourses() : loadLanguageCourses();
+  const url = isSearching.value
+    ? '/courses/search/' + encodeURIComponent(searchInfo.value)
+    : '/courses/language/' + encodeURIComponent(mainLang.value);
+  return requestCourses(url);
+}
+
+function changePage(page) {
+  currentPage.value = page;
+  return retryLoad();
 }
 
 loadLanguageCourses();
@@ -192,6 +218,7 @@ loadLanguageCourses();
 .course-card__action { align-self: end; color: var(--cc4c-primary); font-size: .875rem; font-weight: 700; transition: color 180ms ease, transform 180ms ease; }
 .course-card:hover h3, .course-card:focus-visible h3, .course-card:hover .course-card__action, .course-card:focus-visible .course-card__action { color: var(--cc4c-primary-hover); }
 .course-card:hover .course-card__action, .course-card:focus-visible .course-card__action { transform: translateX(5px); }
+.collection-pagination { justify-content: center; margin-top: 26px; }
 @media (max-width: 1024px) { .course-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 768px) { .discovery-hero { align-items: start; flex-direction: column; } .discovery-toolbar { align-items: stretch; } .discovery-search { width: 100%; max-width: none; } }
 @media (max-width: 480px) { .discovery-page { padding: 12px; } .discovery-hero { padding: 24px 20px; border-radius: 16px; } .discovery-hero__stat { width: 100%; grid-template-columns: auto auto; align-items: center; justify-content: center; gap: 8px; } .discovery-hero__stat span { margin: 0; } .discovery-toolbar { padding: 16px; } .language-picker { width: 100%; } .language-picker :deep(.el-radio-button__inner) { padding: 7px 8px; } .discovery-search { flex-wrap: wrap; } .discovery-search .el-button { width: 100%; } .collection-heading { align-items: start; flex-direction: column; } .course-grid { grid-template-columns: 1fr; gap: 18px; } .course-card__visual { height: 190px; } }

@@ -10,6 +10,10 @@ spring:
     username: "${CC4C_DB_USERNAME:root}"
     #数据库访问密码
     password: "${CC4C_DB_PASSWORD:}"
+  flyway:
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
   mail:
     host: smtp.qq.com
     password: "${CC4C_MAIL_PASSWORD:}"
@@ -30,6 +34,12 @@ spring:
 server:
   #项目启动的端口号，可以自己设定，但请与前端设置的不同
   port: 4080
+
+springdoc:
+  api-docs:
+    enabled: "${CC4C_API_DOCS_ENABLED:false}"
+  swagger-ui:
+    enabled: "${CC4C_API_DOCS_ENABLED:false}"
 
 #自定义配置属性
 cc4c:

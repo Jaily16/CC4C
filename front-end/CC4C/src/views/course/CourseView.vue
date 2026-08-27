@@ -120,6 +120,17 @@
             </div>
           </div>
         </article>
+        <el-pagination
+          v-if="commentTotal > commentPageSize"
+          class="comments-pagination"
+          background
+          small
+          layout="prev, pager, next"
+          :current-page="commentPage"
+          :page-size="commentPageSize"
+          :total="commentTotal"
+          @current-change="changeCommentPage"
+        />
       </section>
     </el-drawer>
   </main>
@@ -135,6 +146,7 @@ import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
@@ -156,6 +168,9 @@ const replyText = ref('');
 const replyingTo = ref(null);
 const commentList = ref([]);
 const commentsError = ref('');
+const commentPage = ref(1);
+const commentPageSize = 10;
+const commentTotal = ref(0);
 const langs = [
   { no: '1', name: 'java', icon: assets.languageIcons.java },
   { no: '2', name: 'c++', icon: assets.languageIcons['c++'] },
@@ -177,7 +192,7 @@ async function verifyUser() {
     }
     return true;
   } catch (error) {
-    ElMessage.error('登录状态验证失败，请重新登录');
+    ElMessage.error(apiErrorMessage(error, '登录状态验证失败，请重新登录'));
     await router.push('/login');
     return false;
   }
@@ -192,7 +207,7 @@ async function loadCourseModules() {
     courseModules.value = Array.isArray(resp.data.data) ? resp.data.data : [];
   } catch (error) {
     courseModules.value = [];
-    modulesError.value = '课程目录加载失败，请检查网络后重试。';
+    modulesError.value = apiErrorMessage(error, '课程目录加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     modulesLoading.value = false;
@@ -204,6 +219,8 @@ function selectLang() {
   text.value = '';
   isFavor.value = false;
   commentList.value = [];
+  commentPage.value = 1;
+  commentTotal.value = 0;
   return loadCourseModules();
 }
 
@@ -214,11 +231,15 @@ async function loadComments() {
   }
   commentsError.value = '';
   try {
-    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`);
-    commentList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get(`/comments/course/${courseData.value.courseId}`, {
+      params: { page: commentPage.value, size: commentPageSize },
+    });
+    commentList.value = resp.data.data?.items || [];
+    commentTotal.value = resp.data.data?.total || 0;
   } catch (error) {
     commentList.value = [];
-    commentsError.value = '评论加载失败，请稍后重试。';
+    commentTotal.value = 0;
+    commentsError.value = apiErrorMessage(error, '评论加载失败，请稍后重试。');
     console.error(error);
   }
 }
@@ -235,6 +256,8 @@ async function openCourse(courseName) {
     }
     courseData.value = courseResp.data.data;
     text.value = courseData.value.description || '';
+    commentPage.value = 1;
+    commentTotal.value = 0;
     const [favorResult] = await Promise.all([
       axios.get(`/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`).catch(() => null),
       loadComments(),
@@ -242,7 +265,7 @@ async function openCourse(courseName) {
     isFavor.value = favorResult?.data?.data === true;
   } catch (error) {
     courseData.value = null;
-    courseError.value = '课程加载失败，请稍后重试。';
+    courseError.value = apiErrorMessage(error, '课程加载失败，请稍后重试。');
     console.error(error);
   } finally {
     courseLoading.value = false;
@@ -258,7 +281,7 @@ async function starCourse() {
   try {
     const resp = isFavor.value
       ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.get(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      : await axios.post(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -266,7 +289,7 @@ async function starCourse() {
     isFavor.value = !isFavor.value;
     ElMessage.success(isFavor.value ? '收藏成功' : '取消收藏成功');
   } catch (error) {
-    ElMessage.error('收藏操作失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '收藏操作失败，请稍后重试'));
     console.error(error);
   }
 }
@@ -283,15 +306,16 @@ async function comment() {
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       ElMessage.error(resp.data.msg || '评论失败');
       return;
     }
     commentText.value = '';
+    commentPage.value = 1;
     await loadComments();
     ElMessage.success('评论成功');
   } catch (error) {
-    ElMessage.error('评论失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '评论失败，请稍后重试'));
     console.error(error);
   }
 }
@@ -312,7 +336,7 @@ async function reply(fatherId) {
       content: replyText.value.trim(),
       fatherId,
     });
-    if (resp.data.data !== true) {
+    if (!resp.data.data) {
       ElMessage.error(resp.data.msg || '回复失败');
       return;
     }
@@ -321,9 +345,15 @@ async function reply(fatherId) {
     await loadComments();
     ElMessage.success('回复成功');
   } catch (error) {
-    ElMessage.error('回复失败，请稍后重试');
+    ElMessage.error(apiErrorMessage(error, '回复失败，请稍后重试'));
     console.error(error);
   }
+}
+
+function changeCommentPage(page) {
+  commentPage.value = page;
+  replyingTo.value = null;
+  return loadComments();
 }
 
 verifyUser().then((verified) => {
@@ -333,6 +363,7 @@ verifyUser().then((verified) => {
 
 <style scoped>
 .course-browser { min-width: 0; padding: clamp(16px, 3vw, 32px); }
+.comments-pagination { justify-content: center; }
 .course-browser__content { width: min(100%, var(--cc4c-content-max-width)); margin: 0 auto; }
 .page-heading { margin-bottom: 24px; }
 .page-heading__eyebrow { margin: 0 0 6px; color: var(--cc4c-primary); font-size: .8125rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }

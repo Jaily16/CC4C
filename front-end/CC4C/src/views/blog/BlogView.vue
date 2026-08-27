@@ -41,6 +41,16 @@
           </article>
         </div>
       </PageFeedback>
+      <el-pagination
+        v-if="total > pageSize"
+        class="blog-pagination"
+        background
+        layout="prev, pager, next"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="changePage"
+      />
     </section>
   </main>
 </template>
@@ -52,12 +62,16 @@ import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { View } from '@element-plus/icons-vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
+import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
 const blogList = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
+const currentPage = ref(1);
+const pageSize = 12;
+const total = ref(0);
 
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
@@ -73,7 +87,7 @@ async function verifyUser() {
     }
     return true;
   } catch (error) {
-    ElMessage.error('登录状态验证失败，请重新登录');
+    ElMessage.error(apiErrorMessage(error, '登录状态验证失败，请重新登录'));
     await router.push('/login');
     return false;
   }
@@ -92,15 +106,22 @@ async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const resp = await axios.get('/blogs/list/1');
-    blogList.value = Array.isArray(resp.data.data) ? resp.data.data : [];
+    const resp = await axios.get('/blogs/list/1', { params: { page: currentPage.value, size: pageSize } });
+    blogList.value = resp.data.data?.items || [];
+    total.value = resp.data.data?.total || 0;
   } catch (error) {
     blogList.value = [];
-    errorMessage.value = '博客加载失败，请检查网络后重试。';
+    total.value = 0;
+    errorMessage.value = apiErrorMessage(error, '博客加载失败，请检查网络后重试。');
     console.error(error);
   } finally {
     loading.value = false;
   }
+}
+
+function changePage(page) {
+  currentPage.value = page;
+  return loadBlogs();
 }
 
 verifyUser().then((verified) => {
@@ -126,5 +147,6 @@ verifyUser().then((verified) => {
 .blog-card h2 { margin: 0; color: var(--cc4c-text); font-size: clamp(1.05rem, 2vw, 1.3rem); line-height: 1.45; }
 .blog-card__summary { display: -webkit-box; margin: 9px 0 0; overflow: hidden; color: var(--cc4c-muted); line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .blog-card__action { flex: 0 0 auto; color: var(--cc4c-primary); font-size: .875rem; font-weight: 700; white-space: nowrap; }
+.blog-pagination { justify-content: center; margin-top: 24px; }
 @media (max-width: 480px) { .blogs-page { padding: 12px; } .page-heading { align-items: flex-start; flex-direction: column; } .blog-card { align-items: flex-start; flex-direction: column; gap: 10px; } .blog-card__action { display: inline-flex; min-height: 36px; align-items: center; } }
 </style>

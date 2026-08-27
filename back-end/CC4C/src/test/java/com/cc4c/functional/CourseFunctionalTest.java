@@ -1,16 +1,10 @@
 package com.cc4c.functional;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc4c.entity.Code;
-import com.cc4c.entity.Course;
-import com.cc4c.entity.CourseModule;
-import com.cc4c.entity.ProgrammingLanguage;
-import com.cc4c.entity.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import java.util.Map;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -20,154 +14,113 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CourseFunctionalTest extends FunctionalTestSupport {
 
     @Test
-    void moduleAndCoursePublishingFlowWorksAndRejectsInvalidAssociations() throws Exception {
-        ProgrammingLanguage language = createLanguage();
-        CourseModule module = new CourseModule();
-        module.setLanguageId(language.getLanguageId());
-        module.setPriority(1);
-        module.setModuleName(unique("module_"));
-        module.setLevel(0);
+    void moduleAndCoursePublishingUsesCreatedConflictAndUnprocessableStatuses() throws Exception {
+        LanguageFixture language = createLanguage();
+        Map<String, Object> module = Map.of(
+                "languageId", language.id(),
+                "priority", 1,
+                "moduleName", unique("module_"),
+                "level", 0);
 
         mockMvc.perform(post("/courses/module")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(module)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_ADD_MODULE_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(22001));
 
         mockMvc.perform(post("/courses/module")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(module)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.MODULE_PRIORITY_REPEATED.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(42001));
 
-        Course course = coursePayload(language, module, unique("published_"));
+        String courseName = unique("published_");
+        Map<String, Object> course = coursePayload(courseName, language.id(), 1);
         mockMvc.perform(post("/courses/add")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(course)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_ADD_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(get("/courses/{name}", course.getCourseName()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_GET_ONE_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data.courseName").value(course.getCourseName()));
-
-        mockMvc.perform(get("/courses/module/{id}", language.getLanguageId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_GET_MODULES_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data[0].courseList[0]").value(course.getCourseName()));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(22000))
+                .andExpect(jsonPath("$.data.courseName").value(courseName));
 
         mockMvc.perform(post("/courses/add")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(course)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_NAME_REPEATED.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(42000));
 
-        Course invalid = coursePayload(language, module, unique("invalid_module_"));
-        invalid.setPriority(999);
         mockMvc.perform(post("/courses/add")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalid)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_ADD_MODULE_COURSE_FAILED.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-        assertFalse(courseDao.exists(new LambdaQueryWrapper<Course>().eq(Course::getCourseName, invalid.getCourseName())));
-
-        mockMvc.perform(get("/courses/module/{id}", 999999))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_GET_MODULES_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data").isEmpty());
+                        .content(objectMapper.writeValueAsString(
+                                coursePayload(unique("invalid_module_"), language.id(), 99))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value(52002));
     }
 
     @Test
-    void courseDiscoveryAndRecommendationEndpointsReturnStableCollections() throws Exception {
-        ProgrammingLanguage language = createLanguage();
-        CourseModule module = createModule(language);
-        Course course = createCourse(language, module);
+    void courseListsAndFavoritesAreDatabasePaged() throws Exception {
+        UserFixture user = createUser();
+        LanguageFixture language = createLanguage();
+        ModuleFixture module = createModule(language);
+        CourseFixture course = createCourse(language, module);
 
-        mockMvc.perform(get("/courses/home"))
+        mockMvc.perform(get("/courses/search/{info}", course.name()).param("page", "1").param("size", "12"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[?(@.courseName == '" + course.getCourseName() + "')]").exists());
+                .andExpect(jsonPath("$.data.items[0].courseName").value(course.name()))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(12))
+                .andExpect(jsonPath("$.data.total").value(1));
 
-        mockMvc.perform(get("/courses/search/{info}", course.getCourseName().substring(0, 8)))
+        mockMvc.perform(get("/courses/language/{name}", language.name())
+                        .param("page", "1").param("size", "12"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_SEARCH_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.items[0].courseId").value(course.id()));
 
-        mockMvc.perform(get("/courses/language/{name}", language.getLanguageName()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_SEARCH_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data[0].courseName").value(course.getCourseName()));
+        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data").value(true));
+        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isConflict());
 
-        mockMvc.perform(get("/courses/recommend/{language}/{major}", language.getLanguageId(), 0))
+        mockMvc.perform(get("/courses/favorList/{id}", user.id())
+                        .param("page", "1").param("size", "8"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_GET_RECOMMENDATION_SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.items[0].courseName").value(course.name()))
+                .andExpect(jsonPath("$.data.items[0].languageName").value(language.name()))
+                .andExpect(jsonPath("$.data.total").value(1));
 
-        mockMvc.perform(get("/courses/search/{info}", unique("missing_")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.COURSE_SEARCH_NO_RESULT.getCode()))
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data").isEmpty());
+        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.id(), course.id()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void courseFavoriteLifecycleIsIdempotentAndQueryable() throws Exception {
-        User user = createUser();
-        ProgrammingLanguage language = createLanguage();
-        CourseModule module = createModule(language);
-        Course course = createCourse(language, module);
+    void recommendationHierarchyAndPagingBoundsAreValidated() throws Exception {
+        LanguageFixture language = createLanguage();
+        ModuleFixture module = createModule(language);
+        CourseFixture course = createCourse(language, module);
 
-        mockMvc.perform(get("/courses/ifFavor/{userId}/{courseId}", user.getId(), course.getCourseId()))
+        mockMvc.perform(get("/courses/recommend/{language}/{major}", language.id(), 0))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(false));
+                .andExpect(jsonPath("$.data[0].moduleName").value(module.name()))
+                .andExpect(jsonPath("$.data[0].courseList[0]").value(course.name()));
 
-        mockMvc.perform(get("/courses/star/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
+        mockMvc.perform(get("/courses/home").param("page", "0").param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40000));
 
-        mockMvc.perform(get("/courses/star/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
-
-        mockMvc.perform(get("/courses/ifFavor/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(get("/courses/favorList/{id}", user.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].courseName").value(course.getCourseName()));
-
-        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.SUCCESS.getCode()))
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.getId(), course.getCourseId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(Code.FAIL.getCode()))
-                .andExpect(jsonPath("$.data").value(false));
+        mockMvc.perform(get("/courses/{name}", "definitely-missing-course"))
+                .andExpect(status().isNotFound());
     }
 
-    private Course coursePayload(ProgrammingLanguage language, CourseModule module, String name) {
-        Course course = new Course();
-        course.setLanguageName(language.getLanguageName());
-        course.setLanguageId(language.getLanguageId());
-        course.setPriority(module.getPriority());
-        course.setCourseName(name);
-        course.setDescription("Published from functional test");
-        course.setLevel(0);
-        course.setState(1);
-        return course;
+    private Map<String, Object> coursePayload(String name, int languageId, int priority) {
+        return Map.of(
+                "courseName", name,
+                "description", "Functional course",
+                "level", 0,
+                "state", 1,
+                "languageId", languageId,
+                "priority", priority);
     }
 }
