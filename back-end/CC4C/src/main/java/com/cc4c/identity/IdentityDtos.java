@@ -19,7 +19,9 @@ public final class IdentityDtos {
     public record RegisterRequest(
             @NotBlank @Size(max = 30) String name,
             @NotBlank @Email @Size(max = 320) String email,
-            @NotBlank @Size(min = 4, max = 16) String password,
+            @NotBlank @Size(min = 8, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String password,
+            @NotBlank @Pattern(regexp = "\\d{6}") String verificationCode,
             @NotNull @IntValues({-1, 0, 1}) Integer major,
             @Positive Integer language,
             @Size(max = 260) String avatar
@@ -28,18 +30,19 @@ public final class IdentityDtos {
 
     public record LoginRequest(
             @NotBlank @Email @Size(max = 320) String email,
-            @NotBlank @Size(min = 4, max = 16) String password
+            @NotBlank @Size(min = 4, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String password
     ) {
     }
 
     public record AdminLoginRequest(
             @NotBlank @Size(max = 7) String adminId,
-            @NotBlank @Size(min = 4, max = 16) String adminPassword
+            @NotBlank @Size(min = 4, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String adminPassword
     ) {
     }
 
     public record UserUpdateRequest(
-            @NotNull @Positive Long id,
             @Size(min = 1, max = 30) String name,
             @IntValues({-1, 0, 1}) Integer major,
             @Positive Integer language,
@@ -48,16 +51,38 @@ public final class IdentityDtos {
     }
 
     public record ChangePasswordRequest(
-            @NotNull @Positive Long id,
-            @NotBlank @Size(min = 4, max = 16) String password,
-            @NotBlank @Size(min = 4, max = 16) String newPassword
+            @NotBlank @Size(min = 4, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String password,
+            @NotBlank @Size(min = 8, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String newPassword
     ) {
     }
 
     public record ResetPasswordRequest(
             @NotBlank @Email @Size(max = 320) String email,
-            @NotBlank @Size(min = 4, max = 16) String newPassword
+            @NotBlank @Pattern(regexp = "\\d{6}") String verificationCode,
+            @NotBlank @Size(min = 8, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String newPassword
     ) {
+    }
+
+    public record AdministratorPasswordRequest(
+            @NotBlank @Size(min = 4, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String password,
+            @NotBlank @Size(min = 8, max = 64)
+            @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String newPassword
+    ) {
+    }
+
+    public record VerificationEmailRequest(
+            @NotBlank @Email @Size(max = 320) String email,
+            @NotNull VerificationPurpose purpose
+    ) {
+    }
+
+    public enum VerificationPurpose {
+        REGISTER,
+        PASSWORD_RESET
     }
 
     @Schema(name = "UserResponse")

@@ -9,7 +9,8 @@ $requiredTestVariableNames = @(
     'CC4C_TEST_DB_URL',
     'CC4C_TEST_EMPTY_DB_URL',
     'CC4C_TEST_DB_USERNAME',
-    'CC4C_TEST_DB_PASSWORD'
+    'CC4C_TEST_DB_PASSWORD',
+    'CC4C_TEST_REDIS_URL'
 )
 
 if (-not (Test-Path -LiteralPath $testEnvironmentPath -PathType Leaf)) {
@@ -71,6 +72,15 @@ if ($mainTestDatabaseName.Equals($emptyTestDatabaseName, [System.StringCompariso
 
 if ($MavenArguments.Count -eq 0) {
     $MavenArguments = @('test')
+}
+
+$testEnvironmentValues['CC4C_TEST_REDIS_NAMESPACE'] =
+    'cc4c:test:' + [Guid]::NewGuid().ToString('N')
+$requiredTestVariableNames += 'CC4C_TEST_REDIS_NAMESPACE'
+
+$javaVersionOutput = & java -version 2>&1
+if ($LASTEXITCODE -ne 0 -or ($javaVersionOutput -join "`n") -notmatch 'version "21(?:\.|"|-)') {
+    throw "Java 21 is required. Set JAVA_HOME and place its bin directory first on PATH for this process."
 }
 
 $originalProcessEnvironment = @{}

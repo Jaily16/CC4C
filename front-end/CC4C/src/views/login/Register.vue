@@ -45,7 +45,7 @@
               v-model="user.password"
               type="password"
               autocomplete="new-password"
-              placeholder="至少 4 个字符"
+              placeholder="8–64 个字符"
               show-password
               @blur="validateField('password')"
             />
@@ -54,8 +54,14 @@
           <el-form-item label="邮箱验证码 *" :error="fieldErrors.code">
             <div class="verification-row">
               <el-input v-model.trim="iCode" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" @blur="validateField('code')" />
-              <el-button type="primary" plain :loading="sendingCode" @click="getVCode">
-                {{ sendingCode ? '发送中…' : '获取验证码' }}
+              <el-button
+                type="primary"
+                plain
+                :loading="sendingCode"
+                :disabled="countdown > 0"
+                @click="getVCode"
+              >
+                {{ sendingCode ? '发送中…' : (countdown > 0 ? `${countdown} 秒后重试` : '获取验证码') }}
               </el-button>
             </div>
             <p class="field-hint">验证码会发送至当前填写的邮箱；修改邮箱后需要重新获取。</p>
@@ -85,7 +91,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import axios from '@/plugins/axiosInstance';
@@ -111,8 +117,8 @@ const formError = ref('');
 const iCode = ref('');
 const sendingCode = ref(false);
 const registering = ref(false);
-let vCode = '';
-let rEmail = '';
+const countdown = ref(0);
+let countdownTimer = null;
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -126,10 +132,15 @@ function validateField(field) {
     fieldErrors.email = !user.email ? '请输入邮箱' : (!isEmail(user.email) ? '请输入正确的邮箱地址' : '');
   }
   if (field === 'password') {
-    fieldErrors.password = !user.password ? '请输入密码' : (user.password.length < 4 ? '密码至少需要 4 个字符' : '');
+    const bytes = new TextEncoder().encode(user.password).length;
+    fieldErrors.password = !user.password
+      ? '请输入密码'
+      : (user.password.length < 8 || user.password.length > 64 || bytes > 72
+        ? '密码需为 8–64 个字符且编码后不超过 72 字节'
+        : '');
   }
   if (field === 'code') {
-    fieldErrors.code = iCode.value ? '' : '请输入邮箱验证码';
+    fieldErrors.code = /^\d{6}$/.test(iCode.value) ? '' : '请输入六位邮箱验证码';
   }
 }
 
@@ -145,14 +156,16 @@ async function getVCode() {
 
   sendingCode.value = true;
   try {
-    const resp = await axios.post(`/users/email/${encodeURIComponent(user.email)}`);
+    const resp = await axios.post('/users/email', {
+      email: user.email,
+      purpose: 'REGISTER',
+    });
     if (!resp.data.data) {
       formError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(formError.value);
       return;
     }
-    rEmail = user.email;
-    vCode = resp.data.data;
+    startCountdown();
     ElMessage.success('验证码已发送');
   } catch (error) {
     formError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
@@ -169,21 +182,13 @@ async function register() {
     formError.value = '请完善必填信息后再注册';
     return;
   }
-  if (iCode.value !== vCode || !vCode) {
-    fieldErrors.code = '邮箱验证失败，请重新验证';
-    return;
-  }
-  if (user.email !== rEmail) {
-    fieldErrors.code = '邮箱已修改，请重新获取验证码';
-    return;
-  }
-
   registering.value = true;
   try {
-    const response = await axios.post('/users/register', {
+    const response = await axios.post('/users', {
       name: user.userName,
       email: user.email,
       password: user.password,
+      verificationCode: iCode.value,
       major: user.major,
       language: user.lang,
     });
@@ -203,6 +208,22 @@ async function register() {
     registering.value = false;
   }
 }
+
+function startCountdown() {
+  countdown.value = 60;
+  if (countdownTimer) window.clearInterval(countdownTimer);
+  countdownTimer = window.setInterval(() => {
+    countdown.value -= 1;
+    if (countdown.value <= 0) {
+      window.clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+  }, 1000);
+}
+
+onBeforeUnmount(() => {
+  if (countdownTimer) window.clearInterval(countdownTimer);
+});
 </script>
 
 <style scoped>

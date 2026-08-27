@@ -24,7 +24,7 @@ class TestControllerFunctionalTest extends FunctionalTestSupport {
                 MediaType.IMAGE_PNG_VALUE,
                 new byte[]{1, 2, 3, 4});
 
-        MvcResult result = mockMvc.perform(multipart("/test/uploadImage").file(image))
+        MvcResult result = mockMvc.perform(multipart("/test/uploadImage").file(image).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value("1"))
                 .andExpect(jsonPath("$.message").value("success"))

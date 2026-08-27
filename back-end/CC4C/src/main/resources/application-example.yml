@@ -14,6 +14,17 @@ spring:
     baseline-on-migrate: false
     locations: classpath:db/migration
     validate-on-migrate: true
+  data:
+    redis:
+      url: "${CC4C_REDIS_URL}"
+      connect-timeout: 2s
+      timeout: 2s
+  session:
+    store-type: redis
+    timeout: 2h
+    redis:
+      repository-type: indexed
+      namespace: "${CC4C_SESSION_NAMESPACE}"
   mail:
     host: smtp.qq.com
     password: "${CC4C_MAIL_PASSWORD:}"
@@ -43,6 +54,15 @@ springdoc:
 
 #自定义配置属性
 cc4c:
+  security:
+    pepper: "${CC4C_SECURITY_PEPPER}"
+    cookie-secure: "${CC4C_SESSION_COOKIE_SECURE}"
+    allowed-origins: "${CC4C_ALLOWED_ORIGINS}"
+    bcrypt-strength: "${CC4C_BCRYPT_STRENGTH:12}"
+    password-readiness-enabled: true
+    redis-readiness-enabled: true
+    key-prefix: "${CC4C_SESSION_NAMESPACE}:security"
+  test-controller-enabled: false
   #存储博客图片的路径
   save-img-path: "${CC4C_SAVE_IMG_PATH:../../front-end/CC4C/public/blogImg/}"
   #返回的请求访问博客图片的路径

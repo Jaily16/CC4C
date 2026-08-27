@@ -12,10 +12,14 @@ import com.cc4c.community.api.BlogSnapshot;
 import com.cc4c.community.api.BlogSummary;
 import com.cc4c.community.api.CommunityLookup;
 import com.cc4c.identity.api.IdentityLookup;
+import com.cc4c.identity.api.AccountRole;
+import com.cc4c.identity.api.ActorIdentity;
+import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.shared.BusinessCode;
 import com.cc4c.shared.BusinessException;
 import com.cc4c.shared.PageQuery;
 import com.cc4c.shared.PageResult;
+import com.cc4c.shared.RedisRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,11 +38,20 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     private final BlogMapper mapper;
     private final IdentityLookup identityLookup;
     private final CatalogLookup catalogLookup;
+    private final CurrentActor currentActor;
+    private final RedisRateLimiter rateLimiter;
 
-    CommunityService(BlogMapper mapper, IdentityLookup identityLookup, CatalogLookup catalogLookup) {
+    CommunityService(
+            BlogMapper mapper,
+            IdentityLookup identityLookup,
+            CatalogLookup catalogLookup,
+            CurrentActor currentActor,
+            RedisRateLimiter rateLimiter) {
         this.mapper = mapper;
         this.identityLookup = identityLookup;
         this.catalogLookup = catalogLookup;
+        this.currentActor = currentActor;
+        this.rateLimiter = rateLimiter;
     }
 
     public PageResult<BlogResponse> home(PageQuery query) {
@@ -62,7 +75,8 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                 mapper.selectByLanguage(new Page<>(query.page(), query.size()), languageId), false);
     }
 
-    public PageResult<BlogResponse> byWriter(long userId, PageQuery query) {
+    public PageResult<BlogResponse> byCurrentWriter(PageQuery query) {
+        long userId = currentActor.requiredUserId();
         if (identityLookup.findUser(userId).isEmpty()) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "User does not exist");
         }
@@ -79,15 +93,17 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     public BlogResponse detail(long blogId) {
-        return toResponse(requiredBlog(blogId), true);
+        BlogEntity blog = requiredBlog(blogId);
+        if (blog.getState() != VERIFIED && !canReadNonPublic(blog)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
+        }
+        return toResponse(blog, true);
     }
 
     @Transactional
     public BlogResponse submit(BlogSubmitRequest request) {
-        if (identityLookup.findUser(request.writerId()).isEmpty()) {
-            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, BusinessCode.UNPROCESSABLE_ENTITY,
-                    "Blog writer does not exist");
-        }
+        long writerId = currentActor.requiredUserId();
+        rateLimiter.checkBlogPublish(writerId);
         Set<Integer> languages = new LinkedHashSet<>(request.languageList());
         if (languages.size() != request.languageList().size()
                 || languages.stream().anyMatch(language -> !catalogLookup.languageExists(language))) {
@@ -96,7 +112,7 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         }
 
         BlogEntity blog = new BlogEntity();
-        blog.setWriterId(request.writerId());
+        blog.setWriterId(writerId);
         blog.setTitle(request.title());
         blog.setContent(request.content());
         blog.setPublishTime(new Date());
@@ -104,16 +120,17 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         blog.setState(PENDING);
         mapper.insert(blog);
         languages.forEach(language -> mapper.insertLanguage(blog.getBlogId(), language));
-        mapper.insertSubmission(request.writerId(), blog.getBlogId());
-        mapper.deleteDraft(request.writerId());
+        mapper.insertSubmission(writerId, blog.getBlogId());
+        mapper.deleteDraft(writerId);
         return toResponse(blog, true);
     }
 
     @Transactional
-    public boolean delete(long userId, long blogId) {
+    public boolean delete(long blogId) {
+        long userId = currentActor.requiredUserId();
         BlogEntity blog = requiredBlog(blogId);
         if (!blog.getWriterId().equals(userId)) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
+            throw new BusinessException(HttpStatus.FORBIDDEN, BusinessCode.FORBIDDEN, "无权删除该博客");
         }
         mapper.deleteById(blogId);
         return true;
@@ -121,27 +138,18 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
 
     @Transactional
     public boolean saveDraft(BlogDraftRequest request) {
-        if (identityLookup.findUser(request.userId()).isEmpty()) {
-            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, BusinessCode.UNPROCESSABLE_ENTITY,
-                    "User does not exist");
-        }
-        mapper.upsertDraft(request.userId(), request.content());
+        long userId = currentActor.requiredUserId();
+        mapper.upsertDraft(userId, request.content());
         return true;
     }
 
-    public String draft(long userId) {
-        if (identityLookup.findUser(userId).isEmpty()) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "User does not exist");
-        }
-        return mapper.selectDraft(userId);
+    public String draft() {
+        return mapper.selectDraft(currentActor.requiredUserId());
     }
 
     @Transactional
-    public boolean deleteDraft(long userId) {
-        if (identityLookup.findUser(userId).isEmpty()) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "User does not exist");
-        }
-        mapper.deleteDraft(userId);
+    public boolean deleteDraft() {
+        mapper.deleteDraft(currentActor.requiredUserId());
         return true;
     }
 
@@ -207,6 +215,14 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
         }
         return blog;
+    }
+
+    private boolean canReadNonPublic(BlogEntity blog) {
+        return currentActor.current()
+                .map(actor -> actor.role() == AccountRole.ADMIN
+                        || (actor.role() == AccountRole.USER
+                        && Long.toString(blog.getWriterId()).equals(actor.id())))
+                .orElse(false);
     }
 
     private PageResult<BlogResponse> toResponsePage(IPage<BlogEntity> page, boolean includeContent) {

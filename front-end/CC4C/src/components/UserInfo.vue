@@ -135,17 +135,19 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import axios from '@/plugins/axiosInstance';
+import axios, { resetCsrfToken } from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { EditPen, Loading, Lock, Notebook, Plus, StarFilled, UserFilled } from '@element-plus/icons-vue';
 import store from '@/store';
 import { apiErrorMessage } from '@/utils/apiError';
+import { useRouter } from 'vue-router';
 
 
 const props = defineProps({
   activeIndex: { type: [String, Number], default: 1 },
 });
 const emit = defineEmits(['user-updated']);
+const router = useRouter();
 
 const majorList = [
   { label: '非计算机专业', value: -1 },
@@ -179,8 +181,8 @@ const avatarUploading = ref(false);
 const profileSaving = ref(false);
 const passwordSaving = ref(false);
 const uploadedAvatar = ref('');
-const infoForm = reactive({ id: '', name: '', major: 0, language: 1, avatar: '' });
-const passwordForm = reactive({ id: '', password: '', newPassword: '' });
+const infoForm = reactive({ name: '', major: 0, language: 1, avatar: '' });
+const passwordForm = reactive({ password: '', newPassword: '' });
 const editErrors = reactive({ name: '', avatar: '' });
 const passwordErrors = reactive({ password: '', newPassword: '' });
 const editAvatarPreview = computed(() => uploadedAvatar.value || infoForm.avatar || '');
@@ -195,7 +197,6 @@ function handleAvatarError() {
 }
 
 function fillProfileForm() {
-  infoForm.id = currentUser.value.id;
   infoForm.name = currentUser.value.name || '';
   infoForm.major = Number(currentUser.value.major);
   infoForm.language = Number(currentUser.value.language);
@@ -211,7 +212,6 @@ function openEditDialog() {
 }
 
 function openPasswordDialog() {
-  passwordForm.id = currentUser.value.id;
   passwordErrors.password = '';
   passwordErrors.newPassword = '';
   passwordDialogOpen.value = true;
@@ -238,7 +238,7 @@ function resetPasswordDialog() {
 }
 
 async function syncCurrentUser() {
-  const response = await axios.get('/users/info');
+  const response = await axios.get('/users/me');
   const user = response.data.data;
   if (!user || !user.id) throw new Error(response.data.msg || '用户信息刷新失败');
   store.commit('SET_ID', user.id);
@@ -278,7 +278,7 @@ async function uploadAvatar({ file }) {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await axios.post('/users/uploadAvatar', formData, {
+    const response = await axios.post('/users/me/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     const requestPath = response.data.data?.requestPath;
@@ -302,8 +302,7 @@ async function saveProfile() {
 
   profileSaving.value = true;
   try {
-    const response = await axios.put('/users/update', {
-      id: infoForm.id,
+    const response = await axios.put('/users/me', {
       name: infoForm.name.trim(),
       major: infoForm.major,
       language: infoForm.language,
@@ -333,13 +332,17 @@ async function saveProfile() {
 
 async function changePassword() {
   passwordErrors.password = passwordForm.password ? '' : '请输入原密码。';
-  passwordErrors.newPassword = passwordForm.newPassword ? '' : '请输入新密码。';
+  const bytes = new TextEncoder().encode(passwordForm.newPassword).length;
+  passwordErrors.newPassword = !passwordForm.newPassword
+    ? '请输入新密码。'
+    : (passwordForm.newPassword.length < 8 || passwordForm.newPassword.length > 64 || bytes > 72
+      ? '新密码需为 8–64 个字符且编码后不超过 72 字节。'
+      : '');
   if (passwordErrors.password || passwordErrors.newPassword || passwordSaving.value) return;
 
   passwordSaving.value = true;
   try {
-    const response = await axios.put('/users/password/change', {
-      id: currentUser.value.id,
+    const response = await axios.put('/users/me/password', {
       password: passwordForm.password,
       newPassword: passwordForm.newPassword,
     });
@@ -348,10 +351,11 @@ async function changePassword() {
       return;
     }
     clearPasswords();
-    const refreshed = await refreshCurrentUser();
     passwordDialogOpen.value = false;
-    if (refreshed) ElMessage.success('密码修改成功');
-    else ElMessage.warning('密码已修改，但个人信息自动刷新失败');
+    resetCsrfToken();
+    store.commit('RESET_STATE');
+    ElMessage.success('密码修改成功，请重新登录');
+    await router.replace('/login');
   } catch (error) {
     ElMessage.error(apiErrorMessage(error, '密码修改失败，请稍后重试'));
     console.error(error);

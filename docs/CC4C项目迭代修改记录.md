@@ -638,16 +638,16 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 
 ### 13.1 当前状态
 
-截至 2026-08-27，V3 方面一“基础版本与依赖现代化”和方面二“模块化单体、API 与数据治理”均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面二在保留核心业务流程和前端路由的同时，明确调整了写操作 HTTP 方法、分页响应、错误状态和草稿语义；方面三至方面七尚未实施。
+截至 2026-08-27，V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”和方面三“安全与身份体系”均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面三以方面二提交 `57d769b` 为基线，已用 Spring Security、Spring Session Redis、BCrypt、CSRF、服务端角色及所有权校验替换旧业务 Cookie 和明文密码比较；方面四至方面七尚未实施。
 
 | 项目 | 当前记录 |
 | --- | --- |
 | 规划基线 | `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`） |
 | 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
 | 预计规模 | 6–8 周，按七个方面依次推进 |
-| 当前阶段 | 方面二已完成并通过用户浏览器验收 |
-| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
-| 下一方面 | 安全与身份体系；尚未规划或实施 |
+| 当前阶段 | 方面三已完成并通过用户浏览器验收 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V4、Spring Security、Spring Session Data Redis、BCrypt、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
+| 下一方面 | 缓存、数据库与性能优化；尚未规划或实施 |
 
 ### 13.2 已确定的总体路线
 
@@ -659,7 +659,7 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 6. Actuator、Micrometer、Prometheus、Grafana 与 Gatling 性能证据。
 7. Docker Compose、Testcontainers 和 GitHub Actions 持续交付。
 
-Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway 已在方面二落地。Spring Security、Redis、RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
+Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway V1–V3 已在方面二落地；Spring Security、Spring Session Redis、BCrypt、CSRF、安全限流和 Flyway V4 已在方面三落地。Redis 业务缓存、RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
 
 ### 13.3 安全与实施边界
 
@@ -826,6 +826,71 @@ flowchart LR
 - 成功创建返回 201，非法输入、未授权、不存在、冲突和不可处理场景分别返回 400/401/404/409/422；前端已同步读取错误消息。
 - `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），涉及当前冻结的前端框架或编辑器依赖；本方面未越界升级。Vite 仍有主包大于 500 KiB 的提示。
 - Flyway 11.7.2 在当前 MySQL 8.4 环境给出“官方测试至 MySQL 8.1”的兼容提示，但 V1–V3、重复迁移和 `validate` 的实际门禁全部通过。
-- 当前仍使用业务 Cookie 和明文密码比较，未引入 Spring Security、密码哈希、Redis、RabbitMQ、Actuator、容器或 CI；这些属于后续方面。
+- 方面二验收时仍使用业务 Cookie 和明文密码比较；该历史状态已由方面三替换。RabbitMQ、Actuator、容器和 CI 仍未实施。
 - 本机 `application.yml` 未读取、未修改、未暂存；JAR 不包含该文件。备份、EXPLAIN、构建产物和日志均保存在忽略目录。
-- 方面二已在用户独立授权后创建本地 Git 提交；未推送。后续不得在未规划方面三前开始安全体系改造。
+- 方面二已在用户独立授权后创建本地 Git 提交 `57d769b`，未推送。方面三随后在用户批准的独立计划下实施，并与方面二保持独立提交边界。
+
+### 13.12 方面三实际变更
+
+#### 密码结构、迁移与启动门禁
+
+- 新增 Flyway `V4__expand_password_columns.sql`，把 `user.password` 和 `administrator.admin_password` 扩展为 `VARCHAR(255)`；迁移文件不读取、记录或转换任何明文。
+- 新增非 Web 离线密码迁移入口。执行前必须提供备份路径、SHA-256 和精确数据库名称；非 `{bcrypt}` 值分批转换，已迁移值直接跳过，未知 `{id}`、超过 BCrypt 72 字节或备份校验失败时拒绝继续。
+- 迁移前只停止精确监听 CC4C 端口且命令行指向当前 JAR 的后端进程，没有停止无关 Java 进程。专用恢复测试库备份使用 `mysqldump --single-transaction --skip-lock-tables`，SHA-256 为 `dc31e918e52544017ac3ce9d43a3bb378ecfcd0981b0d62e90beb7cd23afd791`。
+- 实际离线迁移转换 2 个用户密码和 5 个管理员密码，验证明文及未知格式剩余数为 0；第二次执行转换数为 0，证明幂等。普通 Web 启动新增密码就绪检查，发现明文或未知格式会快速失败。
+- 生产 BCrypt 强度固定为 12，测试强度为 4。注册、改密和重置密码要求 8–64 字符且 UTF-8 不超过 72 字节；登录仍兼容旧账号 4–64 字符输入。
+
+#### Spring Security、Redis Session 与授权
+
+- 增加 Spring Security、Spring Data Redis、Spring Session Data Redis 和测试依赖，不引入 JWT、OAuth2 或内存会话降级。Redis 启动检查显式执行 `PING`，缺少配置或连接失败时拒绝启动。
+- 认证只使用单一不透明 Cookie `CC4C_SESSION`，设置 `Path=/`、HttpOnly 和 SameSite=Lax；Secure 由必填变量控制。旧 `user_email` 与 `admin` Cookie 只被主动过期，任何值都不参与身份判断。
+- 用户和管理员使用独立认证 Token 与 Provider，Principal 只保存 actor ID、角色和显示名，并使用受限类型白名单序列化到 indexed Redis Session。用户最多 3 个会话、管理员最多 1 个；超限撤销最旧会话，同一浏览器切换身份会失效当前会话。
+- 用户会话空闲 2 小时，管理员会话空闲 1 小时。登录使用 session fixation protection；退出会同时失效 Redis Session、安全上下文、会话 Cookie 和 CSRF Cookie。用户或管理员改密、找回密码后会通过 principal 索引撤销该账号全部会话。
+- `SecurityFilterChain` 使用默认拒绝策略，公开、用户和管理员接口按矩阵授权；服务层再次验证博客、草稿、收藏、评论等资源所有权。`/test/**` 控制器只在 test profile 且显式开关启用时创建，普通运行和 OpenAPI 中不存在。
+- 新增 `GET /csrf` 和 `GET /auth/session`。Cookie CSRF 使用 `XSRF-TOKEN` 与 `X-XSRF-TOKEN`，所有 POST/PUT/DELETE（包括登录、注册、发码和退出）都校验；Security Filter 层的 401/403/503 继续返回 `code/data/msg` JSON，不出现默认登录页、重定向或 HTML 错误。
+- CORS 只接受 `CC4C_ALLOWED_ORIGINS` 的精确来源，禁止通配来源与凭据组合；允许必要方法和 Header，并暴露 `Retry-After`。客户端 IP 只取连接的 `remoteAddr`，未提前信任 `X-Forwarded-For`。
+
+#### 验证码、限流与安全审计
+
+- 验证码接口调整为 `POST /users/email`，请求体包含邮箱和 `REGISTER`/`PASSWORD_RESET` 用途；成功统一返回 202，不返回验证码，也不泄露邮箱是否存在。
+- 六位验证码来自 `SecureRandom`，有效期 10 分钟。Redis 只保存由 Pepper 派生的 HMAC-SHA256 标识与验证码摘要，不保存原始邮箱或验证码；用途相互隔离、最多错误 5 次，验证成功后由 Lua 原子消费。
+- Redis Lua 原子实现登录账号/IP、邮件冷却及小时窗口、评论/回复、博客发布限流；超过阈值返回 429 和 `Retry-After`。成功登录清除账号失败计数但保留 IP 窗口。
+- 安全审计只记录动作、结果、角色、actor ID 或 HMAC 标识及远端 IP，不记录密码、验证码、邮箱原文、Cookie、Token、请求体或密码哈希。
+
+#### 接口与前端同步
+
+- `/users/me` 系列只操作当前用户；课程收藏、博客收藏、个人博客、草稿、博客提交、评论和回复不再接受当前操作者 ID。当前身份由 `identity::api` 的 `CurrentActor` 提供，模块边界仍通过 Spring Modulith 验证。
+- 博客详情对匿名只公开已审核内容，作者可查看自己的非公开内容，管理员可查看审核对象；删除博客、草稿、收藏和评论均同时校验角色及所有权。
+- Axios 统一客户端启用 `withXSRFToken`，所有非 GET 请求先去重初始化 `/csrf`，401 时清除本地展示状态并跳转对应登录页，所有 4xx/5xx 仍保持 rejected Promise。
+- Vuex 和 sessionStorage 不再作为认证依据；应用启动调用 `/auth/session`，只缓存展示资料和角色。路由增加用户/管理员元数据和异步守卫，后端继续作为最终授权边界。
+- 注册与找回页面只接受用户输入的六位验证码，浏览器不再保存或比较验证码；增加 60 秒倒计时和泛化提示。用户、管理员改密成功后均清空前端状态并回到相应登录页。
+- 新增 `.env.runtime.example` 和 `run-local.ps1`，运行文件要求 Redis、namespace、Pepper、Cookie Secure、精确 CORS 来源等安全变量；本机 `.env.runtime.local` 始终忽略。测试每次生成独立 Redis namespace，只删除本次 namespace 下的键，禁止 `FLUSHDB` 和 `FLUSHALL`。
+
+### 13.13 方面三验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 工具链 | Maven 3.9.16；Eclipse Temurin Java 21.0.12.1；Spring Boot 3.5.16 |
+| 后端 `./run-tests.ps1 clean verify` | 63/63 通过，0 失败、0 错误、0 跳过；JAR 构建成功 |
+| 密码与 Flyway | 空库/现有库 V4、首次转换、重复执行、未知格式拒绝、Web 启动明文拒绝均通过 |
+| 认证与会话 | 用户/管理员登录、身份替换、session fixation、USER 3 会话、ADMIN 1 会话、空闲过期和全会话撤销通过 |
+| 授权与 CSRF | 匿名/USER/ADMIN 矩阵、所有权、缺失/错误/正确 CSRF、精确 CORS 来源和 JSON Security 错误通过 |
+| 验证码与限流 | 用途隔离、过期、5 次错误、单次消费、泛化响应、Redis Lua 边界、429 与 `Retry-After` 通过 |
+| Redis | 两个独立 Session repository 读取同一会话通过；启动与运行时不可用场景安全失败；测试只清理独立 namespace |
+| OpenAPI | Swagger UI 返回 200，0 个悬空 Schema 引用；声明 `CC4C_SESSION`/`X-XSRF-TOKEN`，密码字段均为 write-only |
+| 前端 | `npm ci` 和生产构建通过；认证 URL 不携带 actor ID，验证码不在客户端比较 |
+| JAR 与静态扫描 | JAR 不含 `application.yml`，包含脱敏配置和 V4；未发现 JWT/OAuth、可信代理头、旧 Cookie 创建或未保护写接口 |
+| Git 与配置 | `git diff --check` 通过；本机 `.env.*.local`、构建产物、备份和日志未进入跟踪范围 |
+
+脱敏运行使用专用测试库、Redis 独立 namespace、Java 21 和 `SPRING_CONFIG_NAME=application-example`。无副作用运行检查确认匿名 `/auth/session` 为 200/未认证，`/csrf` 创建 XSRF Cookie，未登录私有接口为 401，缺 CSRF 为 403，正确 CSRF 但未认证为 401，合法 CORS 来源为 200、未知来源为 403；以上响应均为统一 JSON。Swagger UI 和前端入口返回 200，旧 Cookie 被过期，运行标准错误为空。
+
+2026-08-27，用户逐项确认浏览器验收通过，覆盖：用户登录与刷新、普通用户访问管理路由被阻止、课程/博客收藏、评论与回复、草稿保存和提交清除、管理员身份切换与审核、用户/管理员改密、管理员退出、找回密码验证码单次消费、新用户注册验证码、跨浏览器全会话撤销、管理员单会话、429 提示、Swagger 安全契约，以及控制台和网络请求中的 Session/CSRF/无 actor ID 契约。
+
+### 13.14 当前契约、已知项与发布安全
+
+- 认证 Cookie 已从 `user_email`/`admin` 明确升级为单一 `CC4C_SESSION`，升级后旧会话必须重新登录。Cookie、CSRF、角色和所有权变化属于方面三公开安全契约，不再保持方面一的旧 Cookie 兼容性。
+- Redis 当前只承载 Session、验证码摘要和安全限流，不包含课程、博客等业务缓存。方面四尚未规划或实施，也没有缓存命中率或性能提升数字。
+- `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），且 Vite 保留主包大于 500 KiB 的提示；方面三未越界升级 Vue、Vite、Vuex、Element Plus 或编辑器，也未执行 `npm audit fix`。
+- 本次本地验收使用临时 Redis 容器，但没有形成 Docker Compose 或容器化交付；容器编排属于方面七。
+- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件。`.env.runtime.local`、`.env.test.local`、数据库备份、日志、Redis 数据、`target`、`node_modules`、`dist` 和 `temp` 均保持忽略。
+- 方面三代码、测试和文档作为一个独立本地提交收口；不执行推送，任何推送仍需进一步明确授权。

@@ -24,23 +24,29 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     private HikariDataSource dataSource;
 
     @Test
-    void userCookieContractRemainsStableAcrossPostLogout() throws Exception {
+    void userSessionCookieIsOpaqueAndLegacyCookiesAreCleared() throws Exception {
         UserFixture user = createUser();
         MvcResult login = mockMvc.perform(post("/users/login")
+                        .with(csrf())
+                        .cookie(new Cookie("user_email", user.email()), new Cookie("admin", "legacy"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + user.email() + "\",\"password\":\"secret1\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        Cookie cookie = login.getResponse().getCookie("user_email");
+        Cookie cookie = login.getResponse().getCookie("CC4C_SESSION");
         assertNotNull(cookie);
-        assertEquals(user.email(), cookie.getValue());
+        assertTrue(!cookie.getValue().contains(user.email()));
         assertEquals("/", cookie.getPath());
         assertTrue(cookie.isHttpOnly());
         assertEquals(7200, cookie.getMaxAge());
+        assertEquals(0, login.getResponse().getCookie("user_email").getMaxAge());
+        assertEquals(0, login.getResponse().getCookie("admin").getMaxAge());
 
-        MvcResult logout = mockMvc.perform(post("/users/logout")).andExpect(status().isOk()).andReturn();
-        Cookie cleared = logout.getResponse().getCookie("user_email");
+        MvcResult logout = mockMvc.perform(post("/users/logout")
+                        .cookie(cookie).with(csrf()))
+                .andExpect(status().isOk()).andReturn();
+        Cookie cleared = logout.getResponse().getCookie("CC4C_SESSION");
         assertNotNull(cleared);
         assertEquals("/", cleared.getPath());
         assertTrue(cleared.isHttpOnly());
@@ -48,24 +54,27 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     }
 
     @Test
-    void administratorCookieContractRemainsStableAcrossPostLogout() throws Exception {
+    void administratorUsesTheSameOpaqueSessionCookie() throws Exception {
         AdminFixture admin = createAdmin();
         MvcResult login = mockMvc.perform(post("/admin/login")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"adminId\":\"" + admin.id()
                                 + "\",\"adminPassword\":\"" + admin.password() + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        Cookie cookie = login.getResponse().getCookie("admin");
+        Cookie cookie = login.getResponse().getCookie("CC4C_SESSION");
         assertNotNull(cookie);
-        assertEquals(admin.id(), cookie.getValue());
+        assertTrue(!cookie.getValue().contains(admin.id()));
         assertEquals("/", cookie.getPath());
         assertTrue(cookie.isHttpOnly());
-        assertEquals(3600, cookie.getMaxAge());
+        assertEquals(7200, cookie.getMaxAge());
 
-        MvcResult logout = mockMvc.perform(post("/admin/logout")).andExpect(status().isOk()).andReturn();
-        Cookie cleared = logout.getResponse().getCookie("admin");
+        MvcResult logout = mockMvc.perform(post("/admin/logout")
+                        .cookie(cookie).with(csrf()))
+                .andExpect(status().isOk()).andReturn();
+        Cookie cleared = logout.getResponse().getCookie("CC4C_SESSION");
         assertNotNull(cleared);
         assertEquals("/", cleared.getPath());
         assertTrue(cleared.isHttpOnly());
@@ -89,14 +98,17 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
         ModuleFixture module = createModule(language);
         CourseFixture course = createCourse(language, module);
 
-        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(post("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isCreated());
-        mockMvc.perform(get("/courses/favorList/{id}", user.id()).param("page", "1").param("size", "8"))
+        mockMvc.perform(get("/courses/star").with(asUser(user))
+                        .param("page", "1").param("size", "8"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].courseName").value(course.name()))
                 .andExpect(jsonPath("$.data.items[0].languageName").value(language.name()))
                 .andExpect(jsonPath("$.data.totalPages").value(1));
-        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(post("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.data").value(false));
     }

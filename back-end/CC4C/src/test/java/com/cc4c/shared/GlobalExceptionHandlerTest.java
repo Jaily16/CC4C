@@ -3,6 +3,7 @@ package com.cc4c.shared;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.RedisSystemException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,5 +37,18 @@ class GlobalExceptionHandlerTest {
                 BusinessCode.FOREIGN_KEY_CONSTRAINT_VIOLATION.code(),
                 invalidReference.getBody().code());
         assertFalse(invalidReference.getBody().msg().contains("SQL"));
+    }
+
+    @Test
+    void redisCommandFailuresMapToGeneric503WithoutInfrastructureDetails() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        var response = handler.handleRedisUnavailable(
+                new RedisSystemException(
+                        "redis-host-and-credential-must-not-leak",
+                        new IllegalStateException("test cause")));
+
+        assertEquals(503, response.getStatusCode().value());
+        assertEquals(BusinessCode.SERVICE_UNAVAILABLE.code(), response.getBody().code());
+        assertFalse(response.getBody().msg().contains("redis-host"));
     }
 }

@@ -35,67 +35,65 @@ public class InteractionController {
         this.service = service;
     }
 
-    @PostMapping("/courses/star/{userId}/{courseId}")
+    @PostMapping("/courses/star/{courseId}")
     public ResponseEntity<ApiResponse<Boolean>> favoriteCourse(
-            @PathVariable @Positive long userId, @PathVariable @Positive int courseId) {
+            @PathVariable @Positive int courseId) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
                         BusinessCode.COURSE_ADD_FAVOR_SUCCESS.code(),
-                        service.favoriteCourse(userId, courseId),
+                        service.favoriteCourse(courseId),
                         "课程收藏成功"));
     }
 
-    @GetMapping("/courses/ifFavor/{userId}/{courseId}")
+    @GetMapping("/courses/star/{courseId}")
     public ApiResponse<Boolean> isCourseFavorite(
-            @PathVariable @Positive long userId, @PathVariable @Positive int courseId) {
-        return ApiResponse.success(service.isCourseFavorite(userId, courseId));
+            @PathVariable @Positive int courseId) {
+        return ApiResponse.success(service.isCourseFavorite(courseId));
     }
 
-    @DeleteMapping("/courses/deleteFavor/{userId}/{courseId}")
+    @DeleteMapping("/courses/star/{courseId}")
     public ApiResponse<Boolean> removeCourseFavorite(
-            @PathVariable @Positive long userId, @PathVariable @Positive int courseId) {
+            @PathVariable @Positive int courseId) {
         return ApiResponse.success(
                 BusinessCode.COURSE_DELETE_FAVOR_SUCCESS.code(),
-                service.removeCourseFavorite(userId, courseId),
+                service.removeCourseFavorite(courseId),
                 "课程取消收藏成功");
     }
 
-    @GetMapping("/courses/favorList/{id}")
+    @GetMapping("/courses/star")
     public ApiResponse<PageResponse<CourseFavoriteSummary>> courseFavorites(
-            @PathVariable @Positive long id,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(
                 BusinessCode.COURSE_GET_FAVOR_COURSE_LIST_SUCCESS.code(),
-                PageResponse.from(service.courseFavorites(id, new PageQuery(page, size))),
+                PageResponse.from(service.courseFavorites(new PageQuery(page, size))),
                 null);
     }
 
-    @PostMapping("/blogs/collect/{uid}/{bid}")
+    @PostMapping("/blogs/collect/{blogId}")
     public ResponseEntity<ApiResponse<Boolean>> favoriteBlog(
-            @PathVariable @Positive long uid, @PathVariable @Positive long bid) {
+            @PathVariable @Positive long blogId) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(service.favoriteBlog(uid, bid)));
+                .body(ApiResponse.success(service.favoriteBlog(blogId)));
     }
 
-    @DeleteMapping("/blogs/collect/{uid}/{bid}")
+    @DeleteMapping("/blogs/collect/{blogId}")
     public ApiResponse<Boolean> removeBlogFavorite(
-            @PathVariable @Positive long uid, @PathVariable @Positive long bid) {
-        return ApiResponse.success(service.removeBlogFavorite(uid, bid));
+            @PathVariable @Positive long blogId) {
+        return ApiResponse.success(service.removeBlogFavorite(blogId));
     }
 
-    @GetMapping("/blogs/collectList/{id}")
+    @GetMapping("/blogs/collect")
     public ApiResponse<PageResponse<BlogSummary>> blogFavorites(
-            @PathVariable @Positive long id,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(PageResponse.from(service.blogFavorites(id, new PageQuery(page, size))));
+        return ApiResponse.success(PageResponse.from(service.blogFavorites(new PageQuery(page, size))));
     }
 
-    @GetMapping("/blogs/ifCollect/{uid}/{bid}")
+    @GetMapping("/blogs/collect/{blogId}")
     public ApiResponse<Boolean> isBlogFavorite(
-            @PathVariable @Positive long uid, @PathVariable @Positive long bid) {
-        return ApiResponse.success(service.isBlogFavorite(uid, bid));
+            @PathVariable @Positive long blogId) {
+        return ApiResponse.success(service.isBlogFavorite(blogId));
     }
 
     @PostMapping("/comments/course")
@@ -114,6 +112,12 @@ public class InteractionController {
     public ResponseEntity<ApiResponse<CommentResponse>> reply(
             @Valid @RequestBody ReplyCommentRequest request) {
         return created(service.reply(request));
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ApiResponse<Boolean> deleteComment(
+            @PathVariable @Positive long commentId) {
+        return ApiResponse.success(service.deleteComment(commentId));
     }
 
     @GetMapping("/comments/course/{id}")

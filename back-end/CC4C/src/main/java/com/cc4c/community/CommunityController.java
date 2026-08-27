@@ -72,17 +72,15 @@ public class CommunityController {
 
     @DeleteMapping("/delete")
     public ApiResponse<Boolean> delete(
-            @RequestParam @Positive long userId,
             @RequestParam @Positive long blogId) {
-        return ApiResponse.success(service.delete(userId, blogId));
+        return ApiResponse.success(service.delete(blogId));
     }
 
-    @GetMapping("/myBlogs/{id}")
+    @GetMapping("/myBlogs")
     public ApiResponse<PageResponse<BlogResponse>> myBlogs(
-            @PathVariable @Positive long id,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(PageResponse.from(service.byWriter(id, new PageQuery(page, size))));
+        return ApiResponse.success(PageResponse.from(service.byCurrentWriter(new PageQuery(page, size))));
     }
 
     @GetMapping("/{id}")
@@ -111,14 +109,14 @@ public class CommunityController {
         return ApiResponse.success(service.saveDraft(request));
     }
 
-    @GetMapping("/draft/{id}")
-    public ApiResponse<String> draft(@PathVariable @Positive long id) {
-        return ApiResponse.success(service.draft(id));
+    @GetMapping("/draft")
+    public ApiResponse<String> draft() {
+        return ApiResponse.success(service.draft());
     }
 
-    @DeleteMapping("/draft/{id}")
-    public ApiResponse<Boolean> deleteDraft(@PathVariable @Positive long id) {
-        return ApiResponse.success(service.deleteDraft(id));
+    @DeleteMapping("/draft")
+    public ApiResponse<Boolean> deleteDraft() {
+        return ApiResponse.success(service.deleteDraft());
     }
 
     @GetMapping("/search/{info}")

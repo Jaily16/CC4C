@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本已完成 V3 方面一“基础版本与依赖现代化”和方面二“模块化单体、API 与数据治理”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V3 管理。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一客户端适配分页和写操作方法。V3 方面三至方面七尚未实施。
+当前版本已完成 V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”和方面三“安全与身份体系”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V4 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护，Redis 在当前阶段仅用于会话、验证码和安全限流。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面四至方面七尚未实施。
 
 ## 平台亮点
 
@@ -110,18 +110,19 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 网络与构建 | Axios 1.19.0、Vite |
 | 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
 | API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
-| 数据访问 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway |
+| 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
+| 数据访问 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V4 |
 | 序列化与服务 | Jackson、JavaMail、文件资源读写 |
 
 ## 系统架构
 
 ```mermaid
 flowchart TB
-    Browser[用户 / 管理员 · Vue 3 SPA] -->|Axios · REST API| HTTP[DTO · Bean Validation · OpenAPI]
+    Browser[用户 / 管理员 · Vue 3 SPA] -->|CC4C_SESSION · CSRF · Axios| HTTP[Spring Security · DTO · OpenAPI]
 
     subgraph Backend[Spring Boot 3.5 模块化单体]
         Shared[shared<br/>响应、分页、异常、CORS、文件与配置]
-        Identity[identity<br/>用户、管理员、验证码]
+        Identity[identity<br/>认证、用户、管理员、验证码]
         Catalog[catalog<br/>语言、课程、课程模块]
         Community[community<br/>博客、草稿]
         Interaction[interaction<br/>评论、回复、收藏]
@@ -146,7 +147,8 @@ flowchart TB
     HTTP --> Interaction
     HTTP --> Moderation
     Backend -->|MyBatis-Plus · HikariCP| DB[(MySQL)]
-    Flyway[Flyway V1–V3] -. 结构与基线数据 .-> DB
+    Identity -->|Session、验证码、限流| Redis[(Redis)]
+    Flyway[Flyway V1–V4] -. 结构、基线数据与密码列 .-> DB
 ```
 
 Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
@@ -175,9 +177,11 @@ CC4C/
 │  │  └─ moderation/                # 博客审核
 │  ├─ src/main/resources/
 │  │  ├─ application-example.yml    # 可提交的脱敏配置模板
-│  │  └─ db/migration/              # Flyway V1–V3 迁移
+│  │  └─ db/migration/              # Flyway V1–V4 迁移
 │  ├─ src/test/                     # 后端自动化测试
 │  ├─ run-tests.ps1                 # 测试环境校验与 Maven 门禁
+│  ├─ run-local.ps1                 # 从忽略的本机 .env 文件安全启动
+│  ├─ migrate-passwords.ps1          # 既有明文密码离线迁移入口
 │  └─ pom.xml
 ├─ database/
 │  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
@@ -195,6 +199,7 @@ CC4C/
 - Maven 3.6.3+
 - Node.js 18+ 与 npm
 - MySQL 8.x
+- Redis 7.x
 
 ### 2. 克隆仓库
 
@@ -215,11 +220,17 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
   ON <database_name>.* TO '<application_user>'@'127.0.0.1';
 ```
 
-首次启动时 Flyway 会依次执行 V1–V3，创建 16 张表、写入公开课程目录基线并应用关系约束和查询索引。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
+首次启动时 Flyway 会依次执行 V1–V4，创建 16 张表、写入公开课程目录基线、应用关系约束和查询索引，并把用户及管理员密码列扩展到 255 字符。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
 
 ### 4. 配置后端运行环境
 
-仓库只跟踪脱敏的 `application-example.yml`。使用环境变量提供本机参数，并在启动时显式选择该配置；不要读取、复制或提交本机 `application.yml`。
+仓库只跟踪脱敏的 `application-example.yml` 和 `.env.runtime.example`。本地运行时复制模板并填写忽略文件；`run-local.ps1` 会校验变量、Java 版本和 JAR，再显式加载脱敏配置。不要复制或提交本机 `application.yml`。
+
+```powershell
+cd back-end/CC4C
+Copy-Item .env.runtime.example .env.runtime.local
+# 只在本机编辑 .env.runtime.local，不要把真实值写入模板或文档
+```
 
 可用环境变量：
 
@@ -228,6 +239,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
 | `CC4C_DB_URL` | MySQL JDBC 连接地址 |
 | `CC4C_DB_USERNAME` | 数据库用户名 |
 | `CC4C_DB_PASSWORD` | 数据库密码 |
+| `CC4C_REDIS_URL` | Redis 连接地址；当前仅用于会话、验证码和限流 |
+| `CC4C_SESSION_NAMESPACE` | 当前应用独占的 Redis Session 命名空间 |
+| `CC4C_SECURITY_PEPPER` | 至少 32 字符的随机安全 Pepper |
+| `CC4C_SESSION_COOKIE_SECURE` | HTTPS 部署必须为 `true`；本地 HTTP 可为 `false` |
+| `CC4C_ALLOWED_ORIGINS` | 允许携带凭据的精确前端来源列表，禁止通配符 |
 | `CC4C_MAIL_USERNAME` | 邮件服务账号 |
 | `CC4C_MAIL_PASSWORD` | 邮件服务授权信息 |
 | `CC4C_REQUEST_AVATAR_PATH` | 前端可访问的头像资源地址 |
@@ -236,18 +252,19 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
 | `CC4C_SAVE_IMG_PATH` | 本机内容图片保存目录 |
 | `CC4C_API_DOCS_ENABLED` | 是否公开 OpenAPI JSON 与 Swagger UI；默认 `false` |
 
-> 不要把真实值写回 `application-example.yml`、README、日志或源码。数据库连接变量应显式设置；邮件变量仅在需要真实邮件投递时设置。
+> 不要把真实值写回 `application-example.yml`、`.env.runtime.example`、README、日志或源码。`.env.runtime.local` 必须保持忽略；密码、验证码、Cookie、CSRF Token、Pepper 和 SMTP 授权码不得记录或提交。
 
 ### 5. 启动后端
 
+先构建并验证 JAR，再由受控脚本启动：
+
 ```powershell
 cd back-end/CC4C
-$env:SPRING_CONFIG_NAME = 'application-example'
-$env:CC4C_DB_URL = 'jdbc:mysql://127.0.0.1:3306/<database_name>'
-$env:CC4C_DB_USERNAME = '<username>'
-$env:CC4C_DB_PASSWORD = '<password>'
-mvn spring-boot:run
+.\run-tests.ps1 clean verify
+.\run-local.ps1
 ```
+
+Redis 不可连接、Pepper 不足 32 字符、CORS 含通配符、Java 不是 21、JAR 缺失或数据库仍含明文/未知格式密码时，应用会快速失败，不会降级到内存会话或旧密码比较。既有数据库升级必须先停止后端并备份，应用 V4 后使用 `migrate-passwords.ps1` 离线转换密码；脚本要求备份路径、SHA-256 和精确数据库名确认，且重复执行不会再次转换 `{bcrypt}` 值。
 
 后端默认地址：`http://localhost:4080`
 
@@ -283,22 +300,25 @@ npm ci
 npm run build
 ```
 
-后端测试必须连接相互独立的主测试库和空迁移库。先由数据库管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、四个变量任一为空、库名不符合约束或两个 URL 相同时都会快速失败，不会回退到开发库：
+后端测试必须连接相互独立的主测试库、空迁移库和专用 Redis。先由管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、五个变量任一为空、库名不符合约束或两个数据库 URL 相同时都会快速失败，不会回退到开发库：
 
 ```powershell
 cd back-end/CC4C
 Copy-Item .env.test.example .env.test.local
-# 填写 CC4C_TEST_DB_URL、CC4C_TEST_EMPTY_DB_URL、CC4C_TEST_DB_USERNAME、CC4C_TEST_DB_PASSWORD
+# 填写四个 CC4C_TEST_DB_* 变量和 CC4C_TEST_REDIS_URL
 .\run-tests.ps1 clean verify
 ```
 
-主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾。测试门禁会先验证现有库基线和空库 V1–V3 重建，再执行完整测试。当前验收基线为 40 项测试全部通过。
+主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾。测试门禁每次生成独立 Redis namespace，只清理该命名空间，禁止 `FLUSHDB` 或 `FLUSHALL`。门禁会验证现有库和空库 V1–V4、密码迁移、Spring Security、Redis Session、CSRF、授权、验证码、限流及既有业务回归。当前验收基线为 63 项测试全部通过。
 
 ## 安全说明
 
 - `back-end/CC4C/src/main/resources/application.yml` 是本机真实配置，已被 Git 忽略，禁止提交。
 - Maven 构建显式排除 `application.yml`；最终 JAR 只允许包含脱敏的 `application-example.yml`。
-- `.env.test.local` 与前端 `.env.local` 仅限本机使用，禁止提交；`.env.example` 文件不得包含秘密。
+- `.env.runtime.local`、`.env.test.local` 与前端 `.env.local` 仅限本机使用，禁止提交；`.env.example` 文件不得包含秘密。
+- 认证只信任服务端 Redis Session 和 `CC4C_SESSION`；旧 `user_email`、`admin` Cookie 会被清除，不能作为身份依据。
+- 所有浏览器写请求必须携带 CSRF Token；生产 HTTPS 环境必须设置 `CC4C_SESSION_COOKIE_SECURE=true`，CORS 只能配置精确来源。
+- Redis 当前仅用于会话、验证码和安全限流，不是业务缓存；业务缓存属于后续方面四。
 - 不要在源码、README、截图、Issue 或日志中放入 Token、Cookie、数据库密码、SMTP 授权码等敏感信息。
 - GitHub 只应保留脱敏的 `application-example.yml`；如怀疑密钥泄露，请先轮换密钥，再清理历史记录。
 - `node_modules/`、`dist/`、`target/`、`temp/` 和运行日志均属于本地产物，不应提交。

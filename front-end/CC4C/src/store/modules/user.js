@@ -96,8 +96,13 @@
 // }
 
 
+import api from '@/plugins/axiosInstance'
+
 const getDefaultState = () => {
     return {
+        authenticated: false,
+        hydrated: false,
+        role: '',
         id: sessionStorage.getItem('id') ? sessionStorage.getItem('id') : '',
         name: sessionStorage.getItem('name') ? sessionStorage.getItem('name') : '',
         email: sessionStorage.getItem('email') ? sessionStorage.getItem('email') : '',
@@ -118,6 +123,18 @@ const mutations = {
         sessionStorage.setItem('language', 1);
         sessionStorage.setItem('avatar', '');
         Object.assign(state, getDefaultState())
+        state.hydrated = true
+    },
+    SET_HYDRATED: (state, hydrated) => {
+        state.hydrated = hydrated
+    },
+    SET_SESSION: (state, session) => {
+        state.authenticated = Boolean(session?.authenticated)
+        state.role = session?.role || ''
+        state.id = session?.actorId || ''
+        state.name = session?.displayName || ''
+        sessionStorage.setItem('id', state.id)
+        sessionStorage.setItem('name', state.name)
     },
     SET_ID: (state, id) => {
         state.id = id
@@ -146,8 +163,33 @@ const mutations = {
     }
 }
 
+const actions = {
+    async hydrateSession({ state, commit }, { force = false } = {}) {
+        if (state.hydrated && !force) return state
+        const response = await api.get('/auth/session')
+        const session = response.data.data
+        if (!session?.authenticated) {
+            commit('RESET_STATE')
+            return state
+        }
+        commit('SET_SESSION', session)
+        if (session.role === 'USER') {
+            const userResponse = await api.get('/users/me')
+            const user = userResponse.data.data
+            commit('SET_ID', user.id)
+            commit('SET_NAME', user.name)
+            commit('SET_EMAIL', user.email)
+            commit('SET_MAJOR', user.major)
+            commit('SET_LANGUAGE', user.language)
+            commit('SET_AVATAR', user.avatar)
+        }
+        commit('SET_HYDRATED', true)
+        return state
+    },
+}
 
 export default {
     state,
-    mutations
+    mutations,
+    actions,
 }

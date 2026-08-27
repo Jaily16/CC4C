@@ -45,7 +45,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import axios from '@/plugins/axiosInstance';
+import axios, { resetCsrfToken } from '@/plugins/axiosInstance';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Position, SwitchButton } from '@element-plus/icons-vue';
@@ -55,7 +55,7 @@ import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
 const user = computed(() => store.state.user);
-const isLoggedIn = computed(() => user.value.id !== '');
+const isLoggedIn = computed(() => user.value.authenticated && user.value.role === 'USER');
 const navItems = [
   { label: '主页', to: '/home' },
   { label: '所有课程', to: '/allCourses' },
@@ -68,6 +68,7 @@ async function logout() {
 
     if (resp.data.data === true) {
       store.commit('RESET_STATE');
+      resetCsrfToken();
       ElMessage.success('已退出登录');
       await router.push('/login');
       return;

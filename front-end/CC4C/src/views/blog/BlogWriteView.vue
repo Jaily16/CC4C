@@ -120,8 +120,8 @@ watch(text, (value) => {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('/users/verify');
-    if (resp.data.data === false) {
+    const resp = await axios.get('/auth/session');
+    if (resp.data.data?.role !== 'USER') {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
       return false;
@@ -136,7 +136,7 @@ async function verifyUser() {
 
 async function loadDraft() {
   try {
-    const resp = await axios.get(`/blogs/draft/${store.state.user.id}`);
+    const resp = await axios.get('/blogs/draft');
     if (resp.data.data != null) {
       text.value = resp.data.data;
       hasDraft.value = true;
@@ -174,7 +174,6 @@ async function publish() {
   publishSubmitting.value = true;
   try {
     const resp = await axios.post('/blogs/submit', {
-      writerId: store.state.user.id,
       title: title.value.trim(),
       languageList: langList.value,
       content: text.value,
@@ -206,7 +205,6 @@ async function draft() {
   draftSaving.value = true;
   try {
     const resp = await axios.put('/blogs/draft', {
-      userId: store.state.user.id,
       content: text.value,
     });
     if (resp.data.data !== true) {
@@ -227,7 +225,7 @@ async function deleteDraft() {
   if (!hasDraft.value || draftSaving.value || publishSubmitting.value || uploading.value) return;
   draftSaving.value = true;
   try {
-    const resp = await axios.delete(`/blogs/draft/${store.state.user.id}`);
+    const resp = await axios.delete('/blogs/draft');
     if (!resp.data.data) {
       ElMessage.error(resp.data.msg || '草稿删除失败');
       return;

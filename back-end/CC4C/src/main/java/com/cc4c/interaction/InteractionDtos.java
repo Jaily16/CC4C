@@ -12,21 +12,18 @@ public final class InteractionDtos {
     }
 
     public record CourseCommentRequest(
-            @NotNull @Positive Long userId,
             @NotBlank String content,
             @NotNull @Positive Integer courseId
     ) {
     }
 
     public record BlogCommentRequest(
-            @NotNull @Positive Long userId,
             @NotBlank String content,
             @NotNull @Positive Long blogId
     ) {
     }
 
     public record ReplyCommentRequest(
-            @NotNull @Positive Long userId,
             @NotBlank String content,
             @NotNull @Positive Long fatherId
     ) {

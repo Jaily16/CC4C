@@ -15,7 +15,15 @@ const app = createApp(App)
 app.use(router)
 app.use(store)
 app.use(ElementPlus)
-// app.use(axios)
+
+window.addEventListener('cc4c:unauthorized', async () => {
+  const wasAdminRoute = router.currentRoute.value.path.startsWith('/admin')
+  store.commit('RESET_STATE')
+  const target = wasAdminRoute ? '/adminLogin' : '/login'
+  if (router.currentRoute.value.path !== target) {
+    await router.replace(target)
+  }
+})
 
 app.mount('#app')
 

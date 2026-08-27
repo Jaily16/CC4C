@@ -7,6 +7,7 @@ import com.cc4c.community.api.BlogSnapshot;
 import com.cc4c.community.api.BlogSummary;
 import com.cc4c.community.api.CommunityLookup;
 import com.cc4c.identity.api.IdentityLookup;
+import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.identity.api.UserSnapshot;
 import com.cc4c.interaction.InteractionDtos.BlogCommentRequest;
 import com.cc4c.interaction.InteractionDtos.CommentResponse;
@@ -17,6 +18,7 @@ import com.cc4c.shared.BusinessCode;
 import com.cc4c.shared.BusinessException;
 import com.cc4c.shared.PageQuery;
 import com.cc4c.shared.PageResult;
+import com.cc4c.shared.RedisRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,20 +35,27 @@ public class InteractionService {
     private final IdentityLookup identityLookup;
     private final CatalogLookup catalogLookup;
     private final CommunityLookup communityLookup;
+    private final CurrentActor currentActor;
+    private final RedisRateLimiter rateLimiter;
 
     InteractionService(
             InteractionMapper mapper,
             IdentityLookup identityLookup,
             CatalogLookup catalogLookup,
-            CommunityLookup communityLookup) {
+            CommunityLookup communityLookup,
+            CurrentActor currentActor,
+            RedisRateLimiter rateLimiter) {
         this.mapper = mapper;
         this.identityLookup = identityLookup;
         this.catalogLookup = catalogLookup;
         this.communityLookup = communityLookup;
+        this.currentActor = currentActor;
+        this.rateLimiter = rateLimiter;
     }
 
     @Transactional
-    public boolean favoriteCourse(long userId, int courseId) {
+    public boolean favoriteCourse(int courseId) {
+        long userId = currentActor.requiredUserId();
         requireUser(userId);
         if (!catalogLookup.courseExists(courseId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Course does not exist");
@@ -59,18 +68,20 @@ public class InteractionService {
     }
 
     @Transactional
-    public boolean removeCourseFavorite(long userId, int courseId) {
+    public boolean removeCourseFavorite(int courseId) {
+        long userId = currentActor.requiredUserId();
         if (mapper.deleteCourseFavorite(userId, courseId) == 0) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "课程收藏不存在");
         }
         return true;
     }
 
-    public boolean isCourseFavorite(long userId, int courseId) {
-        return mapper.courseFavoriteExists(userId, courseId);
+    public boolean isCourseFavorite(int courseId) {
+        return mapper.courseFavoriteExists(currentActor.requiredUserId(), courseId);
     }
 
-    public PageResult<CourseFavoriteSummary> courseFavorites(long userId, PageQuery query) {
+    public PageResult<CourseFavoriteSummary> courseFavorites(PageQuery query) {
+        long userId = currentActor.requiredUserId();
         requireUser(userId);
         IPage<CourseFavoriteRow> page = mapper.selectCourseFavorites(
                 new Page<>(query.page(), query.size()), userId);
@@ -85,7 +96,8 @@ public class InteractionService {
     }
 
     @Transactional
-    public boolean favoriteBlog(long userId, long blogId) {
+    public boolean favoriteBlog(long blogId) {
+        long userId = currentActor.requiredUserId();
         requireUser(userId);
         BlogSnapshot blog = communityLookup.findBlog(blogId)
                 .orElseThrow(() -> new BusinessException(
@@ -102,18 +114,20 @@ public class InteractionService {
     }
 
     @Transactional
-    public boolean removeBlogFavorite(long userId, long blogId) {
+    public boolean removeBlogFavorite(long blogId) {
+        long userId = currentActor.requiredUserId();
         if (mapper.deleteBlogFavorite(userId, blogId) == 0) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "博客收藏不存在");
         }
         return true;
     }
 
-    public boolean isBlogFavorite(long userId, long blogId) {
-        return mapper.blogFavoriteExists(userId, blogId);
+    public boolean isBlogFavorite(long blogId) {
+        return mapper.blogFavoriteExists(currentActor.requiredUserId(), blogId);
     }
 
-    public PageResult<BlogSummary> blogFavorites(long userId, PageQuery query) {
+    public PageResult<BlogSummary> blogFavorites(PageQuery query) {
+        long userId = currentActor.requiredUserId();
         requireUser(userId);
         IPage<BlogFavoriteRow> page = mapper.selectBlogFavorites(new Page<>(query.page(), query.size()), userId);
         return new PageResult<>(
@@ -133,31 +147,37 @@ public class InteractionService {
 
     @Transactional
     public CommentResponse commentCourse(CourseCommentRequest request) {
-        UserSnapshot user = requireUser(request.userId());
+        long userId = currentActor.requiredUserId();
+        rateLimiter.checkComment(userId);
+        UserSnapshot user = requireUser(userId);
         if (!catalogLookup.courseExists(request.courseId())) {
             throw unprocessable("Course does not exist");
         }
-        CommentEntity comment = insertComment(request.userId(), request.content());
+        CommentEntity comment = insertComment(userId, request.content());
         mapper.insertCourseComment(comment.getCommentId(), request.courseId());
         return toCreatedResponse(comment, user, null, 0, null);
     }
 
     @Transactional
     public CommentResponse commentBlog(BlogCommentRequest request) {
-        UserSnapshot user = requireUser(request.userId());
+        long userId = currentActor.requiredUserId();
+        rateLimiter.checkComment(userId);
+        UserSnapshot user = requireUser(userId);
         BlogSnapshot blog = communityLookup.findBlog(request.blogId())
                 .orElseThrow(() -> unprocessable("Blog does not exist"));
         if (blog.state() != 1) {
             throw unprocessable("Blog is not published");
         }
-        CommentEntity comment = insertComment(request.userId(), request.content());
+        CommentEntity comment = insertComment(userId, request.content());
         mapper.insertBlogComment(comment.getCommentId(), request.blogId());
         return toCreatedResponse(comment, user, null, 0, null);
     }
 
     @Transactional
     public CommentResponse reply(ReplyCommentRequest request) {
-        UserSnapshot user = requireUser(request.userId());
+        long userId = currentActor.requiredUserId();
+        rateLimiter.checkComment(userId);
+        UserSnapshot user = requireUser(userId);
         CommentEntity parent = mapper.selectById(request.fatherId());
         if (parent == null) {
             throw unprocessable("Parent comment does not exist");
@@ -167,12 +187,28 @@ public class InteractionService {
         if (layer > 2) {
             throw unprocessable("Comment nesting cannot exceed two reply levels");
         }
-        CommentEntity comment = insertComment(request.userId(), request.content());
+        CommentEntity comment = insertComment(userId, request.content());
         mapper.insertReply(comment.getCommentId(), request.fatherId(), layer);
         String fatherName = identityLookup.findUser(parent.getUserId())
                 .map(UserSnapshot::name)
                 .orElse(null);
         return toCreatedResponse(comment, user, request.fatherId(), layer, fatherName);
+    }
+
+    @Transactional
+    public boolean deleteComment(long commentId) {
+        long userId = currentActor.requiredUserId();
+        CommentEntity comment = mapper.selectById(commentId);
+        if (comment == null) {
+            throw new BusinessException(
+                    HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "评论不存在");
+        }
+        if (!comment.getUserId().equals(userId)) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN, BusinessCode.FORBIDDEN, "无权删除该评论");
+        }
+        mapper.deleteById(commentId);
+        return true;
     }
 
     public PageResult<CommentResponse> courseComments(int courseId, PageQuery query) {

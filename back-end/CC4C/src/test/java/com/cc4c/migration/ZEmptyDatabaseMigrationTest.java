@@ -18,7 +18,7 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
 
         var flyway = flyway(url, false);
         flyway.clean();
-        assertEquals(3, flyway.migrate().migrationsExecuted);
+        assertEquals(4, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
 
@@ -33,5 +33,9 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
         assertEquals(9, scalar(url, "SELECT COUNT(*) FROM course_module"));
         assertEquals(61, scalar(url, "SELECT COUNT(*) FROM module_course"));
         assertEquals(0, scalar(url, "SELECT COUNT(*) FROM administrator"));
+        assertEquals(255, scalar(url, """
+                SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'user' AND column_name = 'password'
+                """));
     }
 }

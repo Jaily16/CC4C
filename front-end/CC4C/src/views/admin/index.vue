@@ -10,6 +10,7 @@
       </router-link>
       <div class="admin-header__status">
         <span><i aria-hidden="true"></i>管理员会话</span>
+        <el-button plain @click="passwordDialogOpen = true">修改密码</el-button>
         <el-button plain @click="logout">退出管理端</el-button>
       </div>
     </header>
@@ -41,26 +42,43 @@
     </nav>
 
     <main class="admin-main">
-      <PageFeedback v-if="verifying" :loading="true" />
-      <router-view v-else-if="verified" />
+      <router-view />
     </main>
+
+    <el-dialog v-model="passwordDialogOpen" title="修改管理员密码" width="min(92vw, 460px)">
+      <el-form label-position="top" @submit.prevent="changePassword">
+        <el-form-item label="当前密码">
+          <el-input v-model="passwordForm.password" type="password" show-password autocomplete="current-password" />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" />
+        </el-form-item>
+        <p v-if="passwordError" class="admin-password-error">{{ passwordError }}</p>
+        <div class="dialog-actions">
+          <el-button @click="passwordDialogOpen = false">取消</el-button>
+          <el-button type="primary" :loading="passwordSaving" @click="changePassword">确认修改</el-button>
+        </div>
+      </el-form>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
-import axios from '@/plugins/axiosInstance';
+import { computed, reactive, ref } from 'vue';
+import axios, { resetCsrfToken } from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { Checked, DataAnalysis, Plus } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
-import PageFeedback from '@/components/common/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
+import store from '@/store';
 
 
 const route = useRoute();
 const router = useRouter();
-const verifying = ref(true);
-const verified = ref(false);
+const passwordDialogOpen = ref(false);
+const passwordSaving = ref(false);
+const passwordError = ref('');
+const passwordForm = reactive({ password: '', newPassword: '' });
 const menuItems = [
   { path: '/admin/CoursesAndBlogs', label: '内容数据概览', shortLabel: '概览', icon: DataAnalysis },
   { path: '/admin/addCourse', label: '发布新课程', shortLabel: '课程', icon: Plus },
@@ -68,37 +86,45 @@ const menuItems = [
 ];
 const activePath = computed(() => route.path);
 
-async function verifyAdmin() {
-  verifying.value = true;
-  try {
-    const response = await axios.get('/admin/verify');
-    if (response.data.data === false) {
-      ElMessage.warning(response.data.msg || '请先登录管理端');
-      await router.replace('/adminLogin');
-      return;
-    }
-    verified.value = true;
-  } catch (error) {
-    ElMessage.error(apiErrorMessage(error, '管理员身份验证失败，请重新登录'));
-    await router.replace('/adminLogin');
-    console.error(error);
-  } finally {
-    verifying.value = false;
-  }
-}
-
 async function logout() {
   try {
     await axios.post('/admin/logout');
   } catch (error) {
     console.error(error);
   } finally {
+    resetCsrfToken();
+    store.commit('RESET_STATE');
     ElMessage.success('已退出管理端');
     await router.replace('/adminLogin');
   }
 }
 
-verifyAdmin();
+async function changePassword() {
+  passwordError.value = '';
+  const bytes = new TextEncoder().encode(passwordForm.newPassword).length;
+  if (!passwordForm.password) {
+    passwordError.value = '请输入当前密码';
+    return;
+  }
+  if (passwordForm.newPassword.length < 8 || passwordForm.newPassword.length > 64 || bytes > 72) {
+    passwordError.value = '新密码需为 8–64 个字符且编码后不超过 72 字节';
+    return;
+  }
+  passwordSaving.value = true;
+  try {
+    await axios.put('/admin/password', passwordForm);
+    resetCsrfToken();
+    store.commit('RESET_STATE');
+    ElMessage.success('密码已修改，请重新登录');
+    await router.replace('/adminLogin');
+  } catch (error) {
+    passwordError.value = apiErrorMessage(error, '管理员密码修改失败');
+  } finally {
+    passwordSaving.value = false;
+    passwordForm.password = '';
+    passwordForm.newPassword = '';
+  }
+}
 </script>
 
 <style scoped>
@@ -123,6 +149,8 @@ verifyAdmin();
 .admin-sidebar__help span { color: var(--cc4c-muted); font-size: .72rem; line-height: 1.55; }
 .admin-main { min-width: 0; min-height: 100vh; padding: 96px 30px 34px 260px; }
 .admin-mobile-nav { display: none; }
+.admin-password-error { color: var(--el-color-danger); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 @media (max-width: 1024px) {
   .admin-sidebar { display: none; }

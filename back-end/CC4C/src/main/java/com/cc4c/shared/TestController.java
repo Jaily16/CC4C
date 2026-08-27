@@ -1,6 +1,8 @@
 package com.cc4c.shared;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +15,8 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/test")
+@Profile("test")
+@ConditionalOnProperty(name = "cc4c.test-controller-enabled", havingValue = "true")
 public class TestController {
     private static final Set<String> SUPPORTED_IMAGE_TYPES = Set.of("jpg", "jpeg", "png", "gif");
     private final String saveImagePath;

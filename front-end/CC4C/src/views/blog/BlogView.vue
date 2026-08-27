@@ -79,8 +79,8 @@ function blogSummary(blog) {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('/users/verify');
-    if (resp.data.data === false) {
+    const resp = await axios.get('/auth/session');
+    if (resp.data.data?.role !== 'USER') {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
       return false;

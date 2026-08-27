@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 /* Layout */
 import Layout from '../layout/index.vue'
+import store from '../store'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -34,21 +35,25 @@ const router = createRouter({
       {
         path: '/userinfo',
         name: 'userinfo',
+        meta: { requiresUser: true },
         component: () => import('../views/UserinfoView.vue')
       },
       {
         path: '/favorite',
         name: 'favorite',
+        meta: { requiresUser: true },
         component: () => import('../views/FavoriteView.vue')
       },
       {
         path: '/blogWrite',
         name: 'blogWrite',
+        meta: { requiresUser: true },
         component: () => import('../views/blog/BlogWriteView.vue')
       },
       {
         path: '/blogmanage',
         name: 'blogmanage',
+        meta: { requiresUser: true },
         component: () => import('../views/blog/BlogManageView.vue')
       },
       {
@@ -76,6 +81,7 @@ const router = createRouter({
     {
       path: '/admin',
       redirect: '/adminlogin',
+      meta: { requiresAdmin: true },
       component: () => import('@/views/admin/index.vue'),
       children: [
         {
@@ -123,6 +129,26 @@ const router = createRouter({
     },
 
   ]
+})
+
+router.beforeEach(async (to) => {
+  try {
+    await store.dispatch('hydrateSession')
+  } catch (error) {
+    store.commit('RESET_STATE')
+    console.error(error)
+  }
+
+  const user = store.state.user
+  if (to.matched.some((record) => record.meta.requiresAdmin) && user.role !== 'ADMIN') {
+    return { path: '/adminLogin', query: { redirect: to.fullPath } }
+  }
+  if (to.matched.some((record) => record.meta.requiresUser) && user.role !== 'USER') {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (to.path === '/login' && user.role === 'USER') return '/home'
+  if (to.path === '/adminLogin' && user.role === 'ADMIN') return '/admin/CoursesAndBlogs'
+  return true
 })
 
 export default router

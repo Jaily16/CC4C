@@ -1,4 +1,6 @@
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${CC4C_TEST_DB_URL}
     username: ${CC4C_TEST_DB_USERNAME}
@@ -7,10 +9,30 @@ spring:
     baseline-on-migrate: false
     locations: classpath:db/migration
     validate-on-migrate: true
+  data:
+    redis:
+      url: ${CC4C_TEST_REDIS_URL}
+      connect-timeout: 2s
+      timeout: 2s
+  session:
+    store-type: redis
+    timeout: 2h
+    redis:
+      repository-type: indexed
+      namespace: ${CC4C_TEST_REDIS_NAMESPACE:cc4c:test:manual}
   mail:
     username: test-sender@example.com
 
 cc4c:
+  security:
+    pepper: cc4c-functional-test-pepper-not-a-production-secret
+    cookie-secure: false
+    allowed-origins: http://localhost:5173
+    bcrypt-strength: 4
+    password-readiness-enabled: false
+    redis-readiness-enabled: true
+    key-prefix: ${CC4C_TEST_REDIS_NAMESPACE:cc4c:test:manual}:security
+  test-controller-enabled: true
   save-img-path: ${user.dir}/target/functional-files/blog/
   request-img-path: http://localhost:5173/test-blog/
   save-avatar-path: ${user.dir}/target/functional-files/avatar/
@@ -21,3 +43,7 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+logging:
+  level:
+    org.springframework.session.data.redis.RedisIndexedSessionRepository: ERROR

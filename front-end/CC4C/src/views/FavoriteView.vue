@@ -153,8 +153,8 @@ function formatDate(value) {
 }
 
 async function verifyUser() {
-  const response = await axios.get('/users/verify');
-  if (response.data.data === false) {
+  const response = await axios.get('/auth/session');
+  if (response.data.data?.role !== 'USER') {
     ElMessage.warning(response.data.msg || '请先登录');
     await router.push('/login');
     return false;
@@ -168,8 +168,8 @@ async function loadFavorites() {
   try {
     if (!await verifyUser()) return;
     const [courseResponse, blogResponse] = await Promise.all([
-      axios.get(`/courses/favorList/${store.state.user.id}`, { params: { page: coursePage.value, size: pageSize } }),
-      axios.get(`/blogs/collectList/${store.state.user.id}`, { params: { page: blogPage.value, size: pageSize } }),
+      axios.get('/courses/star', { params: { page: coursePage.value, size: pageSize } }),
+      axios.get('/blogs/collect', { params: { page: blogPage.value, size: pageSize } }),
     ]);
     favoriteCourses.value = courseResponse.data.data?.items || [];
     favoriteBlogs.value = blogResponse.data.data?.items || [];

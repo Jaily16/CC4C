@@ -119,8 +119,8 @@ function formatDate(value) {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('/users/verify');
-    if (resp.data.data === false) {
+    const resp = await axios.get('/auth/session');
+    if (resp.data.data?.role !== 'USER') {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
       return false;
@@ -139,7 +139,7 @@ async function loadBlogs() {
   try {
     const verified = await verifyUser();
     if (!verified) return;
-    const resp = await axios.get(`/blogs/myBlogs/${store.state.user.id}`, { params: { page: currentPage.value, size: pageSize } });
+    const resp = await axios.get('/blogs/myBlogs', { params: { page: currentPage.value, size: pageSize } });
     blogList.value = resp.data.data?.items || [];
     total.value = resp.data.data?.total || 0;
   } catch (error) {

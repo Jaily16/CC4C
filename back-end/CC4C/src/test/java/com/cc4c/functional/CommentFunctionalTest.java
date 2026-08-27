@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,17 +21,17 @@ class CommentFunctionalTest extends FunctionalTestSupport {
         BlogFixture blog = createBlog(user, 1);
 
         mockMvc.perform(post("/comments/course")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"course comment\",\"courseId\":" + course.id() + "}"))
+                        .content("{\"content\":\"course comment\",\"courseId\":" + course.id() + "}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(54000))
                 .andExpect(jsonPath("$.data.commentId").isString());
 
         mockMvc.perform(post("/comments/blog")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"blog comment\",\"blogId\":\"" + blog.id() + "\"}"))
+                        .content("{\"content\":\"blog comment\",\"blogId\":\"" + blog.id() + "\"}"))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/comments/course/{id}", course.id()).param("page", "1").param("size", "10"))
@@ -74,23 +75,24 @@ class CommentFunctionalTest extends FunctionalTestSupport {
         UserFixture user = createUser();
 
         mockMvc.perform(post("/comments/course")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"bad course\",\"courseId\":999999}"))
+                        .content("{\"content\":\"bad course\",\"courseId\":999999}"))
                 .andExpect(status().isUnprocessableEntity());
         mockMvc.perform(post("/comments/blog")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"bad blog\",\"blogId\":\"999999999999\"}"))
+                        .content("{\"content\":\"bad blog\",\"blogId\":\"999999999999\"}"))
                 .andExpect(status().isUnprocessableEntity());
         mockMvc.perform(post("/comments/indirect")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"bad parent\",\"fatherId\":\"999999999999\"}"))
+                        .content("{\"content\":\"bad parent\",\"fatherId\":\"999999999999\"}"))
                 .andExpect(status().isUnprocessableEntity());
         mockMvc.perform(post("/comments/course")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id() + "\",\"content\":\"  \",\"courseId\":1}"))
+                        .content("{\"content\":\"  \",\"courseId\":1}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.content").exists());
 
@@ -100,19 +102,39 @@ class CommentFunctionalTest extends FunctionalTestSupport {
                 """, Integer.class));
     }
 
+    @Test
+    void onlyTheCommentOwnerCanDeleteIt() throws Exception {
+        UserFixture owner = createUser();
+        UserFixture other = createUser();
+        LanguageFixture language = createLanguage();
+        ModuleFixture module = createModule(language);
+        CourseFixture course = createCourse(language, module);
+        postCourseComment(owner, course, "owned comment");
+        long commentId = commentId("owned comment");
+
+        mockMvc.perform(delete("/comments/{id}", commentId)
+                        .with(asUser(other)).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/comments/{id}", commentId)
+                        .with(asUser(owner)).with(csrf()))
+                .andExpect(status().isOk());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT deleted FROM comment WHERE comment_id = ?", Integer.class, commentId));
+    }
+
     private void postCourseComment(UserFixture user, CourseFixture course, String content) throws Exception {
         mockMvc.perform(post("/comments/course")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"" + content + "\",\"courseId\":" + course.id() + "}"))
+                        .content("{\"content\":\"" + content + "\",\"courseId\":" + course.id() + "}"))
                 .andExpect(status().isCreated());
     }
 
     private void postReply(UserFixture user, long fatherId, String content, int expectedStatus) throws Exception {
         mockMvc.perform(post("/comments/indirect")
+                        .with(asUser(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + user.id()
-                                + "\",\"content\":\"" + content + "\",\"fatherId\":\"" + fatherId + "\"}"))
+                        .content("{\"content\":\"" + content + "\",\"fatherId\":\"" + fatherId + "\"}"))
                 .andExpect(status().is(expectedStatus));
     }
 

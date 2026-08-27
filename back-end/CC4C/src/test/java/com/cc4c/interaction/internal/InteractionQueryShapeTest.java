@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cc4c.catalog.api.CatalogLookup;
 import com.cc4c.community.api.CommunityLookup;
 import com.cc4c.identity.api.IdentityLookup;
+import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.shared.PageQuery;
+import com.cc4c.shared.RedisRateLimiter;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
@@ -25,8 +27,10 @@ class InteractionQueryShapeTest {
         IdentityLookup identityLookup = mock(IdentityLookup.class);
         CatalogLookup catalogLookup = mock(CatalogLookup.class);
         CommunityLookup communityLookup = mock(CommunityLookup.class);
+        CurrentActor currentActor = mock(CurrentActor.class);
+        RedisRateLimiter rateLimiter = mock(RedisRateLimiter.class);
         InteractionService service = new InteractionService(
-                mapper, identityLookup, catalogLookup, communityLookup);
+                mapper, identityLookup, catalogLookup, communityLookup, currentActor, rateLimiter);
 
         when(catalogLookup.courseExists(7)).thenReturn(true);
         Page<CommentRow> topPage = new Page<>(1, 10, 1);

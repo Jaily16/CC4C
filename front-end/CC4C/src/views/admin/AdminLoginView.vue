@@ -52,12 +52,14 @@
 import { reactive, ref } from 'vue';
 import axios from '@/plugins/axiosInstance';
 import { apiErrorMessage } from '@/utils/apiError';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { assets } from '@/assets';
+import store from '@/store';
 
 
 const router = useRouter();
+const route = useRoute();
 const form = reactive({ id: '', password: '' });
 const fieldErrors = reactive({ id: '', password: '' });
 const formError = ref('');
@@ -94,7 +96,11 @@ async function login() {
     }
 
     ElMessage.success(resp.data.msg || '登录成功');
-    await router.push({ path: '/admin/CoursesAndBlogs' });
+    await store.dispatch('hydrateSession', { force: true });
+    const redirect = typeof route.query.redirect === 'string'
+      ? route.query.redirect
+      : '/admin/CoursesAndBlogs';
+    await router.push(redirect);
   } catch (error) {
     formError.value = apiErrorMessage(error, '管理员登录服务暂时不可用，请稍后重试');
     ElMessage.error(formError.value);

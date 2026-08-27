@@ -82,7 +82,7 @@ const isCompact = ref(false);
 const avatarLoadFailed = ref(false);
 const user = computed(() => store.state.user);
 const collapsed = computed(() => isCollapse.value || isCompact.value);
-const displayName = computed(() => user.value.id === '' ? '游客' : user.value.name);
+const displayName = computed(() => user.value.role === 'USER' ? user.value.name : '游客');
 const avatar = computed(() => avatarLoadFailed.value ? '' : user.value.avatar);
 const avatarInitial = computed(() => (displayName.value || '游').trim().slice(0, 1).toUpperCase());
 

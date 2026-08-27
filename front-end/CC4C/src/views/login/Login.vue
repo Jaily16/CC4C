@@ -71,7 +71,7 @@
             v-model="findForm.password"
             type="password"
             autocomplete="new-password"
-            placeholder="至少 4 个字符"
+            placeholder="8–64 个字符"
             show-password
             @blur="validateRecoveryField('password')"
           />
@@ -79,8 +79,14 @@
         <el-form-item label="邮箱验证码" :error="recoveryErrors.code">
           <div class="verification-row">
             <el-input v-model.trim="iCode" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" />
-            <el-button type="primary" plain :loading="sendingRecoveryCode" @click="getVCode">
-              {{ sendingRecoveryCode ? '发送中…' : '获取验证码' }}
+            <el-button
+              type="primary"
+              plain
+              :loading="sendingRecoveryCode"
+              :disabled="recoveryCountdown > 0"
+              @click="getVCode"
+            >
+              {{ sendingRecoveryCode ? '发送中…' : (recoveryCountdown > 0 ? `${recoveryCountdown} 秒后重试` : '获取验证码') }}
             </el-button>
           </div>
         </el-form-item>
@@ -97,9 +103,9 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { onBeforeUnmount, reactive, ref } from 'vue';
 import axios from '@/plugins/axiosInstance';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
@@ -107,6 +113,7 @@ import { apiErrorMessage } from '@/utils/apiError';
 
 
 const router = useRouter();
+const route = useRoute();
 const form = reactive({ email: '', password: '' });
 const fieldErrors = reactive({ email: '', password: '' });
 const formError = ref('');
@@ -119,8 +126,8 @@ const recoveryError = ref('');
 const iCode = ref('');
 const sendingRecoveryCode = ref(false);
 const findingPassword = ref(false);
-let vCode = '';
-let rEmail = '';
+const recoveryCountdown = ref(0);
+let recoveryTimer = null;
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -161,21 +168,9 @@ async function login() {
       return;
     }
 
-    const infoResp = await axios.get('/users/info');
-    const currentUser = infoResp.data.data;
-    if (!currentUser || !currentUser.id) {
-      formError.value = infoResp.data.msg || '获取用户信息失败';
-      ElMessage.error(formError.value);
-      return;
-    }
-
-    store.commit('SET_ID', currentUser.id);
-    store.commit('SET_NAME', currentUser.name);
-    store.commit('SET_EMAIL', currentUser.email);
-    store.commit('SET_MAJOR', currentUser.major);
-    store.commit('SET_LANGUAGE', currentUser.language);
-    store.commit('SET_AVATAR', currentUser.avatar);
-    await router.push({ path: '/home' });
+    await store.dispatch('hydrateSession', { force: true });
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/home';
+    await router.push(redirect);
   } catch (error) {
     formError.value = apiErrorMessage(error, '登录服务暂时不可用，请稍后重试');
     ElMessage.error(formError.value);
@@ -195,7 +190,12 @@ function validateRecoveryField(field) {
     recoveryErrors.email = !findForm.email ? '请输入邮箱' : (!isEmail(findForm.email) ? '请输入正确的邮箱地址' : '');
   }
   if (field === 'password') {
-    recoveryErrors.password = !findForm.password ? '请输入新密码' : (findForm.password.length < 4 ? '密码至少需要 4 个字符' : '');
+    const bytes = new TextEncoder().encode(findForm.password).length;
+    recoveryErrors.password = !findForm.password
+      ? '请输入新密码'
+      : (findForm.password.length < 8 || findForm.password.length > 64 || bytes > 72
+        ? '密码需为 8–64 个字符且编码后不超过 72 字节'
+        : '');
   }
 }
 
@@ -206,14 +206,16 @@ async function getVCode() {
 
   sendingRecoveryCode.value = true;
   try {
-    const resp = await axios.post(`/users/email/${encodeURIComponent(findForm.email)}`);
+    const resp = await axios.post('/users/email', {
+      email: findForm.email,
+      purpose: 'PASSWORD_RESET',
+    });
     if (!resp.data.data) {
       recoveryError.value = resp.data.msg || '未能成功获取邮箱验证码';
       ElMessage.error(recoveryError.value);
       return;
     }
-    rEmail = findForm.email;
-    vCode = resp.data.data;
+    startRecoveryCountdown();
     ElMessage.success('验证码已发送');
   } catch (error) {
     recoveryError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
@@ -228,18 +230,15 @@ async function findPassword() {
   recoveryError.value = '';
   validateRecoveryField('email');
   validateRecoveryField('password');
-  recoveryErrors.code = !iCode.value ? '请输入邮箱验证码' : '';
+  recoveryErrors.code = /^\d{6}$/.test(iCode.value) ? '' : '请输入六位邮箱验证码';
 
   if (recoveryErrors.email || recoveryErrors.password || recoveryErrors.code) return;
-  if (iCode.value !== vCode || rEmail !== findForm.email) {
-    recoveryErrors.code = '验证码错误或邮箱已变更，请重新验证';
-    return;
-  }
 
   findingPassword.value = true;
   try {
     const resp = await axios.put('/users/password/forget', {
       email: findForm.email,
+      verificationCode: iCode.value,
       newPassword: findForm.password,
     });
     if (resp.data.data !== true) {
@@ -260,6 +259,22 @@ async function findPassword() {
     findingPassword.value = false;
   }
 }
+
+function startRecoveryCountdown() {
+  recoveryCountdown.value = 60;
+  if (recoveryTimer) window.clearInterval(recoveryTimer);
+  recoveryTimer = window.setInterval(() => {
+    recoveryCountdown.value -= 1;
+    if (recoveryCountdown.value <= 0) {
+      window.clearInterval(recoveryTimer);
+      recoveryTimer = null;
+    }
+  }, 1000);
+}
+
+onBeforeUnmount(() => {
+  if (recoveryTimer) window.clearInterval(recoveryTimer);
+});
 </script>
 
 <style scoped>

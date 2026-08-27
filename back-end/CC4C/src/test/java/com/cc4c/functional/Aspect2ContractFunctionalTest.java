@@ -12,9 +12,10 @@ class Aspect2ContractFunctionalTest extends FunctionalTestSupport {
 
     @Test
     void invalidDtoReturnsFieldErrorsWithoutEchoingTheRequest() throws Exception {
-        mockMvc.perform(post("/users/register")
+        mockMvc.perform(post("/users").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"\",\"email\":\"not-an-email\",\"password\":\"x\",\"major\":9}"))
+                        .content("{\"name\":\"\",\"email\":\"not-an-email\",\"password\":\"x\","
+                                + "\"verificationCode\":\"x\",\"major\":9}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40000))
                 .andExpect(jsonPath("$.data.name").exists())
@@ -41,14 +42,20 @@ class Aspect2ContractFunctionalTest extends FunctionalTestSupport {
 
     @Test
     void removedGetWriteMethodsAreNotAccepted() throws Exception {
-        mockMvc.perform(get("/users/logout")).andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(get("/users/email/test@example.com")).andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(get("/courses/star/1/1")).andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(get("/blogs/collect/1/1")).andExpect(status().isMethodNotAllowed());
-        mockMvc.perform(post("/blogs/draft")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"1\",\"content\":\"draft\"}"))
+        UserFixture user = createUser();
+        mockMvc.perform(get("/users/logout").with(asUser(user)))
                 .andExpect(status().isMethodNotAllowed());
+        mockMvc.perform(get("/users/email/test@example.com").with(asUser(user)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/courses/star/1/1").with(asUser(user)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/blogs/collect/1/1").with(asUser(user)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/blogs/draft")
+                        .with(asUser(user)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"draft\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -64,8 +71,22 @@ class Aspect2ContractFunctionalTest extends FunctionalTestSupport {
                 .andExpect(jsonPath("$.paths['/users/logout'].post.responses['400'].content"
                         + "['application/json'].schema['$ref']")
                         .value("#/components/schemas/ApiErrorResponse"))
-                .andExpect(jsonPath("$.paths['/users/register'].post.responses['201'].content")
+                .andExpect(jsonPath("$.paths['/users'].post.responses['201'].content")
                         .exists())
+                .andExpect(jsonPath("$.components.securitySchemes.CC4C_SESSION.type").value("apiKey"))
+                .andExpect(jsonPath("$.components.securitySchemes.X-XSRF-TOKEN.type").value("apiKey"))
+                .andExpect(jsonPath("$.paths['/users/login'].post.security[0].CC4C_SESSION")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/users/login'].post.security[0].X-XSRF-TOKEN")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/users/me'].get.security[0].CC4C_SESSION")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/users/me'].get.security[0].X-XSRF-TOKEN")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/users/logout'].post.security[0].CC4C_SESSION")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/users/logout'].post.security[0].X-XSRF-TOKEN")
+                        .isArray())
                 .andExpect(jsonPath("$.components.schemas.UserResponse.properties.password").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.UserResponse.properties.newPassword").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.UserEntity").doesNotExist())

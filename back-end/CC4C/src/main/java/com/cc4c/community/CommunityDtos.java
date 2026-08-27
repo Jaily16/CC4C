@@ -16,7 +16,6 @@ public final class CommunityDtos {
     }
 
     public record BlogSubmitRequest(
-            @NotNull @Positive Long writerId,
             @NotBlank @Size(max = 75) String title,
             @NotBlank String content,
             @NotEmpty List<@Positive Integer> languageList
@@ -24,7 +23,6 @@ public final class CommunityDtos {
     }
 
     public record BlogDraftRequest(
-            @NotNull @Positive Long userId,
             @NotBlank String content
     ) {
     }

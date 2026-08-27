@@ -184,8 +184,8 @@ function selectedLanguage() {
 
 async function verifyUser() {
   try {
-    const resp = await axios.get('/users/verify');
-    if (resp.data.data === false) {
+    const resp = await axios.get('/auth/session');
+    if (resp.data.data?.role !== 'USER') {
       ElMessage.warning(resp.data.msg || '请先登录');
       await router.push('/login');
       return false;
@@ -259,7 +259,7 @@ async function openCourse(courseName) {
     commentPage.value = 1;
     commentTotal.value = 0;
     const [favorResult] = await Promise.all([
-      axios.get(`/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`).catch(() => null),
+      axios.get(`/courses/star/${courseData.value.courseId}`).catch(() => null),
       loadComments(),
     ]);
     isFavor.value = favorResult?.data?.data === true;
@@ -280,8 +280,8 @@ async function starCourse() {
   if (!courseData.value?.courseId) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.post(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      ? await axios.delete(`/courses/star/${courseData.value.courseId}`)
+      : await axios.post(`/courses/star/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -302,7 +302,6 @@ async function comment() {
   }
   try {
     const resp = await axios.post('/comments/course', {
-      userId: store.state.user.id,
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
     });
@@ -332,7 +331,6 @@ async function reply(fatherId) {
   }
   try {
     const resp = await axios.post('/comments/indirect', {
-      userId: store.state.user.id,
       content: replyText.value.trim(),
       fatherId,
     });

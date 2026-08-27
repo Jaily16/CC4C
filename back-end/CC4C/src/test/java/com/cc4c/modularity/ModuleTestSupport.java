@@ -17,6 +17,7 @@ abstract class ModuleTestSupport {
         registry.add("spring.datasource.url", () -> required("CC4C_TEST_DB_URL"));
         registry.add("spring.datasource.username", () -> required("CC4C_TEST_DB_USERNAME"));
         registry.add("spring.datasource.password", () -> required("CC4C_TEST_DB_PASSWORD"));
+        registry.add("spring.data.redis.url", () -> required("CC4C_TEST_REDIS_URL"));
     }
 
     private static String required(String name) {

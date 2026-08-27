@@ -15,6 +15,7 @@ class CourseFunctionalTest extends FunctionalTestSupport {
 
     @Test
     void moduleAndCoursePublishingUsesCreatedConflictAndUnprocessableStatuses() throws Exception {
+        AdminFixture administrator = createAdmin();
         LanguageFixture language = createLanguage();
         Map<String, Object> module = Map.of(
                 "languageId", language.id(),
@@ -23,12 +24,14 @@ class CourseFunctionalTest extends FunctionalTestSupport {
                 "level", 0);
 
         mockMvc.perform(post("/courses/module")
+                        .with(asAdministrator(administrator)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(module)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(22001));
 
         mockMvc.perform(post("/courses/module")
+                        .with(asAdministrator(administrator)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(module)))
                 .andExpect(status().isConflict())
@@ -37,6 +40,7 @@ class CourseFunctionalTest extends FunctionalTestSupport {
         String courseName = unique("published_");
         Map<String, Object> course = coursePayload(courseName, language.id(), 1);
         mockMvc.perform(post("/courses/add")
+                        .with(asAdministrator(administrator)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(course)))
                 .andExpect(status().isCreated())
@@ -44,12 +48,14 @@ class CourseFunctionalTest extends FunctionalTestSupport {
                 .andExpect(jsonPath("$.data.courseName").value(courseName));
 
         mockMvc.perform(post("/courses/add")
+                        .with(asAdministrator(administrator)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(course)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(42000));
 
         mockMvc.perform(post("/courses/add")
+                        .with(asAdministrator(administrator)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 coursePayload(unique("invalid_module_"), language.id(), 99))))
@@ -76,22 +82,27 @@ class CourseFunctionalTest extends FunctionalTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].courseId").value(course.id()));
 
-        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(post("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data").value(true));
-        mockMvc.perform(post("/courses/star/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(post("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isConflict());
 
-        mockMvc.perform(get("/courses/favorList/{id}", user.id())
+        mockMvc.perform(get("/courses/star")
+                        .with(asUser(user))
                         .param("page", "1").param("size", "8"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].courseName").value(course.name()))
                 .andExpect(jsonPath("$.data.items[0].languageName").value(language.name()))
                 .andExpect(jsonPath("$.data.total").value(1));
 
-        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(delete("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isOk());
-        mockMvc.perform(delete("/courses/deleteFavor/{userId}/{courseId}", user.id(), course.id()))
+        mockMvc.perform(delete("/courses/star/{courseId}", course.id())
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isNotFound());
     }
 

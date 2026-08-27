@@ -1,5 +1,6 @@
 package com.cc4c.functional;
 
+import com.cc4c.identity.IdentityDtos.VerificationPurpose;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -11,6 +12,7 @@ import java.util.Map;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -23,141 +25,132 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class UserAdminFunctionalTest extends FunctionalTestSupport {
+    private static final String CODE = "123456";
 
     @Test
-    void registrationUsesCreatedConflictAndUnprocessableStatuses() throws Exception {
+    void registrationUsesVerificationCodesHashesPasswordsAndPreservesBusinessStatuses() throws Exception {
         String name = unique("register_");
         String email = unique("register_") + "@example.com";
-        Map<String, Object> payload = userPayload(name, email, 1);
+        issueVerificationCode(email, VerificationPurpose.REGISTER, CODE);
 
-        mockMvc.perform(post("/users/register")
+        mockMvc.perform(post("/users").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
+                        .content(objectMapper.writeValueAsString(userPayload(name, email, 1, CODE))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").value(true));
 
-        mockMvc.perform(post("/users/register")
+        String storedPassword = jdbcTemplate.queryForObject(
+                "SELECT password FROM user WHERE email = ?", String.class, email);
+        assertNotNull(storedPassword);
+        assertTrue(storedPassword.startsWith("{bcrypt}"));
+
+        String duplicateNameEmail = unique("other_") + "@example.com";
+        issueVerificationCode(duplicateNameEmail, VerificationPurpose.REGISTER, CODE);
+        mockMvc.perform(post("/users").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                userPayload(name, unique("other_") + "@example.com", 1))))
+                                userPayload(name, duplicateNameEmail, 1, CODE))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(40001));
 
-        mockMvc.perform(post("/users/register")
+        String invalidEmail = unique("invalid_") + "@example.com";
+        issueVerificationCode(invalidEmail, VerificationPurpose.REGISTER, CODE);
+        mockMvc.perform(post("/users").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                userPayload(unique("other_"), email, 1))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(40001));
-
-        mockMvc.perform(post("/users/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                userPayload(unique("invalid_"), unique("invalid_") + "@example.com", 999999))))
+                                userPayload(unique("invalid_"), invalidEmail, 999999, CODE))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value(60001));
     }
 
     @Test
-    void userLoginProfilePasswordAndCookieLifecycleWorks() throws Exception {
+    void userLoginSessionProfileAndPasswordLifecycleWorks() throws Exception {
         UserFixture user = createUser();
 
-        mockMvc.perform(post("/users/login")
+        mockMvc.perform(post("/users/login").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + user.email() + "\",\"password\":\"wrong\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value(40002))
-                .andExpect(cookie().doesNotExist("user_email"));
+                .andExpect(jsonPath("$.msg").value("账号或密码错误"))
+                .andExpect(cookie().doesNotExist("CC4C_SESSION"));
 
-        MvcResult login = mockMvc.perform(post("/users/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + user.email() + "\",\"password\":\"secret1\"}"))
+        Cookie session = loginUser(user.email(), user.password());
+        mockMvc.perform(get("/auth/session").cookie(session))
                 .andExpect(status().isOk())
-                .andExpect(cookie().exists("user_email"))
-                .andReturn();
-        Cookie loginCookie = login.getResponse().getCookie("user_email");
-        assertNotNull(loginCookie);
+                .andExpect(jsonPath("$.data.authenticated").value(true))
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.actorId").value(Long.toString(user.id())));
 
-        mockMvc.perform(get("/users/verify"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.data").value(false));
-        mockMvc.perform(get("/users/verify").cookie(loginCookie))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(true));
-
-        mockMvc.perform(get("/users/info").cookie(loginCookie))
+        mockMvc.perform(get("/users/me").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(Long.toString(user.id())))
-                .andExpect(jsonPath("$.data.name").value(user.name()))
-                .andExpect(jsonPath("$.data.password").doesNotExist())
-                .andExpect(jsonPath("$.data.newPassword").doesNotExist());
+                .andExpect(jsonPath("$.data.password").doesNotExist());
 
         String changedName = unique("changed_");
-        mockMvc.perform(put("/users/update")
+        mockMvc.perform(put("/users/me").cookie(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"id\":\"" + user.id()
-                                + "\",\"name\":\"" + changedName + "\",\"major\":1,\"language\":2}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(true));
+                        .content("{\"name\":\"" + changedName + "\",\"major\":1,\"language\":2}"))
+                .andExpect(status().isOk());
         assertEquals(changedName, jdbcTemplate.queryForObject(
                 "SELECT user_name FROM user WHERE user_id = ?", String.class, user.id()));
 
-        mockMvc.perform(put("/users/password/change")
+        mockMvc.perform(put("/users/me/password").cookie(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"id\":\"" + user.id()
-                                + "\",\"password\":\"wrong\",\"newPassword\":\"secret2\"}"))
+                        .content("{\"password\":\"wrong\",\"newPassword\":\"secret22\"}"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(put("/users/password/change")
+        mockMvc.perform(put("/users/me/password").cookie(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"id\":\"" + user.id()
-                                + "\",\"password\":\"secret1\",\"newPassword\":\"secret2\"}"))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(put("/users/password/forget")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + user.email() + "\",\"newPassword\":\"secret2\"}"))
-                .andExpect(status().isConflict());
-        mockMvc.perform(put("/users/password/forget")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + user.email() + "\",\"newPassword\":\"secret3\"}"))
-                .andExpect(status().isOk());
-
-        MvcResult logout = mockMvc.perform(post("/users/logout"))
+                        .content("{\"password\":\"secret1\",\"newPassword\":\"secret22\"}"))
                 .andExpect(status().isOk())
-                .andReturn();
-        assertEquals(0, logout.getResponse().getCookie("user_email").getMaxAge());
+                .andExpect(cookie().maxAge("CC4C_SESSION", 0));
+
+        Cookie secondSession = loginUser(user.email(), "secret22");
+        issueVerificationCode(user.email(), VerificationPurpose.PASSWORD_RESET, CODE);
+        mockMvc.perform(put("/users/password/forget").cookie(secondSession).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + user.email()
+                                + "\",\"verificationCode\":\"" + CODE
+                                + "\",\"newPassword\":\"secret33\"}"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().maxAge("CC4C_SESSION", 0));
+
+        loginUser(user.email(), "secret33");
     }
 
     @Test
-    void unknownUsersUseUnauthorizedAndNotFoundStatuses() throws Exception {
-        mockMvc.perform(get("/users/info").cookie(new Cookie("user_email", "missing@example.com")))
+    void anonymousAndForgedLegacyIdentityCannotAccessPrivateUserResources() throws Exception {
+        mockMvc.perform(get("/users/me").cookie(new Cookie("user_email", "missing@example.com")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.data").value(false));
+                .andExpect(cookie().maxAge("user_email", 0));
 
-        mockMvc.perform(put("/users/password/change")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"id\":\"999999999999\",\"password\":\"old1\",\"newPassword\":\"new1\"}"))
+        UserFixture missing = new UserFixture(
+                999999999999L, "missing", "missing@example.com", "unused");
+        mockMvc.perform(get("/users/me").with(asUser(missing)))
                 .andExpect(status().isNotFound());
-
-        mockMvc.perform(put("/users/update")
+        mockMvc.perform(put("/users/me").with(asUser(missing)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"id\":\"999999999999\",\"name\":\"missing\"}"))
+                        .content("{\"name\":\"missing\"}"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void emailAndAvatarEndpointsUseIsolatedDependencies() throws Exception {
+    void verificationEmailIsGenericAndAvatarRequiresAuthenticatedUser() throws Exception {
         String recipient = unique("mail_") + "@example.com";
-        when(emailSender.send(anyString(), anyString(), eq(recipient))).thenReturn(true);
+        when(verificationCodeGenerator.generate()).thenReturn(CODE);
+        when(emailSender.send(eq(CODE), anyString(), eq(recipient))).thenReturn(true);
 
-        mockMvc.perform(post("/users/email/{email}", recipient))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(matchesPattern("\\d{4}")));
+        mockMvc.perform(post("/users/email").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + recipient + "\",\"purpose\":\"REGISTER\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data").value(true))
+                .andExpect(jsonPath("$.verificationCode").doesNotExist());
 
+        UserFixture user = createUser();
         MockMultipartFile avatar = new MockMultipartFile(
                 "file", "avatar.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1, 2, 3, 4});
-        mockMvc.perform(multipart("/users/uploadAvatar").file(avatar))
+        mockMvc.perform(multipart("/users/me/avatar").file(avatar)
+                        .with(asUser(user)).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.requestPath")
                         .value(matchesPattern("http://localhost:5173/test-avatar/img[1-5]/.+avatar\\.png")))
@@ -165,40 +158,88 @@ class UserAdminFunctionalTest extends FunctionalTestSupport {
     }
 
     @Test
-    void administratorLoginVerificationAndCookieLifecycleWorks() throws Exception {
+    void administratorLoginSessionPasswordAndLogoutLifecycleWorks() throws Exception {
         AdminFixture admin = createAdmin();
 
-        mockMvc.perform(post("/admin/login")
+        mockMvc.perform(post("/admin/login").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"adminId\":\"" + admin.id() + "\",\"adminPassword\":\"wrong\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(cookie().doesNotExist("admin"));
+                .andExpect(jsonPath("$.msg").value("账号或密码错误"));
 
-        MvcResult login = mockMvc.perform(post("/admin/login")
+        Cookie session = loginAdministrator(admin.id(), admin.password());
+        mockMvc.perform(get("/auth/session").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("ADMIN"))
+                .andExpect(jsonPath("$.data.actorId").value(admin.id()));
+
+        mockMvc.perform(put("/admin/password").cookie(session).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"adminId\":\"" + admin.id()
-                                + "\",\"adminPassword\":\"" + admin.password() + "\"}"))
+                        .content("{\"password\":\"wrong\",\"newPassword\":\"admin234\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/admin/password").cookie(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"admin123\",\"newPassword\":\"admin234\"}"))
                 .andExpect(status().isOk())
-                .andExpect(cookie().exists("admin"))
-                .andReturn();
-        Cookie cookie = login.getResponse().getCookie("admin");
-        assertNotNull(cookie);
+                .andExpect(cookie().maxAge("CC4C_SESSION", 0));
 
-        mockMvc.perform(get("/admin/verify").cookie(cookie))
+        Cookie changedSession = loginAdministrator(admin.id(), "admin234");
+        mockMvc.perform(post("/admin/logout").cookie(changedSession).with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(true));
-
-        MvcResult logout = mockMvc.perform(post("/admin/logout"))
-                .andExpect(status().isOk())
-                .andReturn();
-        assertEquals(0, logout.getResponse().getCookie("admin").getMaxAge());
+                .andExpect(cookie().maxAge("CC4C_SESSION", 0));
     }
 
-    private Map<String, Object> userPayload(String name, String email, int language) {
+    @Test
+    void writablePasswordsEnforceBcryptBytesWhileLoginAcceptsLegacyLength() throws Exception {
+        String email = unique("bytes_") + "@example.com";
+        issueVerificationCode(email, VerificationPurpose.REGISTER, CODE);
+        mockMvc.perform(post("/users").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", unique("bytes_"),
+                                "email", email,
+                                "password", "密".repeat(25),
+                                "verificationCode", CODE,
+                                "major", 0,
+                                "language", 1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value("密码必须为 8–64 个字符且 UTF-8 编码不超过 72 字节"));
+
+        UserFixture legacy = createUser();
+        jdbcTemplate.update(
+                "UPDATE user SET password = ? WHERE user_id = ?",
+                passwordEncoder.encode("abcd"),
+                legacy.id());
+        loginUser(legacy.email(), "abcd");
+    }
+
+    private Cookie loginUser(String email, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/users/login").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("CC4C_SESSION"))
+                .andReturn();
+        return result.getResponse().getCookie("CC4C_SESSION");
+    }
+
+    private Cookie loginAdministrator(String id, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/admin/login").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"adminId\":\"" + id + "\",\"adminPassword\":\"" + password + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("CC4C_SESSION"))
+                .andReturn();
+        return result.getResponse().getCookie("CC4C_SESSION");
+    }
+
+    private Map<String, Object> userPayload(
+            String name, String email, int language, String verificationCode) {
         return Map.of(
                 "name", name,
                 "email", email,
-                "password", "secret1",
+                "password", "secret11",
+                "verificationCode", verificationCode,
                 "major", 0,
                 "language", language);
     }

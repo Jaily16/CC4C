@@ -171,7 +171,7 @@ const commentPage = ref(1);
 const commentPageSize = 10;
 const commentTotal = ref(0);
 
-const loggedIn = computed(() => Boolean(store.state.user.id));
+const loggedIn = computed(() => store.state.user.authenticated && store.state.user.role === 'USER');
 const userInitial = computed(() => commentInitial(store.state.user.name));
 
 function commentInitial(name) {
@@ -248,7 +248,7 @@ async function loadCourse() {
     const requests = [loadComments()];
     if (loggedIn.value) {
       requests.push(
-        axios.get(`/courses/ifFavor/${store.state.user.id}/${courseData.value.courseId}`)
+        axios.get(`/courses/star/${courseData.value.courseId}`)
           .then((favorResp) => { isFavor.value = favorResp.data.data === true; })
           .catch((error) => console.error(error))
       );
@@ -266,8 +266,8 @@ async function toggleCollect() {
   if (!courseData.value?.courseId || !loggedIn.value) return;
   try {
     const resp = isFavor.value
-      ? await axios.delete(`/courses/deleteFavor/${store.state.user.id}/${courseData.value.courseId}`)
-      : await axios.post(`/courses/star/${store.state.user.id}/${courseData.value.courseId}`);
+      ? await axios.delete(`/courses/star/${courseData.value.courseId}`)
+      : await axios.post(`/courses/star/${courseData.value.courseId}`);
     if (resp.data.data !== true) {
       ElMessage.error(resp.data.msg || '收藏操作失败');
       return;
@@ -289,7 +289,6 @@ async function comment() {
   commentSubmitting.value = true;
   try {
     const resp = await axios.post('/comments/course', {
-      userId: store.state.user.id,
       content: commentText.value.trim(),
       courseId: courseData.value.courseId,
     });
@@ -324,7 +323,6 @@ async function reply(fatherId) {
   replySubmitting.value = true;
   try {
     const resp = await axios.post('/comments/indirect', {
-      userId: store.state.user.id,
       content: replyText.value.trim(),
       fatherId,
     });
