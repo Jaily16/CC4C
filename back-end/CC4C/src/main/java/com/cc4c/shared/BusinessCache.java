@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -38,19 +39,29 @@ public final class BusinessCache {
     private final ObjectMapper objectMapper;
     private final BusinessCacheProperties properties;
     private final BusinessCacheStore store;
-    private final BusinessCacheMetrics metrics = new BusinessCacheMetrics();
+    private final BusinessCacheMetrics metrics;
     private final ConcurrentHashMap<String, CompletableFuture<Optional<?>>> inFlight =
             new ConcurrentHashMap<>();
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private volatile long bypassUntilNanos;
 
+    @Autowired
+    public BusinessCache(
+            ObjectMapper objectMapper,
+            BusinessCacheProperties properties,
+            ObjectProvider<BusinessCacheStore> storeProvider,
+            Cc4cMetrics micrometer) {
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+        this.store = storeProvider.getIfAvailable();
+        this.metrics = new BusinessCacheMetrics(micrometer);
+    }
+
     public BusinessCache(
             ObjectMapper objectMapper,
             BusinessCacheProperties properties,
             ObjectProvider<BusinessCacheStore> storeProvider) {
-        this.objectMapper = objectMapper;
-        this.properties = properties;
-        this.store = storeProvider.getIfAvailable();
+        this(objectMapper, properties, storeProvider, Cc4cMetrics.disabled());
     }
 
     public <T> Optional<T> getOrLoad(
@@ -61,26 +72,26 @@ public final class BusinessCache {
             Duration negativeTtl,
             Supplier<Optional<T>> loader) {
         if (!properties.enabled() || store == null || circuitOpen()) {
-            metrics.bypass();
-            return load(loader);
+            metrics.bypass(region);
+            return load(loader, region);
         }
 
         ResolvedKey key = resolveKey(region, logicalKey);
         if (key == null) {
-            metrics.bypass();
-            return load(loader);
+            metrics.bypass(region);
+            return load(loader, region);
         }
         JavaType javaType = objectMapper.getTypeFactory().constructType(type);
         ReadResult<T> first = read(key.dataKey(), javaType, region);
         if (first.state() == ReadState.VALUE) {
-            metrics.hit();
+            metrics.hit(region);
             return Optional.of(first.value());
         }
         if (first.state() == ReadState.NEGATIVE) {
-            metrics.negativeHit();
+            metrics.negativeHit(region);
             return Optional.empty();
         }
-        metrics.miss();
+        metrics.miss(region);
         return singleFlight(key, region, javaType, ttl, negativeTtl, loader);
     }
 
@@ -107,6 +118,25 @@ public final class BusinessCache {
         return metrics;
     }
 
+    public HealthSnapshot healthSnapshot() {
+        if (!properties.enabled()) {
+            return new HealthSnapshot(false, true, false);
+        }
+        if (store == null) {
+            return new HealthSnapshot(true, false, circuitOpen());
+        }
+        try {
+            boolean reachable = store.ping();
+            if (reachable) {
+                markSuccess();
+            }
+            return new HealthSnapshot(true, reachable, circuitOpen());
+        } catch (RuntimeException exception) {
+            markFailure("health", "health", exception);
+            return new HealthSnapshot(true, false, circuitOpen());
+        }
+    }
+
     public long clearNamespaceForTests() {
         if (!properties.testCleanupEnabled()) {
             throw new IllegalStateException("Business cache namespace cleanup is disabled");
@@ -127,7 +157,7 @@ public final class BusinessCache {
         CompletableFuture<Optional<?>> mine = new CompletableFuture<>();
         CompletableFuture<Optional<?>> existing = inFlight.putIfAbsent(key.dataKey(), mine);
         if (existing != null) {
-            metrics.lockWait();
+            metrics.lockWait(region);
             @SuppressWarnings("unchecked")
             Optional<T> joined = (Optional<T>) existing.join();
             return joined;
@@ -161,22 +191,22 @@ public final class BusinessCache {
             markSuccess();
         } catch (RuntimeException exception) {
             markFailure("lock", region, exception);
-            metrics.bypass();
-            return load(loader);
+            metrics.bypass(region);
+            return load(loader, region);
         }
 
         if (locked) {
             try {
                 ReadResult<T> second = read(key.dataKey(), javaType, region);
                 if (second.state() == ReadState.VALUE) {
-                    metrics.hit();
+                    metrics.hit(region);
                     return Optional.of(second.value());
                 }
                 if (second.state() == ReadState.NEGATIVE) {
-                    metrics.negativeHit();
+                    metrics.negativeHit(region);
                     return Optional.empty();
                 }
-                Optional<T> loaded = load(loader);
+                Optional<T> loaded = load(loader, region);
                 write(key.dataKey(), loaded, loaded.isPresent() ? ttl : negativeTtl, region);
                 return loaded;
             } finally {
@@ -189,7 +219,7 @@ public final class BusinessCache {
             }
         }
 
-        metrics.lockWait();
+        metrics.lockWait(region);
         long deadline = System.nanoTime() + LOCK_WAIT.toNanos();
         while (System.nanoTime() < deadline) {
             try {
@@ -200,19 +230,19 @@ public final class BusinessCache {
             }
             ReadResult<T> result = read(key.dataKey(), javaType, region);
             if (result.state() == ReadState.VALUE) {
-                metrics.hit();
+                metrics.hit(region);
                 return Optional.of(result.value());
             }
             if (result.state() == ReadState.NEGATIVE) {
-                metrics.negativeHit();
+                metrics.negativeHit(region);
                 return Optional.empty();
             }
             if (result.state() == ReadState.ERROR) {
                 break;
             }
         }
-        metrics.bypass();
-        return load(loader);
+        metrics.bypass(region);
+        return load(loader, region);
     }
 
     private ResolvedKey resolveKey(String region, String logicalKey) {
@@ -274,9 +304,12 @@ public final class BusinessCache {
             T value = objectMapper.readerFor(javaType).readValue(valueNode);
             return ReadResult.value(value);
         } catch (Exception exception) {
-            metrics.error();
-            logger.warn("business_cache_invalid_entry region={} type={}",
-                    region, exception.getClass().getSimpleName());
+            metrics.error(region);
+            logger.atWarn()
+                    .addKeyValue("event", "business_cache_invalid_entry")
+                    .addKeyValue("region", region)
+                    .addKeyValue("exception_type", exception.getClass().getSimpleName())
+                    .log("Invalid business cache entry was discarded");
             try {
                 store.delete(key);
                 markSuccess();
@@ -304,21 +337,30 @@ public final class BusinessCache {
             store.set(key, json, jitter(ttl));
             markSuccess();
         } catch (JsonProcessingException exception) {
-            metrics.error();
-            logger.warn("business_cache_serialization_failure region={} type={}",
-                    region, exception.getClass().getSimpleName());
+            metrics.error(region);
+            logger.atWarn()
+                    .addKeyValue("event", "business_cache_serialization_failure")
+                    .addKeyValue("region", region)
+                    .addKeyValue("exception_type", exception.getClass().getSimpleName())
+                    .log("Business cache value could not be serialized");
         } catch (RuntimeException exception) {
             markFailure("write", region, exception);
         }
     }
 
-    private <T> Optional<T> load(Supplier<Optional<T>> loader) {
-        metrics.load();
-        Optional<T> loaded = loader.get();
-        if (loaded == null) {
-            throw new IllegalStateException("Business cache loader returned null Optional");
+    private <T> Optional<T> load(Supplier<Optional<T>> loader, String region) {
+        long startedNanos = System.nanoTime();
+        try {
+            Optional<T> loaded = loader.get();
+            if (loaded == null) {
+                throw new IllegalStateException("Business cache loader returned null Optional");
+            }
+            metrics.load(region, startedNanos, "success");
+            return loaded;
+        } catch (RuntimeException exception) {
+            metrics.load(region, startedNanos, "error");
+            throw exception;
         }
-        return loaded;
     }
 
     private Duration jitter(Duration ttl) {
@@ -338,12 +380,16 @@ public final class BusinessCache {
     }
 
     private void markFailure(String operation, String region, RuntimeException exception) {
-        metrics.error();
+        metrics.error(region);
         if (consecutiveFailures.incrementAndGet() >= 3) {
             bypassUntilNanos = System.nanoTime() + FAILURE_BYPASS.toNanos();
         }
-        logger.warn("business_cache_failure operation={} region={} type={}",
-                operation, region, exception.getClass().getSimpleName());
+        logger.atWarn()
+                .addKeyValue("event", "business_cache_failure")
+                .addKeyValue("operation", operation)
+                .addKeyValue("region", region)
+                .addKeyValue("exception_type", exception.getClass().getSimpleName())
+                .log("Business cache operation failed");
     }
 
     private void validateRegion(String region) {
@@ -387,5 +433,8 @@ public final class BusinessCache {
         static <T> ReadResult<T> error() {
             return new ReadResult<>(ReadState.ERROR, null);
         }
+    }
+
+    public record HealthSnapshot(boolean enabled, boolean reachable, boolean bypassing) {
     }
 }

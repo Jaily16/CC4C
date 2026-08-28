@@ -8,6 +8,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -26,7 +27,26 @@ public final class ReliableMessageProcessor {
     private final ObjectMapper objectMapper;
     private final RabbitMessagePublisher publisher;
     private final MessagingTopology topology;
+    private final Cc4cMetrics metrics;
     private final String workerId = "consumer-" + UUID.randomUUID();
+
+    @Autowired
+    public ReliableMessageProcessor(
+            InboxRepository inbox,
+            OutboxRepository outbox,
+            MessagePayloadCipher cipher,
+            ObjectMapper objectMapper,
+            RabbitMessagePublisher publisher,
+            MessagingTopology topology,
+            Cc4cMetrics metrics) {
+        this.inbox = inbox;
+        this.outbox = outbox;
+        this.cipher = cipher;
+        this.objectMapper = objectMapper;
+        this.publisher = publisher;
+        this.topology = topology;
+        this.metrics = metrics;
+    }
 
     public ReliableMessageProcessor(
             InboxRepository inbox,
@@ -35,15 +55,50 @@ public final class ReliableMessageProcessor {
             ObjectMapper objectMapper,
             RabbitMessagePublisher publisher,
             MessagingTopology topology) {
-        this.inbox = inbox;
-        this.outbox = outbox;
-        this.cipher = cipher;
-        this.objectMapper = objectMapper;
-        this.publisher = publisher;
-        this.topology = topology;
+        this(inbox, outbox, cipher, objectMapper, publisher, topology, Cc4cMetrics.disabled());
     }
 
     public void process(
+            String consumerName,
+            String expectedEventType,
+            Message message,
+            Channel channel,
+            long deliveryTag,
+            ReliableMessageHandler handler) throws IOException {
+        String fallback = correlationFallback(message);
+        Object header = message.getMessageProperties().getHeaders()
+                .get(CorrelationIds.AMQP_HEADER);
+        String correlationId = CorrelationIds.normalize(
+                header instanceof String value ? value : null, fallback);
+        long startedNanos = metrics.start();
+        try (CorrelationIds.Scope ignored = CorrelationIds.open(correlationId)) {
+            processCorrelated(
+                    consumerName, expectedEventType, message, channel, deliveryTag, handler);
+            metrics.record("cc4c.messaging.consume.duration", startedNanos,
+                    "event_type", expectedEventType, "outcome", "completed");
+        } catch (IOException | RuntimeException exception) {
+            metrics.record("cc4c.messaging.consume.duration", startedNanos,
+                    "event_type", expectedEventType, "outcome", "error");
+            throw exception;
+        }
+    }
+
+    private String correlationFallback(Message message) {
+        Optional<String> reference = messageReference(message).map(MessageReference::eventId);
+        if (reference.isPresent()) {
+            return reference.get();
+        }
+        if (message.getBody().length > MessagePayloadCipher.MAX_PLAINTEXT_BYTES * 2) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(message.getBody(), MessageEnvelope.class).eventId();
+        } catch (RuntimeException | IOException exception) {
+            return null;
+        }
+    }
+
+    private void processCorrelated(
             String consumerName,
             String expectedEventType,
             Message message,
@@ -57,7 +112,11 @@ public final class ReliableMessageProcessor {
             }
             envelope = objectMapper.readValue(message.getBody(), MessageEnvelope.class);
         } catch (RuntimeException | IOException exception) {
-            log.warn("messaging_action=consume type={} result=invalid_envelope", expectedEventType);
+            log.atWarn()
+                    .addKeyValue("event", "message_consume")
+                    .addKeyValue("event_type", expectedEventType)
+                    .addKeyValue("result", "invalid_envelope")
+                    .log("Message envelope was rejected");
             rejectMalformedEnvelope(
                     consumerName, expectedEventType, message, channel, deliveryTag,
                     exception instanceof MessagePayloadException payloadException
@@ -85,6 +144,9 @@ public final class ReliableMessageProcessor {
                 consumerName, envelope.eventId(), envelope.generation(), workerId,
                 Instant.now().plusSeconds(300));
         if (claim != InboxClaim.ACQUIRED) {
+            if (claim == InboxClaim.ALREADY_DONE) {
+                metrics.increment("cc4c.messaging.duplicates", "event_type", envelope.eventType());
+            }
             channel.basicAck(deliveryTag, false);
             return;
         }
@@ -95,6 +157,7 @@ public final class ReliableMessageProcessor {
                 handler.expired(envelope, plaintext);
                 inbox.markDone(consumerName, envelope.eventId(), envelope.generation());
                 outbox.markExpired(envelope.eventId(), envelope.generation());
+                metrics.increment("cc4c.messaging.expired", "event_type", envelope.eventType());
                 channel.basicAck(deliveryTag, false);
             } catch (MessagePayloadException exception) {
                 handleFailure(
@@ -109,9 +172,13 @@ public final class ReliableMessageProcessor {
             inbox.markDone(consumerName, envelope.eventId(), envelope.generation());
             outbox.markDelivered(envelope.eventId(), envelope.generation());
             channel.basicAck(deliveryTag, false);
-            log.info(
-                    "messaging_action=consume event={} type={} generation={} result=delivered",
-                    envelope.eventId(), envelope.eventType(), envelope.generation());
+            log.atInfo()
+                    .addKeyValue("event", "message_consume")
+                    .addKeyValue("event_id", envelope.eventId())
+                    .addKeyValue("event_type", envelope.eventType())
+                    .addKeyValue("generation", envelope.generation())
+                    .addKeyValue("result", "delivered")
+                    .log("Message consumption completed");
         } catch (MailDeliveryException exception) {
             handleFailure(
                     consumerName, envelope, plaintext, message, channel, deliveryTag, handler,
@@ -145,10 +212,17 @@ public final class ReliableMessageProcessor {
                     "", topology.retryQueue(envelope.eventType(), attempt), retry,
                     envelope.eventId() + ":retry:" + (attempt + 1));
             if (outcome.accepted()) {
+                metrics.increment("cc4c.messaging.retries",
+                        "event_type", envelope.eventType(), "stage", "consumer");
                 channel.basicAck(deliveryTag, false);
-                log.warn(
-                        "messaging_action=consume event={} type={} generation={} attempt={} result=retry_scheduled",
-                        envelope.eventId(), envelope.eventType(), envelope.generation(), attempt + 1);
+                log.atWarn()
+                        .addKeyValue("event", "message_consume")
+                        .addKeyValue("event_id", envelope.eventId())
+                        .addKeyValue("event_type", envelope.eventType())
+                        .addKeyValue("generation", envelope.generation())
+                        .addKeyValue("attempt", attempt + 1)
+                        .addKeyValue("result", "retry_scheduled")
+                        .log("Message retry was scheduled");
             } else {
                 channel.basicNack(deliveryTag, false, true);
             }
@@ -163,10 +237,17 @@ public final class ReliableMessageProcessor {
                 topology.deadExchange(), envelope.eventType() + ".dead", dead,
                 envelope.eventId() + ":dead:" + envelope.generation());
         if (outcome.accepted()) {
+            metrics.increment("cc4c.messaging.dead",
+                    "event_type", envelope.eventType(), "error_code", errorCode);
             channel.basicAck(deliveryTag, false);
-            log.warn(
-                    "messaging_action=consume event={} type={} generation={} result=dead error={}",
-                    envelope.eventId(), envelope.eventType(), envelope.generation(), errorCode);
+            log.atWarn()
+                    .addKeyValue("event", "message_consume")
+                    .addKeyValue("event_id", envelope.eventId())
+                    .addKeyValue("event_type", envelope.eventType())
+                    .addKeyValue("generation", envelope.generation())
+                    .addKeyValue("result", "dead")
+                    .addKeyValue("error_code", errorCode)
+                    .log("Message entered the dead-letter path");
         } else {
             channel.basicNack(deliveryTag, false, true);
         }
@@ -193,6 +274,8 @@ public final class ReliableMessageProcessor {
                 copyForDead(original, envelope, errorCode),
                 envelope.eventId() + ":dead:" + envelope.generation());
         if (outcome.accepted()) {
+            metrics.increment("cc4c.messaging.dead",
+                    "event_type", envelope.eventType(), "error_code", errorCode);
             channel.basicAck(deliveryTag, false);
         } else {
             channel.basicNack(deliveryTag, false, true);
@@ -215,9 +298,12 @@ public final class ReliableMessageProcessor {
                 outbox.markDead(reference.eventId(), reference.generation(), errorCode);
             }
         });
-        log.warn(
-                "messaging_action=consume type={} result=dead error={}",
-                expectedEventType, errorCode);
+        log.atWarn()
+                .addKeyValue("event", "message_consume")
+                .addKeyValue("event_type", expectedEventType)
+                .addKeyValue("result", "dead")
+                .addKeyValue("error_code", errorCode)
+                .log("Malformed message entered the dead-letter path");
         // Quorum at-least-once dead lettering confirms the transfer before removing the source message.
         channel.basicReject(deliveryTag, false);
     }
@@ -278,6 +364,8 @@ public final class ReliableMessageProcessor {
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .setMessageId(envelope.eventId() + ":" + envelope.generation())
                 .setHeader("cc4c-event-type", envelope.eventType())
+                .setHeader(CorrelationIds.AMQP_HEADER,
+                        CorrelationIds.currentOr(envelope.eventId()))
                 .setHeader(RETRY_HEADER, attempt)
                 .build();
     }
@@ -289,6 +377,8 @@ public final class ReliableMessageProcessor {
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .setMessageId(envelope.eventId() + ":" + envelope.generation())
                 .setHeader("cc4c-event-type", envelope.eventType())
+                .setHeader(CorrelationIds.AMQP_HEADER,
+                        CorrelationIds.currentOr(envelope.eventId()))
                 .setHeader("cc4c-error-code", errorCode)
                 .build();
     }

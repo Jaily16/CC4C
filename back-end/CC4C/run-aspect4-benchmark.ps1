@@ -7,7 +7,14 @@ $requiredNames = @(
     'CC4C_PERF_DB_USERNAME',
     'CC4C_PERF_DB_PASSWORD',
     'CC4C_PERF_DB_RESET_CONFIRM',
-    'CC4C_PERF_CACHE_REDIS_URL'
+    'CC4C_PERF_CACHE_REDIS_URL',
+    'CC4C_PERF_USER_PASSWORD'
+)
+$optionalNames = @(
+    'CC4C_PERF_BASE_URL',
+    'CC4C_PERF_SESSION_NAMESPACE',
+    'CC4C_PERF_CACHE_NAMESPACE',
+    'CC4C_PERF_RABBITMQ_NAMESPACE'
 )
 
 if (-not (Test-Path -LiteralPath $environmentPath -PathType Leaf)) {
@@ -26,12 +33,18 @@ foreach ($line in Get-Content -LiteralPath $environmentPath) {
         throw "Invalid entry on line $lineNumber of .env.performance.local."
     }
     $name = $line.Substring(0, $separator).Trim()
-    if ($requiredNames -notcontains $name) {
+    if ($requiredNames -notcontains $name -and $optionalNames -notcontains $name) {
         throw "Unsupported variable '$name' in .env.performance.local."
     }
     $values[$name] = $line.Substring($separator + 1)
 }
 foreach ($name in $requiredNames) {
+    if ((-not $values.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($values[$name]))) {
+        $processValue = [Environment]::GetEnvironmentVariable($name, 'Process')
+        if (-not [string]::IsNullOrWhiteSpace($processValue)) {
+            $values[$name] = $processValue
+        }
+    }
     if (-not $values.ContainsKey($name) -or [string]::IsNullOrWhiteSpace($values[$name])) {
         throw "Required variable '$name' is missing or empty."
     }

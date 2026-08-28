@@ -19,7 +19,9 @@ class CorsConfigurationTest {
                 java.util.List.of("http://localhost:5173", "https://cc4c.example.com"),
                 configuration.getAllowedOrigins());
         assertTrue(configuration.getAllowCredentials());
-        assertEquals(java.util.List.of("Retry-After"), configuration.getExposedHeaders());
+        assertEquals(
+                java.util.List.of("Retry-After", "X-Request-ID"),
+                configuration.getExposedHeaders());
     }
 
     @Test

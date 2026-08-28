@@ -1,0 +1,30 @@
+rule_files:
+  - ../rules/cc4c-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="cc4c-backend"}'
+        values: '0x5'
+      - series: 'cc4c_messaging_outbox_oldest_pending_seconds'
+        values: '90x5'
+      - series: 'cc4c_messaging_sampler_age_seconds'
+        values: '45x5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: Cc4cBackendUnreachable
+        exp_alerts:
+          - exp_labels: { job: cc4c-backend, severity: critical }
+            exp_annotations: { summary: "CC4C backend metrics cannot be scraped" }
+      - eval_time: 3m
+        alertname: Cc4cOutboxBacklogOld
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations: { summary: "CC4C Outbox oldest pending message exceeds 60 seconds" }
+      - eval_time: 2m
+        alertname: Cc4cMessagingSamplerStale
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations: { summary: "CC4C asynchronous state sampler is stale" }

@@ -62,7 +62,7 @@ public final class Aspect4PerformanceDataSeeder {
                 if (languages.size() < 4) {
                     throw new IllegalStateException("Performance database must contain the four catalog languages");
                 }
-                seedUsers(connection, languages);
+                seedUsers(connection, languages, environment.userPassword());
                 seedCourses(connection, languages);
                 seedBlogs(connection);
                 seedFavorites(connection);
@@ -129,8 +129,11 @@ public final class Aspect4PerformanceDataSeeder {
         return result;
     }
 
-    private static void seedUsers(Connection connection, Map<Integer, String> languages) throws SQLException {
-        String password = "{bcrypt}" + new BCryptPasswordEncoder(4).encode("benchmark-only-password");
+    private static void seedUsers(
+            Connection connection,
+            Map<Integer, String> languages,
+            String userPassword) throws SQLException {
+        String password = "{bcrypt}" + new BCryptPasswordEncoder(4).encode(userPassword);
         List<Integer> languageIds = languages.keySet().stream().sorted().toList();
         SplittableRandom random = new SplittableRandom(RANDOM_SEED);
         try (PreparedStatement statement = connection.prepareStatement("""
@@ -306,11 +309,12 @@ public final class Aspect4PerformanceDataSeeder {
         }
     }
 
-    private record Environment(String url, String username, String password) {
+    private record Environment(String url, String username, String password, String userPassword) {
         static Environment load() {
             String url = required("CC4C_PERF_DB_URL");
             String username = required("CC4C_PERF_DB_USERNAME");
             String password = required("CC4C_PERF_DB_PASSWORD");
+            String userPassword = required("CC4C_PERF_USER_PASSWORD");
             String confirmation = required("CC4C_PERF_DB_RESET_CONFIRM");
             URI uri = URI.create(url.substring("jdbc:".length()));
             String path = uri.getPath();
@@ -322,7 +326,12 @@ public final class Aspect4PerformanceDataSeeder {
                 throw new IllegalStateException(
                         "Performance database must end with _perf_test and exactly match confirmation");
             }
-            return new Environment(url, username, password);
+            int passwordBytes = userPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if (userPassword.length() < 8 || userPassword.length() > 64 || passwordBytes > 72) {
+                throw new IllegalStateException(
+                        "CC4C_PERF_USER_PASSWORD must satisfy the application password policy");
+            }
+            return new Environment(url, username, password, userPassword);
         }
 
         private static String required(String name) {

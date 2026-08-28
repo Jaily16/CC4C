@@ -7,6 +7,7 @@ import org.mockito.InOrder;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
+import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -19,6 +20,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ReliableMessageProcessorTest {
 
@@ -51,6 +54,28 @@ class ReliableMessageProcessorTest {
         order.verify(fixture.inbox).markDone("consumer", "event-1", 0);
         order.verify(fixture.outbox).markDelivered("event-1", 0);
         order.verify(fixture.channel).basicAck(8L, false);
+    }
+
+    @Test
+    void legacyMessageWithoutCorrelationHeaderUsesEventIdAndClearsMdc() throws Exception {
+        String eventId = "7a3dfb7b-2537-4a26-98df-7ea34650cb45";
+        Fixture fixture = fixture(new MessageEnvelope(
+                eventId, AsyncEventTypes.BLOG_SUBMITTED, 1, 0,
+                Instant.parse("2026-08-28T00:00:00Z"), null,
+                "test-v1", new byte[12], new byte[]{1, 2, 3}));
+        when(fixture.inbox.claim(any(), any(), eq(0), any(), any()))
+                .thenReturn(InboxClaim.ACQUIRED);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertEquals(eventId, MDC.get(CorrelationIds.MDC_KEY));
+            return null;
+        }).when(fixture.handler).handle(any(), any());
+
+        fixture.processor.process(
+                "consumer", AsyncEventTypes.BLOG_SUBMITTED,
+                fixture.message, fixture.channel, 16L, fixture.handler);
+
+        assertNull(MDC.get(CorrelationIds.MDC_KEY));
+        verify(fixture.channel).basicAck(16L, false);
     }
 
     @Test

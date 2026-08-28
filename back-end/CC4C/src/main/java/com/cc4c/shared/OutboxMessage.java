@@ -5,6 +5,7 @@ import java.time.Instant;
 record OutboxMessage(
         long id,
         String eventId,
+        String correlationId,
         int schemaVersion,
         String eventType,
         String aggregateType,

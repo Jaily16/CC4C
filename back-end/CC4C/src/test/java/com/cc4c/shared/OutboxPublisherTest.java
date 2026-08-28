@@ -3,6 +3,7 @@ package com.cc4c.shared;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.core.Message;
 import org.springframework.dao.TransientDataAccessResourceException;
 
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -31,6 +33,14 @@ class OutboxPublisherTest {
         fixture.dispatcher.dispatch();
 
         verify(fixture.repository).markPublished("event-1", 0);
+        ArgumentCaptor<Message> published = ArgumentCaptor.forClass(Message.class);
+        verify(fixture.publisher).publish(
+                eq("events"),
+                eq(AsyncEventTypes.BLOG_SUBMITTED),
+                published.capture(),
+                eq("event-1:0"));
+        assertEquals("request-correlation-fixture",
+                published.getValue().getMessageProperties().getHeader(CorrelationIds.AMQP_HEADER));
         verify(fixture.repository, never()).markPublishFailure(
                 any(), eq(0), any(), any(), eq(false));
     }
@@ -106,7 +116,7 @@ class OutboxPublisherTest {
     private OutboxMessage message(int publishAttempts, int generation) {
         Instant now = Instant.parse("2026-08-28T00:00:00Z");
         return new OutboxMessage(
-                1L, "event-1", 1, AsyncEventTypes.BLOG_SUBMITTED,
+                1L, "event-1", "request-correlation-fixture", 1, AsyncEventTypes.BLOG_SUBMITTED,
                 "blog", "42", AsyncEventTypes.BLOG_SUBMITTED,
                 generation, OutboxStatus.PUBLISHING, publishAttempts, 0,
                 "test-v1", new byte[12], "ciphertext".getBytes(StandardCharsets.UTF_8),

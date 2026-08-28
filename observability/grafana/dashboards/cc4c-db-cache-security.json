@@ -1,0 +1,14 @@
+{
+  "uid": "cc4c-db-cache-security", "title": "CC4C DB, Cache and Security", "schemaVersion": 41,
+  "time": {"from": "now-1h", "to": "now"}, "refresh": "15s", "tags": ["cc4c"],
+  "templating": {"list": []},
+  "panels": [
+    {"id":1,"type":"timeseries","title":"MyBatis p95 by module","gridPos":{"x":0,"y":0,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"histogram_quantile(0.95, sum by (le,module) (rate(cc4c_mybatis_operations_seconds_bucket[5m])))","legendFormat":"{{module}}"}]},
+    {"id":2,"type":"timeseries","title":"Hikari pool","gridPos":{"x":12,"y":0,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"hikaricp_connections_active","legendFormat":"active"},{"expr":"hikaricp_connections_idle","legendFormat":"idle"},{"expr":"hikaricp_connections_pending","legendFormat":"pending"}]},
+    {"id":3,"type":"timeseries","title":"Cache outcomes","gridPos":{"x":0,"y":8,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum by (region,outcome) (rate(cc4c_cache_requests_total[5m]))","legendFormat":"{{region}} {{outcome}}"}]},
+    {"id":4,"type":"timeseries","title":"Security events","gridPos":{"x":12,"y":8,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum by (role,outcome) (rate(cc4c_security_authentication_attempts_total[5m]))","legendFormat":"auth {{role}} {{outcome}}"},{"expr":"sum by (scope) (rate(cc4c_security_rate_limit_rejections_total[5m]))","legendFormat":"limit {{scope}}"}]},
+    {"id":5,"type":"timeseries","title":"MyBatis operations and errors","gridPos":{"x":0,"y":16,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum by (module,command,outcome) (rate(cc4c_mybatis_operations_seconds_count[5m]))","legendFormat":"{{module}} {{command}} {{outcome}}"}]},
+    {"id":6,"type":"timeseries","title":"Cache hit ratio and Redis errors","gridPos":{"x":12,"y":16,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum(rate(cc4c_cache_requests_total{outcome=\"hit\"}[5m])) / clamp_min(sum(rate(cc4c_cache_requests_total{outcome=~\"hit|miss\"}[5m])), 0.000001)","legendFormat":"positive hit ratio"},{"expr":"sum by (operation) (rate(cc4c_cache_redis_operations_seconds_count{outcome=\"error\"}[5m]))","legendFormat":"Redis error {{operation}}"}]},
+    {"id":7,"type":"timeseries","title":"Authorization denials","gridPos":{"x":0,"y":24,"w":24,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum by (role,reason) (rate(cc4c_security_authorization_denials_total[5m]))","legendFormat":"{{role}} {{reason}}"}]}
+  ]
+}

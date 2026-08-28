@@ -11,12 +11,15 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
 class OutboxRepository {
     private static final String COLUMNS = """
-            id, event_id, schema_version, event_type, aggregate_type, aggregate_id, routing_key,
+            id, event_id, correlation_id, schema_version, event_type, aggregate_type,
+            aggregate_id, routing_key,
             generation, status, publish_attempts, consume_attempts, payload_key_id,
             payload_nonce, payload_ciphertext, occurred_at, expires_at, created_at, updated_at,
             failed_at, error_code
@@ -31,6 +34,7 @@ class OutboxRepository {
 
     void insert(
             String eventId,
+            String correlationId,
             String eventType,
             String aggregateType,
             String aggregateId,
@@ -42,12 +46,14 @@ class OutboxRepository {
             String errorCode) {
         jdbc.update("""
                 INSERT INTO async_outbox(
-                    event_id, schema_version, event_type, aggregate_type, aggregate_id, routing_key,
+                    event_id, correlation_id, schema_version, event_type, aggregate_type,
+                    aggregate_id, routing_key,
                     generation, status, next_attempt_at, payload_key_id, payload_nonce,
                     payload_ciphertext, occurred_at, expires_at, failed_at, error_code)
-                VALUES(?, 1, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES(?, ?, 1, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                eventId, eventType, aggregateType, aggregateId, routingKey, initialStatus.name(),
+                eventId, correlationId, eventType, aggregateType, aggregateId, routingKey,
+                initialStatus.name(),
                 timestamp(occurredAt), payload.keyId(), payload.nonce(), payload.ciphertext(),
                 timestamp(occurredAt), timestamp(expiresAt),
                 initialStatus == OutboxStatus.DEAD ? timestamp(occurredAt) : null,
@@ -206,9 +212,30 @@ class OutboxRepository {
                 """, timestamp(before), limit);
     }
 
+    Map<String, Long> statusCounts() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        jdbc.query("SELECT status, COUNT(*) AS count_value FROM async_outbox GROUP BY status",
+                result -> {
+                    counts.put(result.getString("status"), result.getLong("count_value"));
+                });
+        return Map.copyOf(counts);
+    }
+
+    double oldestPendingSeconds() {
+        Double seconds = jdbc.queryForObject("""
+                SELECT COALESCE(
+                    TIMESTAMPDIFF(MICROSECOND, MIN(created_at), CURRENT_TIMESTAMP(3)) / 1000000.0,
+                    0)
+                FROM async_outbox
+                WHERE status IN ('PENDING', 'PUBLISHING')
+                """, Double.class);
+        return seconds == null ? 0.0 : Math.max(0.0, seconds);
+    }
+
     private static OutboxMessage map(ResultSet result, int rowNumber) throws SQLException {
         return new OutboxMessage(
-                result.getLong("id"), result.getString("event_id"), result.getInt("schema_version"),
+                result.getLong("id"), result.getString("event_id"),
+                result.getString("correlation_id"), result.getInt("schema_version"),
                 result.getString("event_type"), result.getString("aggregate_type"),
                 result.getString("aggregate_id"), result.getString("routing_key"),
                 result.getInt("generation"), OutboxStatus.valueOf(result.getString("status")),

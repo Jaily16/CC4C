@@ -1000,4 +1000,58 @@ flowchart LR
 - 回滚到 `bc7dcf8` 时旧代码可忽略 V6 两张附加表，但必须先停止 Dispatcher/Consumer并保留所有未完成 Outbox，待恢复方面五代码后继续处理；不得执行 Flyway `repair` 或伪造 down migration。
 - Flyway 11.7.2 在 MySQL 8.4 上仍提示官方测试至 8.1；V1–V6、重复迁移、`validate` 和结构断言实际通过。`npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），Vite 仍提示主包超过 500 KiB。
 - 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件；`.env.*.local`、Rabbit definitions、数据库备份、邮件内容、日志、target、node_modules、dist 和 temp 均不得进入 Git。
-- 方面五尚未暂存、提交或推送；任何 Git 收口需用户另行明确授权。Actuator、Prometheus、Grafana、压测观测、容器、Testcontainers 和 CI 仍属于方面六与方面七。
+- 方面五已按用户授权收口为本地提交 `5daf68c`，未推送。该提交是方面六唯一基线。
+
+### 13.21 方面六实际变更
+
+#### 管理面、请求关联与日志
+
+- 方面六以本地提交 `5daf68c` 为唯一基线，增加由 Spring Boot 3.5.16 管理的 Actuator 和 Prometheus Registry；Gatling Java DSL 锁定 3.15.1、Maven Plugin 锁定 4.21.10，仅在显式 profile 中运行。
+- Actuator 独立绑定 `127.0.0.1:4081`。匿名只可访问脱敏 `health/liveness/readiness`；`dependencies/info/prometheus` 使用独立无状态 `OBSERVABILITY` Basic 身份，业务 USER/ADMIN Session 不能替代。管理链只允许 GET/HEAD，不创建 Session，并明确排除高风险端点。
+- 新增最高优先级请求关联过滤器：只接受 `[A-Za-z0-9_-]{16,64}`，缺失或非法值生成 UUID；成功、4xx、5xx 和 Security Filter 响应均返回 `X-Request-ID`，CORS 与 OpenAPI 同步声明。
+- Flyway V7 为 `async_outbox` 增加可空 ASCII `correlation_id`。新事件把 HTTP request ID 传入 Outbox、AMQP Header、重试和消费者 MDC；V6 历史消息缺失关联值时回退 eventId，不修改密文、nonce、AAD 或事件版本。
+- 请求、Security、Cache、Publisher 和 Consumer 日志统一使用 SLF4J key-value 与 Spring Boot ECS JSON。HTTP 完成日志只记录 method、路由模板、status、outcome 和 duration；未预期异常只记录受控异常类型、顶部安全栈帧和 fingerprint，不记录异常 message、正文、个人信息或连接凭据。
+
+#### 指标、健康、Prometheus 与 Grafana
+
+- Micrometer 覆盖 HTTP/JVM/GC/Tomcat/Hikari，并新增缓存、MyBatis、安全认证/拒绝/限流、消息发布/消费/重试/DEAD/重复/过期、Outbox/Inbox 状态和采样新鲜度指标。标签只来自固定路由、模块、命令和枚举，禁止动态 ID、邮箱、IP、SQL 或异常正文；HTTP URI 标签上限为 100。
+- MyBatis Interceptor 只计时最外层 Executor，按六模块固定包前缀归类，不记录 statement ID、SQL、参数或数据。缓存保留方面四 `snapshot/reset` API，同时按有限 region 写入 Micrometer。
+- Outbox/Inbox 每 15 秒执行固定聚合查询并写入原子内存快照，Prometheus scrape 不访问数据库。liveness 只检查应用自身；readiness 检查数据库和安全 Redis；业务缓存、RabbitMQ 和异步积压只影响受保护 dependencies。
+- 仓库新增 Prometheus 配置模板、20 条告警规则及规则测试，Grafana Provisioning 提供 API/JVM、DB/缓存/安全、Messaging 三个固定 UID Dashboard。Rabbit 指标由 RabbitMQ 4.3.5 的 `rabbitmq_prometheus` 插件采集，不由应用轮询队列。
+- 本机受控脚本只管理自身记录的 Prometheus/Grafana PID，默认绑定回环地址；秘密环境生成的实际配置、TSDB 和日志只保存在已忽略位置。
+
+#### Gatling 与性能证据
+
+- 新增 PublicReadSmoke、PublicReadStandard、AuthenticatedMixed 和 StepCapacity Java DSL 场景。性能脚本只接受 loopback Base URL、名称精确以 `_perf_test` 结尾且确认变量匹配的数据库，以及彼此不同的 Session/Cache/Rabbit namespace。
+- `PublicReadStandard` 在同一数据、JVM 和硬件上分别运行观测关闭和观测开启，均为闭环 100 并发、2 分钟预热、5 分钟测量、三轮中位数。AuthenticatedMixed 只使用专用测试账号与保留资源，不调用验证码、博客审核或真实邮件。
+- 性能服务启动脚本关闭 Dispatcher/Consumer，避免准备数据或压测时污染运行消息队列；启停只使用精确 Java PID 记录。原始 Gatling 报告、Prometheus 查询和日志全部位于已忽略 `temp/`。
+
+### 13.22 方面六验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 工具链 | Windows 11；Java 21.0.12.1；Maven 3.9.16；Gatling 3.15.1；Prometheus 3.13.2；Grafana 13.1.0；RabbitMQ 4.3.5 |
+| 后端 `./run-tests.ps1 clean verify` | 150/150 通过，0 失败、0 错误、0 跳过；JAR 构建成功 |
+| Flyway 与兼容 | V1–V7 空库/已有库/重复 migrate/validate 通过；V6 历史 Outbox 缺失 correlation ID 时回退 eventId |
+| 请求、日志与安全 | 合法/非法 request ID、MDC 清理、Security/500 响应 Header、异步传播和日志脱敏测试通过；管理端匿名/Basic/USER/ADMIN 隔离通过 |
+| 指标与健康 | 缓存、MyBatis、Security、消息、采样器指标及标签/基数测试通过；DB/安全 Redis/业务缓存/Rabbit/积压状态映射通过 |
+| Prometheus/Grafana | 配置、20 条规则和规则单测通过；三个 Dashboard 静态校验和用户浏览器验收通过 |
+| 标准性能对照 | 观测关闭/开启均 0 错误；p95 5→5 ms，p99 7→8 ms，吞吐 869.98→868.91 req/s；全部通过门禁 |
+| 其他负载 | AuthenticatedMixed 158,023 请求、0 错误、p95 11 ms；StepCapacity 885,823 请求、0 错误、p95 9 ms |
+| 当前构建 smoke | 10,469 请求、0 错误、p95 7 ms、p99 19 ms、168.85 req/s |
+| 缓存回归 | 100% 热命中、SELECT 10,995→0、p95 181.599→5.486 ms；冷路径 p95 退化约 2.06%，通过 |
+| 前端 | `npm ci` 与生产构建通过；业务 URL、Cookie、CSRF、DTO 与路由未改变 |
+| 配置与产物 | JAR 不含 `application.yml`；本机 env、凭据、TSDB、报告原件、日志、target、node_modules 和 temp 均保持忽略 |
+
+用户已确认 API/JVM、DB/缓存/安全、异步消息三个 Grafana 面板正常；业务页面与请求关联、Swagger 契约和管理指标认证正常。性能数字、硬件、负载、随机种子和限制见 `docs/reports/v3/aspect6/`，不表示生产容量。
+
+### 13.23 故障修复、已知边界与发布安全
+
+- 本机安全 Redis 与业务缓存 Redis 共用同一实例，因此按计划跳过单独停止业务缓存实例；共享中断时公开课程回源 MySQL 返回 200、readiness 503，登录安全失败返回统一 503/50300，恢复后 readiness 200 且正常 401 语义恢复。
+- 首轮共享 Redis 演练发现 Lettuce 异常被外层运行时异常包装后落入 500。新增有深度与循环保护的 cause-chain 分类器，由外层 Servlet Filter 和全局异常处理器共同复用；非 Redis 超时仍保留通用 500。
+- 为避免停止本机共享 MySQL 服务，只把 CC4C 临时连接到回环 13307 透明代理并切断代理。Hikari 原默认 30 秒等待已改为脱敏配置默认 `connectionTimeout=3000 ms`、`validationTimeout=1000 ms`；复测 readiness 503，未缓存查询 3,149 ms 内返回脱敏 500/50000 与原 request ID，恢复后 readiness 200。
+- RabbitMQ 中断时业务事务继续写 Outbox；Broker 恢复后自动发布。消费者暂停时主 quorum queue 积压并由指标/告警反映，恢复 Listener 后自动消费。SMTP 永久失败进入 DEAD，恢复配置后管理员以新 generation 重试并送达。
+- 所有故障操作均在精确 PID、容器或 CC4C-only 代理上使用 `try/finally`；结束时普通前端/后端、Prometheus/Grafana 恢复，13307 和临时 SMTP 2526 未监听。最终 DLQ 的合法保留消息未被 purge。
+- `CC4C_OBSERVABILITY_ENABLED=false` 可关闭自定义指标、采样和请求完成日志，管理端口可通过 `-1` 关闭。V7 只增加可空字段；回滚到 `5daf68c` 时旧代码会忽略该列，但不得执行 Flyway `repair` 或破坏性 down migration。
+- `npm ci` 仍报告 10 个既有漏洞（4 中等、6 高危），Vite 仍提示主 chunk 超过 500 KiB；方面六没有越界升级前端依赖。Flyway 11.7.2 对 MySQL 8.4 仍有“官方测试至 8.1”提示，但 V1–V7 实测通过。
+- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件。方面六尚未暂存、提交或推送，任何 Git 收口需用户另行明确授权；Docker、容器编排、Testcontainers 和 CI/CD 仍属于方面七。

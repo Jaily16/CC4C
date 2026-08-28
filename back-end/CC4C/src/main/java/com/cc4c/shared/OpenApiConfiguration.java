@@ -3,6 +3,7 @@ package com.cc4c.shared;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.headers.Header;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.IntegerSchema;
 import io.swagger.v3.oas.models.media.ObjectSchema;
@@ -104,6 +105,12 @@ public class OpenApiConfiguration {
                                                         new io.swagger.v3.oas.models.media.MediaType()
                                                                 .schema(new Schema<>().$ref(
                                                                         "#/components/schemas/ApiErrorResponse"))))));
+                        operation.getResponses().values().forEach(response ->
+                                response.addHeaderObject(
+                                        CorrelationIds.HEADER,
+                                        new Header()
+                                                .description("Request correlation identifier")
+                                                .schema(new StringSchema())));
                     }));
         };
     }

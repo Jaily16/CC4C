@@ -116,5 +116,7 @@ class V2CompatibilityFunctionalTest extends FunctionalTestSupport {
     @Test
     void defaultDataSourceIsHikari() {
         assertTrue(dataSource instanceof HikariDataSource);
+        assertEquals(3_000L, dataSource.getConnectionTimeout());
+        assertEquals(1_000L, dataSource.getValidationTimeout());
     }
 }

@@ -13,6 +13,8 @@
 /back-end/CC4C/.env.test.local
 /back-end/CC4C/.env.runtime.local
 /back-end/CC4C/.env.performance.local
+/.env.observability.local
+/observability/.env.observability.local
 
 # Local scratch files
 /temp/

@@ -56,11 +56,11 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
 
         long currentVersion = scalar(url,
                 "SELECT COALESCE(MAX(CAST(version AS UNSIGNED)), 0) FROM flyway_schema_history");
-        int expectedMigrations = Math.toIntExact(Math.max(0, 6 - currentVersion));
+        int expectedMigrations = Math.toIntExact(Math.max(0, 7 - currentVersion));
         assertEquals(expectedMigrations, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(6, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
+        assertEquals(7, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
         assertEquals(18, scalar(url, """
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = DATABASE()
@@ -71,6 +71,11 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('async_outbox', 'async_inbox')
+                """));
+        assertEquals(64, scalar(url, """
+                SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'async_outbox' AND column_name = 'correlation_id'
                 """));
         assertEquals(2, scalar(url, """
                 SELECT COUNT(DISTINCT index_name)

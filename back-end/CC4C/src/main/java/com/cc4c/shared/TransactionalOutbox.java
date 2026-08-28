@@ -60,7 +60,8 @@ public class TransactionalOutbox {
                 eventId, eventType, 1, 0, persistedOccurredAt, persistedExpiresAt, payload);
         try {
             repository.insert(
-                    eventId, eventType, aggregateType, aggregateId, eventType,
+                    eventId, CorrelationIds.currentOr(eventId), eventType,
+                    aggregateType, aggregateId, eventType,
                     persistedOccurredAt, persistedExpiresAt, encrypted, status, errorCode);
         } catch (DataAccessException exception) {
             throw new BusinessException(

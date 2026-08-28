@@ -29,11 +29,26 @@ $requiredNames = @(
     'CC4C_OUTBOX_DISPATCHER_ENABLED',
     'CC4C_MESSAGE_CONSUMERS_ENABLED',
     'CC4C_API_DOCS_ENABLED',
+    'CC4C_OBSERVABILITY_ENABLED',
+    'CC4C_MANAGEMENT_ADDRESS',
+    'CC4C_MANAGEMENT_PORT',
+    'CC4C_MANAGEMENT_USERNAME',
+    'CC4C_MANAGEMENT_PASSWORD',
+    'CC4C_OBSERVABILITY_ENVIRONMENT',
+    'CC4C_LOG_FORMAT',
     'CC4C_SAVE_IMG_PATH',
     'CC4C_REQUEST_IMG_PATH',
     'CC4C_SAVE_AVATAR_PATH',
     'CC4C_REQUEST_AVATAR_PATH'
 )
+$optionalDefaults = @{
+    CC4C_DB_CONNECTION_TIMEOUT_MS = '3000'
+    CC4C_DB_VALIDATION_TIMEOUT_MS = '1000'
+    CC4C_MESSAGING_SAMPLE_INTERVAL = '15s'
+    CC4C_MAX_HTTP_URI_TAGS = '100'
+}
+$optionalNames = @($optionalDefaults.Keys)
+$allowedNames = $requiredNames + $optionalNames
 
 if (-not (Test-Path -LiteralPath $runtimeEnvironmentPath -PathType Leaf)) {
     throw "Missing $runtimeEnvironmentPath. Copy .env.runtime.example and fill the local values first."
@@ -51,7 +66,7 @@ foreach ($rawLine in Get-Content -LiteralPath $runtimeEnvironmentPath) {
         throw "Invalid entry on line $lineNumber of .env.runtime.local. Expected NAME=value."
     }
     $name = $rawLine.Substring(0, $separator).Trim()
-    if ($requiredNames -notcontains $name) {
+    if ($allowedNames -notcontains $name) {
         throw "Unsupported variable '$name' in .env.runtime.local."
     }
     if ($values.ContainsKey($name)) {
@@ -63,6 +78,11 @@ foreach ($rawLine in Get-Content -LiteralPath $runtimeEnvironmentPath) {
 foreach ($name in $requiredNames) {
     if (-not $values.ContainsKey($name)) {
         throw "Required variable '$name' is missing from .env.runtime.local."
+    }
+}
+foreach ($name in $optionalNames) {
+    if (-not $values.ContainsKey($name)) {
+        $values[$name] = $optionalDefaults[$name]
     }
 }
 foreach ($name in $requiredNames | Where-Object { $_ -notin @('CC4C_MAIL_USERNAME', 'CC4C_MAIL_PASSWORD') }) {
@@ -78,6 +98,43 @@ if ($values['CC4C_SESSION_COOKIE_SECURE'] -notin @('true', 'false')) {
 }
 if ($values['CC4C_API_DOCS_ENABLED'] -notin @('true', 'false')) {
     throw 'CC4C_API_DOCS_ENABLED must be true or false.'
+}
+if ($values['CC4C_OBSERVABILITY_ENABLED'] -notin @('true', 'false')) {
+    throw 'CC4C_OBSERVABILITY_ENABLED must be true or false.'
+}
+if ($values['CC4C_MANAGEMENT_ADDRESS'] -ne '127.0.0.1') {
+    throw 'CC4C_MANAGEMENT_ADDRESS must be 127.0.0.1 for local runs.'
+}
+if ($values['CC4C_MANAGEMENT_PORT'] -ne '4081') {
+    throw 'CC4C_MANAGEMENT_PORT must be 4081 for local runs.'
+}
+if ($values['CC4C_MANAGEMENT_PASSWORD'].Length -lt 24) {
+    throw 'CC4C_MANAGEMENT_PASSWORD must contain at least 24 characters.'
+}
+if ($values['CC4C_OBSERVABILITY_ENVIRONMENT'] -notmatch '^[a-z0-9-]{2,32}$') {
+    throw 'CC4C_OBSERVABILITY_ENVIRONMENT is invalid.'
+}
+if ($values['CC4C_LOG_FORMAT'] -ne 'ecs') {
+    throw 'CC4C_LOG_FORMAT must be ecs for the Aspect 6 local acceptance run.'
+}
+if ($values['CC4C_MESSAGING_SAMPLE_INTERVAL'] -notmatch '^\d+(ms|s|m)$') {
+    throw 'CC4C_MESSAGING_SAMPLE_INTERVAL must be a positive duration such as 15s.'
+}
+$databaseConnectionTimeout = 0
+if (-not [int]::TryParse($values['CC4C_DB_CONNECTION_TIMEOUT_MS'], [ref]$databaseConnectionTimeout) -or
+        $databaseConnectionTimeout -lt 250 -or $databaseConnectionTimeout -gt 60000) {
+    throw 'CC4C_DB_CONNECTION_TIMEOUT_MS must be an integer from 250 to 60000.'
+}
+$databaseValidationTimeout = 0
+if (-not [int]::TryParse($values['CC4C_DB_VALIDATION_TIMEOUT_MS'], [ref]$databaseValidationTimeout) -or
+        $databaseValidationTimeout -lt 250 -or
+        $databaseValidationTimeout -ge $databaseConnectionTimeout) {
+    throw 'CC4C_DB_VALIDATION_TIMEOUT_MS must be at least 250 and less than CC4C_DB_CONNECTION_TIMEOUT_MS.'
+}
+$maxHttpUriTags = 0
+if (-not [int]::TryParse($values['CC4C_MAX_HTTP_URI_TAGS'], [ref]$maxHttpUriTags) -or
+        $maxHttpUriTags -lt 1 -or $maxHttpUriTags -gt 1000) {
+    throw 'CC4C_MAX_HTTP_URI_TAGS must be an integer from 1 to 1000.'
 }
 if ($values['CC4C_BUSINESS_CACHE_ENABLED'] -notin @('true', 'false')) {
     throw 'CC4C_BUSINESS_CACHE_ENABLED must be true or false.'
@@ -106,11 +163,11 @@ if (-not (Test-Path -LiteralPath $jarPath -PathType Leaf)) {
 }
 
 $original = @{}
-$processNames = $requiredNames + 'SPRING_CONFIG_NAME'
+$processNames = $allowedNames + 'SPRING_CONFIG_NAME'
 foreach ($name in $processNames) {
     $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
-foreach ($name in $requiredNames) {
+foreach ($name in $allowedNames) {
     [Environment]::SetEnvironmentVariable($name, $values[$name], 'Process')
 }
 [Environment]::SetEnvironmentVariable('SPRING_CONFIG_NAME', 'application-example', 'Process')

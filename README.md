@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本已完成 V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”、方面三“安全与身份体系”、方面四“缓存、数据库与性能优化”和方面五“异步事件与可靠性”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V6 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面六与方面七尚未实施。
+当前版本已完成 V3 方面一至方面六，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性以及可观测性与性能证据。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面七“容器化与持续交付”尚未实施。
 
 ## 平台亮点
 
@@ -111,18 +111,19 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
 | API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
 | 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
-| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V6、Redis Cache-Aside |
+| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V7、Redis Cache-Aside |
 | 异步可靠性 | RabbitMQ 4.3.5、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
+| 可观测与压测 | Actuator、Micrometer、Prometheus 3.13.2、Grafana 13.1.0、ECS JSON、Gatling 3.15.1 |
 | 序列化与服务 | Jackson、AES-256-GCM、JavaMail、文件资源读写 |
 
 ## 系统架构
 
 ```mermaid
 flowchart TB
-    Browser[用户 / 管理员 · Vue 3 SPA] -->|CC4C_SESSION · CSRF · Axios| HTTP[Spring Security · DTO · OpenAPI]
+    Browser[用户 / 管理员 · Vue 3 SPA] -->|CC4C_SESSION · CSRF · Axios| HTTP[Request ID · Spring Security · DTO · OpenAPI]
 
     subgraph Backend[Spring Boot 3.5 模块化单体]
-        Shared[shared<br/>响应、分页、异常、缓存、Outbox 与 AMQP]
+        Shared[shared<br/>响应、异常、缓存、Outbox、AMQP、指标与健康]
         Identity[identity<br/>认证、用户、管理员、验证码邮件消费者]
         Catalog[catalog<br/>语言、课程、课程模块]
         Community[community<br/>博客、草稿]
@@ -156,7 +157,12 @@ flowchart TB
     Identity -->|Session、验证码、限流| SecurityRedis[(安全 Redis)]
     Catalog -->|公开课程缓存| BusinessRedis[(业务缓存 Redis)]
     Community -->|已审核博客缓存| BusinessRedis
-    Flyway[Flyway V1–V6] -. 结构、基线数据、索引与 Outbox/Inbox .-> DB
+    Flyway[Flyway V1–V7] -. 结构、索引、Outbox/Inbox 与关联 ID .-> DB
+    Backend -->|Actuator / Micrometer · 4081| AppMetrics[应用指标与健康]
+    Rabbit -->|rabbitmq_prometheus · 15692| RabbitMetrics[RabbitMQ 指标]
+    AppMetrics --> Prometheus[Prometheus]
+    RabbitMetrics --> Prometheus
+    Prometheus --> Grafana[Grafana Dashboards / Alerts]
 ```
 
 Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
@@ -185,8 +191,9 @@ CC4C/
 │  │  └─ moderation/                # 博客审核
 │  ├─ src/main/resources/
 │  │  ├─ application-example.yml    # 可提交的脱敏配置模板
-│  │  └─ db/migration/              # Flyway V1–V6 迁移
+│  │  └─ db/migration/              # Flyway V1–V7 迁移
 │  ├─ src/test/                     # 后端自动化测试
+│  ├─ src/gatling/                  # 方面六 Gatling Java DSL 场景
 │  ├─ run-tests.ps1                 # 测试环境校验与 Maven 门禁
 │  ├─ run-aspect4-benchmark.ps1      # 隔离性能库与缓存的方面四基准
 │  ├─ run-local.ps1                 # 从忽略的本机 .env 文件安全启动
@@ -196,7 +203,8 @@ CC4C/
 │  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
 │  ├─ test-database-admin-setup.sql # 专用测试库授权模板
 │  └─ README.md                     # Flyway 初始化、备份与恢复说明
-├─ docs/                            # 迭代文档、异步消息故障手册与 README 图片
+├─ observability/                   # Prometheus 规则、Grafana Provisioning 与本机受控脚本
+├─ docs/                            # 迭代文档、故障手册、README 图片与脱敏报告
 └─ README.md
 ```
 
@@ -230,7 +238,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
   ON <database_name>.* TO '<application_user>'@'127.0.0.1';
 ```
 
-首次启动时 Flyway 会依次执行 V1–V6，创建 18 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列，并建立异步 Outbox/Inbox。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
+首次启动时 Flyway 会依次执行 V1–V7，创建 18 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列、建立异步 Outbox/Inbox，并为 Outbox 增加兼容旧消息的可空请求关联 ID。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
 
 ### 4. 配置后端运行环境
 
@@ -249,6 +257,8 @@ Copy-Item .env.runtime.example .env.runtime.local
 | `CC4C_DB_URL` | MySQL JDBC 连接地址 |
 | `CC4C_DB_USERNAME` | 数据库用户名 |
 | `CC4C_DB_PASSWORD` | 数据库密码 |
+| `CC4C_DB_CONNECTION_TIMEOUT_MS` | Hikari 获取连接等待上限；本机默认 3000 ms，数据库故障时有界失败 |
+| `CC4C_DB_VALIDATION_TIMEOUT_MS` | Hikari 连接验证上限；必须小于连接等待上限，本机默认 1000 ms |
 | `CC4C_REDIS_URL` | 安全 Redis 连接地址，用于会话、验证码和限流 |
 | `CC4C_SESSION_NAMESPACE` | 当前应用独占的 Redis Session 命名空间 |
 | `CC4C_BUSINESS_CACHE_ENABLED` | 是否启用公开课程与博客业务缓存；可设为 `false` 快速回退到数据库 |
@@ -273,6 +283,13 @@ Copy-Item .env.runtime.example .env.runtime.local
 | `CC4C_SAVE_AVATAR_PATH` | 本机头像保存目录 |
 | `CC4C_SAVE_IMG_PATH` | 本机内容图片保存目录 |
 | `CC4C_API_DOCS_ENABLED` | 是否公开 OpenAPI JSON 与 Swagger UI；默认 `false` |
+| `CC4C_OBSERVABILITY_ENABLED` | 是否启用自定义指标、消息采样和请求完成日志 |
+| `CC4C_MANAGEMENT_ADDRESS` / `CC4C_MANAGEMENT_PORT` | 独立管理端绑定地址与端口；本机固定 `127.0.0.1:4081` |
+| `CC4C_MANAGEMENT_USERNAME` / `CC4C_MANAGEMENT_PASSWORD` | Prometheus、Info 与依赖详情的独立 Basic 身份；密码至少 24 字符 |
+| `CC4C_OBSERVABILITY_ENVIRONMENT` | 指标环境标签，只允许受控低基数字符串 |
+| `CC4C_LOG_FORMAT` | 方面六运行使用 `ecs` 输出结构化 JSON |
+| `CC4C_MESSAGING_SAMPLE_INTERVAL` | Outbox/Inbox 内存快照采样间隔，默认 15 秒 |
+| `CC4C_MAX_HTTP_URI_TAGS` | HTTP 路由模板指标基数上限，默认 100 |
 
 > 不要把真实值写回 `application-example.yml`、`.env.runtime.example`、README、日志或源码。`.env.runtime.local` 必须保持忽略；密码、验证码、Cookie、CSRF Token、Pepper 和 SMTP 授权码不得记录或提交。
 
@@ -296,7 +313,20 @@ cd back-end/CC4C
 
 如需在本机验收 API 文档，可在脱敏环境中显式设置 `CC4C_API_DOCS_ENABLED=true`。启用后访问 `/v3/api-docs` 和 `/swagger-ui/index.html`；生产环境应保持默认关闭。
 
-### 6. 启动前端
+### 6. 启动本地观测栈（可选）
+
+后端启用观测并监听 `127.0.0.1:4081`、RabbitMQ 已启用 `rabbitmq_prometheus` 后，复制脱敏模板并填写本机路径与独立监控凭据。预检要求 Prometheus/Grafana 尚未启动，只验证版本、端口、认证、配置和 20 条告警规则；启停脚本只管理自己记录的精确 PID。
+
+```powershell
+Copy-Item observability/.env.observability.example observability/.env.observability.local
+.\observability\scripts\preflight.ps1
+.\observability\scripts\start-local.ps1
+# 验收结束后：.\observability\scripts\stop-local.ps1
+```
+
+匿名只能访问脱敏的 `health`、`liveness` 和 `readiness`；`dependencies`、`info` 与 `prometheus` 要求独立 `OBSERVABILITY` Basic 身份，USER/ADMIN 会话不能替代。Grafana 默认位于 `http://127.0.0.1:3000`，提供 API/JVM、DB/缓存/安全和异步消息三个固定 UID Dashboard。Prometheus/Grafana 本地密码、TSDB 和生成配置均保持忽略。
+
+### 7. 启动前端
 
 先创建本机前端环境文件：
 
@@ -333,7 +363,7 @@ Copy-Item .env.test.example .env.test.local
 .\run-tests.ps1 clean verify
 ```
 
-主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾；RabbitMQ vhost 必须显式以 `_test` 结尾并与确认值一致。测试门禁每次分别生成独立的 Session、业务缓存和 Rabbit namespace，只清理本轮精确资源，禁止 `FLUSHDB`、`FLUSHALL`、默认 vhost 或全局队列清理。门禁会验证 V1–V6、密码迁移、安全体系、Cache-Aside、Outbox 事务原子性、Publisher Confirm、返回消息、幂等消费、重试/DLQ、管理员恢复和既有业务回归。当前验收基线为 125 项测试全部通过。
+主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾；RabbitMQ vhost 必须显式以 `_test` 结尾并与确认值一致。测试门禁每次分别生成独立的 Session、业务缓存和 Rabbit namespace，只清理本轮精确资源，禁止 `FLUSHDB`、`FLUSHALL`、默认 vhost 或全局队列清理。门禁会验证 V1–V7、密码迁移、安全体系、Cache-Aside、Outbox 事务原子性、Publisher Confirm、返回消息、幂等消费、重试/DLQ、请求关联、管理端权限、指标/健康、日志脱敏和既有业务回归。当前验收基线为 150 项测试全部通过。
 
 ### 方面四独立性能基准
 
@@ -344,7 +374,11 @@ cd back-end/CC4C
 .\run-aspect4-benchmark.ps1
 ```
 
-工具使用固定种子 `20260827` 生成 2,000 用户、1,000 课程、20,000 博客以及合计 200,000 条收藏、评论与回复关系，只清理工具保留的有限 ID 区间，不执行 Flyway `clean`/`repair` 或 `DROP DATABASE`。当前同机三轮中位数实测：HTTP 错误为 0，热缓存命中率 100%，目标 SELECT 从 10,995 降至 0，p95 从 182.514 ms 降至 5.177 ms；冷路径 p95 从 96.047 ms 变为 96.279 ms。结果只代表本机受控对照，不表示生产容量；原始 JSON、Markdown 与 EXPLAIN 保存在已忽略的 `temp/`。
+工具使用固定种子 `20260827` 生成 2,000 用户、1,000 课程、20,000 博客以及合计 200,000 条收藏、评论与回复关系，只清理工具保留的有限 ID 区间，不执行 Flyway `clean`/`repair` 或 `DROP DATABASE`。方面六收口时的当前构建重跑结果：HTTP 错误为 0，热缓存命中率 100%，目标 SELECT 从 10,995 降至 0，三轮中位数 p95 从 181.599 ms 降至 5.486 ms；冷路径 p95 从 95.875 ms 变为 97.848 ms，约退化 2.06%。结果只代表本机受控对照，不表示生产容量；原始 JSON、Markdown 与 EXPLAIN 保存在已忽略的 `temp/`。
+
+### 方面六 Gatling 与观测开销证据
+
+Gatling 场景只允许连接 loopback 和名称精确以 `_perf_test` 结尾的性能库。三轮 `PublicReadStandard` 中位数显示：观测关闭/开启均为 0 错误，p95 均为 5 ms，p99 从 7 ms 变为 8 ms，吞吐从 869.98 req/s 变为 868.91 req/s；p99 退化 14.29%、吞吐下降 0.12%，均通过门禁。`AuthenticatedMixed` 共 158,023 请求、0 错误、p95 11 ms；`StepCapacity` 共 885,823 请求、0 错误、p95 9 ms。故障修复后的当前构建 smoke 为 10,469 请求、0 错误、p95 7 ms、p99 19 ms。完整环境、负载、指标、告警和故障演练证据见 [方面六报告](docs/reports/v3/aspect6/README.md)。
 
 ## 安全说明
 
@@ -356,6 +390,8 @@ cd back-end/CC4C
 - 安全 Redis 与业务缓存使用不同 namespace；生产环境应使用独立实例。业务缓存只覆盖公开课程和已审核博客，认证、私有内容与权限结果不得缓存。
 - Outbox 和 RabbitMQ 载荷使用 AES-256-GCM 加密；明文邮箱、验证码、邮件正文、Cookie、Session ID 和消息密钥不得写入数据库摘要、管理 API 或日志。
 - 消息语义为至少一次投递，不宣称端到端 exactly-once；Publisher Confirm 与消费者 ACK 分开处理，外部 SMTP 不确定窗口可能产生内容相同的重复邮件。
+- 管理端口只绑定回环地址，观测 Basic 身份与业务 USER/ADMIN 完全分离；禁止暴露 `env`、`configprops`、`heapdump`、`loggers`、`shutdown` 等高风险端点。
+- 指标标签只使用路由模板和枚举值，禁止 request/event/actor ID、邮箱、IP、SQL、Cookie 或异常正文；ECS 日志同样不得记录请求正文或连接凭据。
 - RabbitMQ 生产 namespace 禁止 purge、删除 vhost 或原地重建队列；失败恢复以数据库 Outbox 为事实来源，并通过受保护的管理员接口显式重试或忽略。
 - 不要在源码、README、截图、Issue 或日志中放入 Token、Cookie、数据库密码、SMTP 授权码等敏感信息。
 - GitHub 只应保留脱敏的 `application-example.yml`；如怀疑密钥泄露，请先轮换密钥，再清理历史记录。

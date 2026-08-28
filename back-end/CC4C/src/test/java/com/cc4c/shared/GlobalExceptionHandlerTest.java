@@ -3,6 +3,7 @@ package com.cc4c.shared;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisSystemException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,5 +51,24 @@ class GlobalExceptionHandlerTest {
         assertEquals(503, response.getStatusCode().value());
         assertEquals(BusinessCode.SERVICE_UNAVAILABLE.code(), response.getBody().code());
         assertFalse(response.getBody().msg().contains("redis-host"));
+    }
+
+    @Test
+    void wrappedRedisFailuresMapTo503WhileDatabaseTimeoutsRemainGeneric500() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        var redis = handler.handleUnexpectedException(new QueryTimeoutException(
+                "outer timeout must not leak",
+                new RedisSystemException(
+                        "redis-host-must-not-leak",
+                        new IllegalStateException("test cause"))));
+        var database = handler.handleUnexpectedException(new QueryTimeoutException(
+                "database details must not leak",
+                new IllegalStateException("database unavailable")));
+
+        assertEquals(503, redis.getStatusCode().value());
+        assertEquals(BusinessCode.SERVICE_UNAVAILABLE.code(), redis.getBody().code());
+        assertFalse(redis.getBody().msg().contains("redis-host"));
+        assertEquals(500, database.getStatusCode().value());
+        assertEquals(BusinessCode.INTERNAL_ERROR.code(), database.getBody().code());
     }
 }

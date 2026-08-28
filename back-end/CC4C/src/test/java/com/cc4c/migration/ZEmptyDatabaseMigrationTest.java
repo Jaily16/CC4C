@@ -18,7 +18,7 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
 
         var flyway = flyway(url, false);
         flyway.clean();
-        assertEquals(6, flyway.migrate().migrationsExecuted);
+        assertEquals(7, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
 
@@ -44,6 +44,11 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
                   AND index_name IN (
                     'idx_user_favors_course_user_time_course',
                     'idx_user_collects_blog_user_time_blog')
+                """));
+        assertEquals(64, scalar(url, """
+                SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'async_outbox' AND column_name = 'correlation_id'
                 """));
     }
 }

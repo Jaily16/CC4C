@@ -2,6 +2,7 @@ package com.cc4c.shared;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -35,24 +36,35 @@ public final class RedisRateLimiter {
     private final StringRedisTemplate redis;
     private final SecurityKeyHasher hasher;
     private final String prefix;
+    private final Cc4cMetrics metrics;
+
+    @Autowired
+    public RedisRateLimiter(
+            StringRedisTemplate redis,
+            SecurityKeyHasher hasher,
+            SecurityProperties properties,
+            Cc4cMetrics metrics) {
+        this.redis = redis;
+        this.hasher = hasher;
+        this.prefix = properties.keyPrefix();
+        this.metrics = metrics;
+    }
 
     public RedisRateLimiter(
             StringRedisTemplate redis,
             SecurityKeyHasher hasher,
             SecurityProperties properties) {
-        this.redis = redis;
-        this.hasher = hasher;
-        this.prefix = properties.keyPrefix();
+        this(redis, hasher, properties, Cc4cMetrics.disabled());
     }
 
     public void checkLogin(String accountType, String identifier, String remoteAddress) {
-        checkWithin("login:ip:" + hasher.hash(remoteAddress), 20);
-        checkWithin(loginAccountKey(accountType, identifier), 5);
+        checkWithin("login:ip:" + hasher.hash(remoteAddress), 20, "login_ip");
+        checkWithin(loginAccountKey(accountType, identifier), 5, "login_account");
     }
 
     public void loginFailed(String accountType, String identifier, String remoteAddress) {
-        requireWithin("login:ip:" + hasher.hash(remoteAddress), 20, Duration.ofMinutes(15));
-        requireWithin(loginAccountKey(accountType, identifier), 5, Duration.ofMinutes(15));
+        requireWithin("login:ip:" + hasher.hash(remoteAddress), 20, Duration.ofMinutes(15), "login_ip");
+        requireWithin(loginAccountKey(accountType, identifier), 5, Duration.ofMinutes(15), "login_account");
     }
 
     public void loginSucceeded(String accountType, String identifier) {
@@ -61,16 +73,16 @@ public final class RedisRateLimiter {
 
     public void checkVerificationEmail(String email) {
         String subject = hasher.hash(email.trim().toLowerCase(Locale.ROOT));
-        requireWithin("email:cooldown:" + subject, 1, Duration.ofSeconds(60));
-        requireWithin("email:hour:" + subject, 5, Duration.ofHours(1));
+        requireWithin("email:cooldown:" + subject, 1, Duration.ofSeconds(60), "verification_email_cooldown");
+        requireWithin("email:hour:" + subject, 5, Duration.ofHours(1), "verification_email_hour");
     }
 
     public void checkComment(long userId) {
-        requireWithin("comment:user:" + hasher.hash(Long.toString(userId)), 10, Duration.ofMinutes(1));
+        requireWithin("comment:user:" + hasher.hash(Long.toString(userId)), 10, Duration.ofMinutes(1), "comment_user");
     }
 
     public void checkBlogPublish(long userId) {
-        requireWithin("blog:user:" + hasher.hash(Long.toString(userId)), 5, Duration.ofHours(1));
+        requireWithin("blog:user:" + hasher.hash(Long.toString(userId)), 5, Duration.ofHours(1), "blog_user");
     }
 
     private String loginAccountKey(String accountType, String identifier) {
@@ -78,7 +90,7 @@ public final class RedisRateLimiter {
                 + hasher.hash(identifier.trim().toLowerCase(Locale.ROOT));
     }
 
-    private void requireWithin(String suffix, long limit, Duration window) {
+    private void requireWithin(String suffix, long limit, Duration window, String scope) {
         Long retryMilliseconds = redis.execute(
                 LIMIT_SCRIPT,
                 List.of(key(suffix)),
@@ -91,11 +103,12 @@ public final class RedisRateLimiter {
                     "安全服务暂时不可用");
         }
         if (retryMilliseconds >= 0) {
-            throw new RateLimitException((retryMilliseconds + 999) / 1000);
+            rejected(scope);
+            throw new RateLimitException((retryMilliseconds + 999) / 1000, scope);
         }
     }
 
-    private void checkWithin(String suffix, long limit) {
+    private void checkWithin(String suffix, long limit, String scope) {
         Long retryMilliseconds = redis.execute(
                 CHECK_SCRIPT,
                 List.of(key(suffix)),
@@ -107,11 +120,16 @@ public final class RedisRateLimiter {
                     "安全服务暂时不可用");
         }
         if (retryMilliseconds >= 0) {
-            throw new RateLimitException((retryMilliseconds + 999) / 1000);
+            rejected(scope);
+            throw new RateLimitException((retryMilliseconds + 999) / 1000, scope);
         }
     }
 
     private String key(String suffix) {
         return prefix + ":rate:" + suffix;
+    }
+
+    private void rejected(String scope) {
+        metrics.increment("cc4c.security.rate.limit.rejections", "scope", scope);
     }
 }

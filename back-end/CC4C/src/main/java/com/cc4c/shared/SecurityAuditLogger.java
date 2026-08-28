@@ -14,21 +14,24 @@ public final class SecurityAuditLogger {
     }
 
     public void authentication(String role, String identifier, String result, String remoteAddress) {
-        log.info(
-                "security_action=authentication role={} subject={} result={} remote={}",
-                role,
-                hasher.hash(identifier),
-                result,
-                hasher.hash(remoteAddress));
+        log.atInfo()
+                .addKeyValue("event", "security_audit")
+                .addKeyValue("action", "authentication")
+                .addKeyValue("role", role)
+                .addKeyValue("subject", hasher.hash(identifier))
+                .addKeyValue("result", result)
+                .addKeyValue("remote", hasher.hash(remoteAddress))
+                .log("Security audit event");
     }
 
     public void action(String action, String role, String actorId, String result, String remoteAddress) {
-        log.info(
-                "security_action={} role={} actor={} result={} remote={}",
-                action,
-                role,
-                actorId,
-                result,
-                hasher.hash(remoteAddress));
+        log.atInfo()
+                .addKeyValue("event", "security_audit")
+                .addKeyValue("action", action)
+                .addKeyValue("role", role)
+                .addKeyValue("actor", actorId)
+                .addKeyValue("result", result)
+                .addKeyValue("remote", hasher.hash(remoteAddress))
+                .log("Security audit event");
     }
 }

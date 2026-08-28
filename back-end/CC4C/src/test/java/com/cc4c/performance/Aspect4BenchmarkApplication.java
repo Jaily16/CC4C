@@ -396,6 +396,8 @@ public final class Aspect4BenchmarkApplication {
         properties.put("spring.datasource.username", environment.databaseUsername());
         properties.put("spring.datasource.password", environment.databasePassword());
         properties.put("spring.datasource.driver-class-name", "com.mysql.cj.jdbc.Driver");
+        properties.put("spring.datasource.hikari.connection-timeout", "3000");
+        properties.put("spring.datasource.hikari.validation-timeout", "1000");
         properties.put("spring.flyway.baseline-on-migrate", "false");
         properties.put("spring.flyway.locations", "classpath:db/migration");
         properties.put("spring.flyway.validate-on-migrate", "true");
@@ -413,8 +415,18 @@ public final class Aspect4BenchmarkApplication {
         properties.put("spring.mail.username", "benchmark@example.invalid");
         properties.put("spring.mail.password", "benchmark-not-used");
         properties.put("spring.mail.properties.mail.smtp.auth", "false");
+        properties.put("spring.rabbitmq.dynamic", "false");
+        properties.put("spring.rabbitmq.listener.simple.auto-startup", "false");
         properties.put("springdoc.api-docs.enabled", "false");
         properties.put("springdoc.swagger-ui.enabled", "false");
+        properties.put("management.server.port", "-1");
+        properties.put("cc4c.observability.enabled", "false");
+        properties.put("cc4c.observability.environment", "performance");
+        properties.put("cc4c.observability.management-username", "benchmark-observer");
+        properties.put("cc4c.observability.management-password",
+                "benchmark-observer-password-not-a-secret");
+        properties.put("cc4c.observability.messaging-sample-interval", "15s");
+        properties.put("cc4c.observability.max-http-uri-tags", "100");
         properties.put("cc4c.security.pepper", "cc4c-aspect-four-benchmark-pepper-not-a-secret");
         properties.put("cc4c.security.cookie-secure", "false");
         properties.put("cc4c.security.allowed-origins", "http://localhost:5173");
@@ -426,6 +438,17 @@ public final class Aspect4BenchmarkApplication {
         properties.put("cc4c.cache.redis-url", environment.redisUrl());
         properties.put("cc4c.cache.namespace", "cc4c:perf:" + runId + ":cache");
         properties.put("cc4c.cache.test-cleanup-enabled", "true");
+        properties.put("cc4c.messaging.namespace", "cc4c.perf.messaging." + runId);
+        properties.put("cc4c.messaging.active-key-id", "benchmark-v1");
+        properties.put(
+                "cc4c.messaging.payload-keys",
+                "benchmark-v1=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+        properties.put("cc4c.messaging.moderation-recipients", "benchmark@example.invalid");
+        properties.put("cc4c.messaging.confirm-timeout", "1s");
+        properties.put("cc4c.messaging.consumer-retry-delays", "1s,2s,3s");
+        properties.put("cc4c.messaging.poll-interval", "1h");
+        properties.put("cc4c.messaging.dispatcher-enabled", "false");
+        properties.put("cc4c.messaging.consumers-enabled", "false");
         properties.put("cc4c.test-controller-enabled", "false");
         properties.put("cc4c.save-img-path", "target/performance-files/blog/");
         properties.put("cc4c.request-img-path", "http://localhost/performance-blog/");

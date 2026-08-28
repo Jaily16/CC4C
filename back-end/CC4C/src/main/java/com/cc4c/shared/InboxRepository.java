@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Repository
 class InboxRepository {
@@ -92,6 +94,15 @@ class InboxRepository {
                 WHERE status = 'DONE' AND processed_at < ?
                 ORDER BY processed_at LIMIT ?
                 """, Timestamp.from(before), limit);
+    }
+
+    Map<String, Long> statusCounts() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        jdbc.query("SELECT status, COUNT(*) AS count_value FROM async_inbox GROUP BY status",
+                result -> {
+                    counts.put(result.getString("status"), result.getLong("count_value"));
+                });
+        return Map.copyOf(counts);
     }
 
     private record InboxRow(String status, String leaseOwner, Instant leaseUntil) {

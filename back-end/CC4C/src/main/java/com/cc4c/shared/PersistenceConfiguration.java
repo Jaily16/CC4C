@@ -19,4 +19,9 @@ public class PersistenceConfiguration {
         interceptor.addInnerInterceptor(pagination);
         return interceptor;
     }
+
+    @Bean
+    MybatisMetricsInterceptor mybatisMetricsInterceptor(Cc4cMetrics metrics) {
+        return new MybatisMetricsInterceptor(metrics);
+    }
 }

@@ -71,6 +71,9 @@ class Aspect2ContractFunctionalTest extends FunctionalTestSupport {
                 .andExpect(jsonPath("$.paths['/users/logout'].post.responses['400'].content"
                         + "['application/json'].schema['$ref']")
                         .value("#/components/schemas/ApiErrorResponse"))
+                .andExpect(jsonPath("$.paths['/users/logout'].post.responses['400'].headers"
+                        + "['X-Request-ID'].schema.type")
+                        .value("string"))
                 .andExpect(jsonPath("$.paths['/users'].post.responses['201'].content")
                         .exists())
                 .andExpect(jsonPath("$.components.securitySchemes.CC4C_SESSION.type").value("apiKey"))

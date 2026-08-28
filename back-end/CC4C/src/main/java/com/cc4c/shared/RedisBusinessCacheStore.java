@@ -30,11 +30,17 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
             """, Long.class);
 
     private final String redisUrl;
+    private final Cc4cMetrics metrics;
     private LettuceConnectionFactory connectionFactory;
     private StringRedisTemplate template;
 
     RedisBusinessCacheStore(String redisUrl) {
+        this(redisUrl, Cc4cMetrics.disabled());
+    }
+
+    RedisBusinessCacheStore(String redisUrl, Cc4cMetrics metrics) {
         this.redisUrl = redisUrl;
+        this.metrics = metrics;
     }
 
     @Override
@@ -73,22 +79,26 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
 
     @Override
     public String get(String key) {
-        return template.opsForValue().get(key);
+        return observe("get", () -> template.opsForValue().get(key));
     }
 
     @Override
     public void set(String key, String value, Duration ttl) {
-        template.opsForValue().set(key, value, ttl);
+        observe("set", () -> {
+            template.opsForValue().set(key, value, ttl);
+            return null;
+        });
     }
 
     @Override
     public boolean setIfAbsent(String key, String value, Duration ttl) {
-        return Boolean.TRUE.equals(template.opsForValue().setIfAbsent(key, value, ttl));
+        return observe("set_if_absent",
+                () -> Boolean.TRUE.equals(template.opsForValue().setIfAbsent(key, value, ttl)));
     }
 
     @Override
     public long increment(String key) {
-        Long result = template.opsForValue().increment(key);
+        Long result = observe("increment", () -> template.opsForValue().increment(key));
         if (result == null) {
             throw new IllegalStateException("Redis increment returned no result");
         }
@@ -97,17 +107,22 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
 
     @Override
     public void delete(String key) {
-        template.delete(key);
+        observe("delete", () -> {
+            template.delete(key);
+            return null;
+        });
     }
 
     @Override
     public boolean compareAndDelete(String key, String expectedValue) {
-        Long result = template.execute(COMPARE_AND_DELETE, List.of(key), expectedValue);
+        Long result = observe("compare_delete",
+                () -> template.execute(COMPARE_AND_DELETE, List.of(key), expectedValue));
         return result != null && result > 0;
     }
 
     @Override
     public long deleteByPrefix(String prefix) {
+        long startedNanos = metrics.start();
         long deleted = 0;
         try (RedisConnection connection = connectionFactory.getConnection();
                 Cursor<byte[]> cursor = connection.keyCommands().scan(
@@ -123,8 +138,23 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
             if (!batch.isEmpty()) {
                 deleted += connection.keyCommands().del(batch.toArray(byte[][]::new));
             }
+            metrics.record("cc4c.cache.redis.operations", startedNanos,
+                    "operation", "scan_delete", "outcome", "success");
+            return deleted;
+        } catch (RuntimeException exception) {
+            metrics.record("cc4c.cache.redis.operations", startedNanos,
+                    "operation", "scan_delete", "outcome", "error");
+            throw exception;
         }
-        return deleted;
+    }
+
+    @Override
+    public boolean ping() {
+        return observe("ping", () -> {
+            try (RedisConnection connection = connectionFactory.getConnection()) {
+                return "PONG".equalsIgnoreCase(connection.ping());
+            }
+        });
     }
 
     @Override
@@ -161,6 +191,20 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
             standalone.setDatabase(Integer.parseInt(path.substring(1)));
         } catch (NumberFormatException exception) {
             throw new IllegalStateException("CC4C cache Redis URL contains an invalid database number", exception);
+        }
+    }
+
+    private <T> T observe(String operation, java.util.function.Supplier<T> action) {
+        long startedNanos = metrics.start();
+        try {
+            T result = action.get();
+            metrics.record("cc4c.cache.redis.operations", startedNanos,
+                    "operation", operation, "outcome", "success");
+            return result;
+        } catch (RuntimeException exception) {
+            metrics.record("cc4c.cache.redis.operations", startedNanos,
+                    "operation", operation, "outcome", "error");
+            throw exception;
         }
     }
 }

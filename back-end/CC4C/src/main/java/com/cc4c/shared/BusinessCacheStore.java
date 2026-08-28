@@ -16,4 +16,8 @@ public interface BusinessCacheStore {
     boolean compareAndDelete(String key, String expectedValue);
 
     long deleteByPrefix(String prefix);
+
+    default boolean ping() {
+        return true;
+    }
 }

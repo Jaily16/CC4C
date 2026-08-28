@@ -2,6 +2,7 @@ package com.cc4c.identity.internal;
 
 import com.cc4c.identity.api.Cc4cPrincipal;
 import com.cc4c.shared.BusinessCode;
+import com.cc4c.shared.Cc4cMetrics;
 import com.cc4c.shared.SecurityProperties;
 import com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
@@ -11,6 +12,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.http.HttpMethod;
@@ -20,6 +22,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.jackson2.SecurityJackson2Modules;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
@@ -125,7 +129,7 @@ class SecurityConfiguration {
             SecurityErrorWriter errorWriter) {
         FilterRegistrationBean<RedisFailureResponseFilter> registration =
                 new FilterRegistrationBean<>(new RedisFailureResponseFilter(errorWriter));
-        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
         return registration;
     }
 
@@ -147,13 +151,15 @@ class SecurityConfiguration {
     }
 
     @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             CookieCsrfTokenRepository csrfTokenRepository,
             SecurityContextRepository securityContextRepository,
             LegacyCookieCleanupFilter legacyCookieCleanupFilter,
             ConcurrentSessionFilter concurrentSessionFilter,
-            SecurityErrorWriter errorWriter) throws Exception {
+            SecurityErrorWriter errorWriter,
+            Cc4cMetrics metrics) throws Exception {
         http
                 .cors(cors -> {
                 })
@@ -213,19 +219,27 @@ class SecurityConfiguration {
                         .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
-                                errorWriter.write(
+                        {
+                            metrics.increment("cc4c.security.authorization.denials",
+                                    "role", "anonymous", "reason", "unauthenticated");
+                            errorWriter.write(
                                         response,
                                         401,
                                         BusinessCode.UNAUTHORIZED,
-                                        "请先登录"))
-                        .accessDeniedHandler((request, response, exception) ->
-                                errorWriter.write(
+                                        "请先登录");
+                        })
+                        .accessDeniedHandler((request, response, exception) -> {
+                            metrics.increment("cc4c.security.authorization.denials",
+                                    "role", currentRole(),
+                                    "reason", exception instanceof CsrfException ? "csrf" : "access");
+                            errorWriter.write(
                                         response,
                                         403,
                                         BusinessCode.FORBIDDEN,
                                         exception instanceof CsrfException
                                                 ? "CSRF 验证失败"
-                                                : "无权执行此操作")))
+                                                : "无权执行此操作");
+                        }))
                 .requestCache(cache -> cache.disable())
                 .formLogin(login -> login.disable())
                 .httpBasic(basic -> basic.disable())
@@ -234,5 +248,21 @@ class SecurityConfiguration {
         http.addFilterBefore(legacyCookieCleanupFilter, SecurityContextHolderFilter.class);
         http.addFilterAfter(concurrentSessionFilter, SecurityContextHolderFilter.class);
         return http.build();
+    }
+
+    private static String currentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "anonymous";
+        }
+        if (authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))) {
+            return "admin";
+        }
+        if (authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_USER".equals(authority.getAuthority()))) {
+            return "user";
+        }
+        return "anonymous";
     }
 }

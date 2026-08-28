@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: CC4C
+    orgId: 1
+    folder: CC4C
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: ${CC4C_GRAFANA_DASHBOARD_PATH}

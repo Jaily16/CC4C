@@ -1,12 +1,11 @@
 package com.cc4c.identity.internal;
 
 import com.cc4c.shared.BusinessCode;
+import com.cc4c.shared.RedisInfrastructureFailure;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.RedisSystemException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -25,7 +24,10 @@ final class RedisFailureResponseFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         try {
             filterChain.doFilter(request, response);
-        } catch (RedisConnectionFailureException | RedisSystemException exception) {
+        } catch (RuntimeException exception) {
+            if (!RedisInfrastructureFailure.isUnavailable(exception)) {
+                throw exception;
+            }
             if (response.isCommitted()) {
                 throw exception;
             }

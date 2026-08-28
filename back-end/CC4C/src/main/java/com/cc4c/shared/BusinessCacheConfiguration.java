@@ -12,6 +12,7 @@ class BusinessCacheConfiguration {
     @ConditionalOnProperty(prefix = "cc4c.cache", name = "enabled", havingValue = "true")
     BusinessCacheStore businessCacheStore(
             BusinessCacheProperties properties,
+            Cc4cMetrics metrics,
             @Value("${spring.session.redis.namespace:}") String sessionNamespace) {
         if (properties.redisUrl() == null || properties.redisUrl().isBlank()) {
             throw new IllegalStateException("CC4C_CACHE_REDIS_URL is required when business cache is enabled");
@@ -25,6 +26,6 @@ class BusinessCacheConfiguration {
         if (properties.namespace().equals(sessionNamespace)) {
             throw new IllegalStateException("CC4C cache namespace must differ from the Session namespace");
         }
-        return new RedisBusinessCacheStore(properties.redisUrl());
+        return new RedisBusinessCacheStore(properties.redisUrl(), metrics);
     }
 }

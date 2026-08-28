@@ -12,12 +12,13 @@
 | `V4__expand_password_columns.sql` | 将用户与管理员密码列扩展到 255 字符，为 `{bcrypt}` 格式保留空间；不读取或转换明文 |
 | `V5__add_interaction_query_indexes.sql` | 为课程收藏和博客收藏分页增加按用户、收藏时间及资源 ID 排序的复合索引 |
 | `V6__add_async_outbox_and_inbox.sql` | 增加加密消息 Outbox/Inbox、租约、尝试次数、generation、受控错误码及发布/消费扫描索引 |
+| `V7__add_outbox_correlation_id.sql` | 为 Outbox 增加可空 ASCII 请求关联 ID，使 HTTP、发布、重试和消费者日志可关联，同时兼容 V6 历史积压 |
 
 `database/legacy/cc4c.sql` 仅供历史对照，已移除默认管理员，不得用于初始化新环境。应用配置中的 `baseline-on-migrate` 默认并持续保持 `false`。
 
 ## 新建空数据库
 
-先由数据库管理员创建使用 `utf8mb4_0900_ai_ci` 的空库，并为应用账号授予业务读写及 Flyway 所需的 `CREATE`、`ALTER`、`INDEX`、`REFERENCES` 权限。随后复制 `.env.runtime.example` 为已忽略的 `.env.runtime.local`，由 `run-local.ps1` 显式加载脱敏配置；Flyway 会按 V1–V6 初始化 18 张表并校验迁移。空库没有历史账号，不需要执行密码转换。
+先由数据库管理员创建使用 `utf8mb4_0900_ai_ci` 的空库，并为应用账号授予业务读写及 Flyway 所需的 `CREATE`、`ALTER`、`INDEX`、`REFERENCES` 权限。随后复制 `.env.runtime.example` 为已忽略的 `.env.runtime.local`，由 `run-local.ps1` 显式加载脱敏配置；Flyway 会按 V1–V7 初始化 18 张表并校验迁移。空库没有历史账号，不需要执行密码转换。
 
 不要将数据库密码、SMTP 授权码或本机路径写入仓库配置、本文档或日志。生产环境不应为方便迁移而使用数据库管理员账号运行应用。
 
@@ -27,7 +28,7 @@
 
 1. 使用 `mysqldump --single-transaction --skip-lock-tables` 备份，并保存 SHA-256。
 2. 核对 16 张表、主外键、重复评论归属及父评论孤儿数据；发现异常立即停止。
-3. 确认当前结构与 V1 一致后，显式在版本 1 建立基线，再应用 V2/V3/V4/V5/V6；完成后应有 16 张业务表和 2 张异步可靠性表。
+3. 确认当前结构与 V1 一致后，显式在版本 1 建立基线，再应用 V2/V3/V4/V5/V6/V7；完成后应有 16 张业务表和 2 张异步可靠性表。
 4. 保持后端停止，使用备份文件、SHA-256 和精确数据库名称运行 `migrate-passwords.ps1`，将所有非 `{bcrypt}` 密码离线转换；工具不得输出账号、明文、哈希或数据库凭据。
 5. 再次执行密码迁移必须转换 0 行，并确认明文或未知 `{id}` 格式剩余数为 0。
 6. 第二次 Flyway `migrate` 必须为零新增迁移，随后执行 `validate` 和结构断言，最后才允许启动 Web 应用。
@@ -53,6 +54,12 @@ V6 增加的 `async_outbox` 是消息管理页面和人工恢复的事实来源�
 载荷以 AES-256-GCM 保存，明文列只保留事件 ID、版本、类型、聚合类型/ID、generation、时间和密钥 ID。邮箱、验证码和邮件正文不得出现在表的摘要字段、受控错误码或运维查询结果中。活动写入密钥与只读旧密钥通过本机环境配置轮换；在旧 Outbox、Inbox 和 DLQ 超过保留期前不得移除旧密钥。
 
 `DELIVERED`、`EXPIRED`、`IGNORED` Outbox 与 `DONE` Inbox 保留 31 天后分批清理，每批不超过 500 条；`PUBLISH_FAILED` 和 `DEAD` 不自动删除。V6 只增加表和索引，不提供伪造 down migration。回滚旧代码时必须保留两张表和未完成记录，待方面五代码恢复后继续处理。
+
+## V7 请求关联兼容性
+
+V7 只向 `async_outbox` 增加可空的 `correlation_id VARCHAR(64)`，不修改 V6 的密文、nonce、AAD、事件版本或索引语义。新 HTTP 事务写入校验后的 `X-Request-ID`，非 HTTP 事件使用 eventId；Publisher 将同一值传入受控 AMQP Header，重试和 DLQ 保持原关联 ID。升级前已存在且该列为空的消息由消费者回退到 eventId，因此无需重写或解密历史积压。
+
+该字段仅用于日志关联，不能用于身份、幂等或授权，也不得写入 Cookie、邮箱、验证码、SQL 或连接信息。回滚到 V6 代码时旧版本会忽略这个可空附加列；不得为回滚删除列或执行 Flyway `repair`。
 
 ## 本地集成测试数据库
 
