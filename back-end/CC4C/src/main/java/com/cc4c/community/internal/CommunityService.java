@@ -8,25 +8,32 @@ import com.cc4c.community.CommunityDtos.BlogDraftRequest;
 import com.cc4c.community.CommunityDtos.BlogResponse;
 import com.cc4c.community.CommunityDtos.BlogSubmitRequest;
 import com.cc4c.community.api.BlogModerationUseCase;
+import com.cc4c.community.api.BlogReviewedNotificationV1;
+import com.cc4c.community.api.BlogSubmittedNotificationV1;
 import com.cc4c.community.api.BlogSnapshot;
 import com.cc4c.community.api.BlogSummary;
 import com.cc4c.community.api.CommunityLookup;
 import com.cc4c.identity.api.IdentityLookup;
+import com.cc4c.identity.api.IdentityNotificationLookup;
 import com.cc4c.identity.api.AccountRole;
 import com.cc4c.identity.api.ActorIdentity;
 import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.shared.BusinessCode;
 import com.cc4c.shared.BusinessCache;
 import com.cc4c.shared.BusinessException;
+import com.cc4c.shared.AsyncEventTypes;
+import com.cc4c.shared.MessagingProperties;
 import com.cc4c.shared.PageQuery;
 import com.cc4c.shared.PageResult;
 import com.cc4c.shared.RedisRateLimiter;
+import com.cc4c.shared.TransactionalOutbox;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -49,24 +56,33 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
 
     private final BlogMapper mapper;
     private final IdentityLookup identityLookup;
+    private final IdentityNotificationLookup identityNotificationLookup;
     private final CatalogLookup catalogLookup;
     private final CurrentActor currentActor;
     private final RedisRateLimiter rateLimiter;
     private final BusinessCache cache;
+    private final TransactionalOutbox outbox;
+    private final MessagingProperties messagingProperties;
 
     CommunityService(
             BlogMapper mapper,
             IdentityLookup identityLookup,
+            IdentityNotificationLookup identityNotificationLookup,
             CatalogLookup catalogLookup,
             CurrentActor currentActor,
             RedisRateLimiter rateLimiter,
-            BusinessCache cache) {
+            BusinessCache cache,
+            TransactionalOutbox outbox,
+            MessagingProperties messagingProperties) {
         this.mapper = mapper;
         this.identityLookup = identityLookup;
+        this.identityNotificationLookup = identityNotificationLookup;
         this.catalogLookup = catalogLookup;
         this.currentActor = currentActor;
         this.rateLimiter = rateLimiter;
         this.cache = cache;
+        this.outbox = outbox;
+        this.messagingProperties = messagingProperties;
     }
 
     public PageResult<BlogResponse> home(PageQuery query) {
@@ -148,17 +164,28 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                     "Blog language does not exist");
         }
 
+        Instant submittedAt = Instant.now();
         BlogEntity blog = new BlogEntity();
         blog.setWriterId(writerId);
         blog.setTitle(request.title());
         blog.setContent(request.content());
-        blog.setPublishTime(new Date());
+        blog.setPublishTime(Date.from(submittedAt));
         blog.setClick(0);
         blog.setState(PENDING);
         mapper.insert(blog);
         languages.forEach(language -> mapper.insertLanguage(blog.getBlogId(), language));
         mapper.insertSubmission(writerId, blog.getBlogId());
         mapper.deleteDraft(writerId);
+        String blogId = Long.toString(blog.getBlogId());
+        for (String recipient : messagingProperties.moderationRecipientList()) {
+            outbox.append(
+                    AsyncEventTypes.BLOG_SUBMITTED,
+                    "blog",
+                    blogId,
+                    new BlogSubmittedNotificationV1(recipient, blogId, blog.getTitle(), submittedAt),
+                    submittedAt,
+                    null);
+        }
         return toResponse(blog, true);
     }
 
@@ -244,6 +271,36 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
             blog.setPublishTime(new Date());
         }
         mapper.updateById(blog);
+        Instant reviewedAt = Instant.now();
+        String recipient = identityNotificationLookup.findNotificationContact(blog.getWriterId())
+                .map(contact -> contact.email())
+                .orElse("");
+        BlogReviewedNotificationV1 notification = new BlogReviewedNotificationV1(
+                recipient,
+                Long.toString(blog.getBlogId()),
+                blog.getTitle(),
+                state == VERIFIED
+                        ? BlogReviewedNotificationV1.ReviewOutcome.APPROVED
+                        : BlogReviewedNotificationV1.ReviewOutcome.DENIED,
+                reviewedAt);
+        if (recipient.isBlank()) {
+            outbox.appendPermanentFailure(
+                    AsyncEventTypes.BLOG_REVIEWED,
+                    "blog",
+                    Long.toString(blog.getBlogId()),
+                    notification,
+                    reviewedAt,
+                    null,
+                    "RECIPIENT_UNAVAILABLE");
+        } else {
+            outbox.append(
+                    AsyncEventTypes.BLOG_REVIEWED,
+                    "blog",
+                    Long.toString(blog.getBlogId()),
+                    notification,
+                    reviewedAt,
+                    null);
+        }
         invalidatePublicBlogs();
         return toSummary(blog);
     }

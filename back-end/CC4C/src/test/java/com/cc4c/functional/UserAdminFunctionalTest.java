@@ -13,8 +13,6 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -137,7 +135,7 @@ class UserAdminFunctionalTest extends FunctionalTestSupport {
     void verificationEmailIsGenericAndAvatarRequiresAuthenticatedUser() throws Exception {
         String recipient = unique("mail_") + "@example.com";
         when(verificationCodeGenerator.generate()).thenReturn(CODE);
-        when(emailSender.send(eq(CODE), anyString(), eq(recipient))).thenReturn(true);
+        long before = countOutboxEvents("identity.verification-email.requested.v1");
 
         mockMvc.perform(post("/users/email").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -145,6 +143,7 @@ class UserAdminFunctionalTest extends FunctionalTestSupport {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data").value(true))
                 .andExpect(jsonPath("$.verificationCode").doesNotExist());
+        assertEquals(before + 1, countOutboxEvents("identity.verification-email.requested.v1"));
 
         UserFixture user = createUser();
         MockMultipartFile avatar = new MockMultipartFile(
@@ -242,5 +241,12 @@ class UserAdminFunctionalTest extends FunctionalTestSupport {
                 "verificationCode", verificationCode,
                 "major", 0,
                 "language", language);
+    }
+
+    private long countOutboxEvents(String eventType) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM async_outbox WHERE event_type = ?",
+                Long.class,
+                eventType);
     }
 }

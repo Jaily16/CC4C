@@ -1,6 +1,6 @@
 # CC4C 第三次迭代开发规划
 
-> 状态：方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”和方面三“安全与身份体系”已于 2026-08-27 完成；方面四“缓存、数据库与性能优化”已于 2026-08-28 完成实现、自动验证、性能门禁和用户浏览器验收；方面五至方面七尚未实施。
+> 状态：方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”和方面三“安全与身份体系”已于 2026-08-27 完成；方面四“缓存、数据库与性能优化”和方面五“异步事件与可靠性”已于 2026-08-28 完成实现、自动验证和用户浏览器验收；方面六与方面七尚未实施。
 
 ## 1. 规划背景与基线
 
@@ -18,7 +18,7 @@ V3 以 Git 提交 `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `542
 - 数据访问已经收敛到 MyBatis-Plus 3.5.17 Boot 3 Starter、HikariCP 和 MySQL；重复 MyBatis Starter、MPJ、Druid、Fastjson及未使用分页配置已移除。
 - 方面二已经建立 `shared`、`identity`、`catalog`、`community`、`interaction`、`moderation` 六模块单体，并由 Spring Modulith 1.4.12 自动验证边界。
 - API 已使用请求/响应 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI；前端已同步分页与写操作方法。
-- 数据库结构与公开目录基线已由 Flyway V1–V5 接管，历史 SQL 仅保留作参考；V5 为课程及博客收藏分页增加复合索引，查询索引以实际 SQL 和 `EXPLAIN FORMAT=JSON` 为依据。
+- 数据库结构与公开目录基线已由 Flyway V1–V6 接管，历史 SQL 仅保留作参考；V5 为课程及博客收藏分页增加复合索引，V6 增加加密消息 Outbox/Inbox，查询索引以实际 SQL 和 `EXPLAIN FORMAT=JSON` 为依据。
 - 方面三已经接入 Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验；认证只信任不透明的 `CC4C_SESSION`，旧业务 Cookie 会被主动清除。
 - Redis 安全连接保存服务端会话、验证码摘要和安全限流计数；方面四以独立连接及 namespace 为公开课程和已审核博客增加 Cache-Aside，私有内容和权限结果不缓存。
 - 已形成固定数据规模、随机种子、并发组合和性能门禁的可重复本地对照；消息可靠性、生产指标、容器编排和持续集成闭环尚未实施。
@@ -180,7 +180,7 @@ V3 优先保留现有 URL 和业务语义；若接口契约必须调整，应同
 - 故障演练确认业务缓存 Redis 不可用时公开读取回源 MySQL，安全 Redis 会话不受影响；用户已确认课程收藏失效、博客审核失效、非公开隔离、身份切换、管理员审核页以及控制台、网络和页面浏览器验收正常。
 - 完整实现、性能证据、测试与安全边界见 [CC4C 项目迭代修改记录](CC4C项目迭代修改记录.md#1315-方面四实际变更)。
 
-### 方面五：异步事件与可靠性（未实施）
+### 方面五：异步事件与可靠性（已完成）
 
 目标是将邮件和审核通知等非主链路工作异步化，并证明失败能够恢复。
 
@@ -190,6 +190,17 @@ V3 优先保留现有 URL 和业务语义；若接口契约必须调整，应同
 - 验证重复消息、消费者宕机、Broker 短暂不可用和最终恢复场景。
 
 普通查询和简单 CRUD 不为展示消息队列而强行异步化。
+
+完成证据（2026-08-28）：
+
+- 以提交 `bc7dcf8` 为唯一基线，增加由 Spring Boot 3.5.16 管理的 Spring AMQP，并在 RabbitMQ 4.3.5 上完成真实 vhost 验证；没有引入 Spring Cloud Stream、Kafka、Actuator、容器或 Testcontainers。
+- Flyway V6 增加 `async_outbox` 与 `async_inbox`。验证码请求、博客提交和审核结果在原业务事务中写入 AES-256-GCM 加密事件，Outbox Writer 强制要求活动事务；RabbitMQ 不可用时 HTTP 202、博客提交和审核仍可靠受理。
+- Publisher 通过 `FOR UPDATE SKIP LOCKED`、30 秒租约、mandatory、correlated Confirm、Return 与有限退避完成多实例发布；消费者通过 Inbox 复合键、手动 ACK、三段 retry queue、最终 DLQ 和 generation 实现至少一次投递与幂等恢复。
+- 验证码邮件、博客待审核通知和审核结果通知已异步化。验证码 10 分钟时效从请求受理开始，延迟旧事件不能覆盖新验证码；Outbox、Rabbit 消息、管理 API 和日志均不保存明文邮箱、验证码或邮件正文。
+- 新增 ADMIN 专用 `/admin/messaging/messages` 查询、重试和忽略接口及前端“异步消息恢复”页面。人工重试增加 generation，已送达、忽略、过期或状态非法的消息不能重放。
+- 后端 `clean verify` 共 125 项测试全部通过，覆盖 V1–V6、加密、事务原子性、Confirm/NACK/Return、幂等、租约接管、真实 retry/DLQ、RabbitMQ 连接恢复、管理员恢复和六模块边界；前端 `npm ci` 与生产构建通过，JAR 不包含本机 `application.yml`。
+- 浏览器故障演练确认：Broker 停止期间验证码仍返回 202，恢复后原事件自动 `confirmed → delivered`；消费者暂停期间博客通知在 quorum queue 积压，恢复后自动消费；永久邮件错误不回滚审核并进入 DEAD，管理员重试以新 generation 成功送达。
+- 完整实现、验证证据和安全边界见 [CC4C 项目迭代修改记录](CC4C项目迭代修改记录.md#1318-方面五实际变更)，运维恢复步骤见 [CC4C 异步消息故障手册](CC4C异步消息故障手册.md)。
 
 ### 方面六：可观测性与性能证据（未实施）
 

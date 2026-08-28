@@ -166,9 +166,9 @@ async function getVCode() {
       return;
     }
     startCountdown();
-    ElMessage.success('验证码已发送');
+    ElMessage.success('验证码请求已受理，邮件可能稍有延迟');
   } catch (error) {
-    formError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
+    formError.value = apiErrorMessage(error, '验证码请求受理失败，请稍后重试');
     ElMessage.error(formError.value);
     console.error(error);
   } finally {

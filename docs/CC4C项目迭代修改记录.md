@@ -646,7 +646,7 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 | 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
 | 预计规模 | 6–8 周，按七个方面依次推进 |
 | 当前阶段 | 方面四已完成并通过自动、性能与用户浏览器验收 |
-| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V5、Spring Security、Spring Session Data Redis、BCrypt、Redis Cache-Aside、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V6、Spring Security、Spring Session Data Redis、BCrypt、Redis Cache-Aside、RabbitMQ 4.3.5、Transactional Outbox/Inbox、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
 | 下一方面 | 异步事件与可靠性；尚未规划或实施 |
 
 ### 13.2 已确定的总体路线
@@ -945,3 +945,59 @@ flowchart LR
 - `npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），Vite 仍提示主包超过 500 KiB；方面四未越界升级或拆分前端依赖。
 - 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件；env 本机文件、性能数据、备份、日志、`target`、`node_modules`、`dist` 和 `temp` 均保持忽略。
 - 方面四尚未暂存、提交或推送；任何 Git 收口需用户另行明确授权。RabbitMQ、Actuator、容器、Testcontainers 和 CI 仍属于方面五至七。
+
+### 13.18 方面五实际变更
+
+#### Outbox、加密与事务边界
+
+- 方面五以本地提交 `bc7dcf8` 为唯一基线，只增加 `spring-boot-starter-amqp`，Spring AMQP 与 Rabbit Java Client 版本继续由 Spring Boot 3.5.16 管理；真实浏览器验收使用 RabbitMQ 4.3.5。
+- Flyway 新增 `V6__add_async_outbox_and_inbox.sql`，数据库从 16 张业务表扩展为 18 张表。`async_outbox` 保存事件版本、路由、generation、状态、租约、尝试次数、受控错误码、AES-GCM nonce 与密文；`async_inbox` 以消费者、eventId 和 generation 组成复合主键。
+- `TransactionalOutbox` 使用强制事务传播，验证码请求、博客提交、审核通过/驳回与事件行同提交、同回滚；没有使用 `REQUIRES_NEW` 或单独的 AFTER_COMMIT 发送窗口绕过业务事务。
+- 消息载荷使用 AES-256-GCM，eventId、事件类型、schemaVersion、generation、时间和 key ID 作为 AAD。事件类型按白名单反序列化，解密后 JSON 上限为 64 KiB；Outbox、RabbitMQ、管理 API 和日志均不包含明文邮箱、验证码或邮件正文。
+
+#### RabbitMQ 发布、消费与恢复
+
+- 运行拓扑由 durable topic exchange、三个 durable quorum 主队列、每类三段 retry quorum queue 和最终 DLQ 组成；消息持久化，Publisher 开启 mandatory、correlated Confirm 与 Return。
+- Dispatcher 每 500 ms 以 `FOR UPDATE SKIP LOCKED` 和 30 秒租约领取最多 50 条，区分 ACK、NACK、Return、超时和连接异常。Broker 发布失败按有限退避重试，超过边界进入 `PUBLISH_FAILED`，不会阻止 Web 应用启动或业务事务写入 Outbox。
+- 消费模板在业务处理前校验 Envelope、版本、大小、时效和密钥，使用 Inbox 租约与唯一键去重；成功写入 `DONE/DELIVERED` 后 ACK，临时失败在重试消息获得 Confirm 后 ACK 原消息，永久失败或重试耗尽进入 DEAD/DLQ。
+- 管理员明确重试时 generation 加一，使人工恢复与同 generation 自动重投语义分离。`DELIVERED/EXPIRED/IGNORED` Outbox 和 `DONE` Inbox 保留 31 天后分批清理；未处理的 `PUBLISH_FAILED/DEAD` 不自动删除。
+
+#### 业务异步化与管理页面
+
+- `POST /users/email` 保持 HTTP 202，但语义调整为“可靠受理”。符合条件的验证码请求先写 Outbox，消费者发信前以 Redis Lua 原子激活验证码；旧事件不能覆盖新验证码，过期事件不发信且不能人工重试。
+- 博客提交为每个去重后的审核邮箱创建独立 `community.blog.submitted.v1`；审核通过或驳回在原审核事务中创建 `community.blog.reviewed.v1`，只快照作者通知邮箱、标题、博客 ID、时间和结果，不包含正文或虚构驳回原因。
+- 新增 `IdentityNotificationLookup` 命名接口，community 不扩展通用用户快照；通用 Outbox、Rabbit 与邮件网关留在 shared，业务模板归 identity/moderation，Spring Modulith 仍恰好识别六个模块且无内部包越界。
+- 新增 ADMIN 专用 `GET/POST /admin/messaging/messages` 查询、重试和忽略接口，以及前端 `/admin/messaging` 页面。页面只显示安全摘要、状态、次数、时间、错误码和 recoverable，不提供载荷、邮箱或任意 Rabbit 管理能力。
+- 找回密码成功后后端会删除 CSRF Cookie；浏览器验收发现前端仍缓存旧 `/csrf` Promise，已在成功重置后调用 `resetCsrfToken()`，下一次写请求会先获取新令牌，不自动重放写请求。
+
+### 13.19 方面五验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 后端 `./run-tests.ps1 clean verify` | 125/125 通过，0 失败、0 错误、0 跳过；Java 21、Spring Boot 3.5.16，JAR 构建成功 |
+| Flyway | 空库 V1–V6、已有库升级、重复 migrate 零新增、`validate` 和 18 张表结构断言通过 |
+| 事务与加密 | 业务提交/回滚与 Outbox 同步，缺少事务被拒绝；AES-GCM 正常、错误 key、修改 AAD、未知 key ID 和超限载荷测试通过 |
+| Publisher 与 Broker | ACK、NACK、Return、超时、连接中断、租约接管和八次失败终止测试通过；真实 `_test` vhost 的 durable quorum、mandatory、Confirm、retry TTL 回主队列、最终 DLQ 与连接恢复断言通过 |
+| 消费与恢复 | Inbox 并发幂等、租约接管、保留清理、重试 Confirm、DEAD/DLQ、generation 管理员重试、忽略、过期验证码不可恢复和受控错误码测试通过；未知版本和非法 Envelope 均不会静默丢失 |
+| 模块与安全 | 六模块验证通过；匿名 401、USER 403、ADMIN 可访问恢复 API，CSRF 与 OpenAPI 安全摘要通过 |
+| 前端 | `npm ci` 和 Vite 生产构建通过；异步消息页面、验证码受理提示和密码重置后 CSRF 刷新编译通过 |
+| 配置与 JAR | JAR 不含 `BOOT-INF/classes/application.yml`，包含脱敏示例与 V6；本机 env、日志、target、node_modules 和 temp 保持忽略 |
+
+首次完整门禁因浏览器验收已在同一专用库留下 4 条合法 Outbox 历史，而两个测试错误假设整表为空，出现 2 个断言失败。测试随后改为比较每次操作前后的事件数量增量，不删除历史消息。最终可靠性审计又补充了非法/未知消息 DEAD 持久化、过期重复消息状态保护、真实 retry/DLQ、Rabbit 连接恢复、Inbox 租约接管与终态保留清理，最终完整 125 项均通过。
+
+2026-08-28，用户逐项确认验证码异步受理、单次消费、CSRF 重置、博客提交通知、审核通过/驳回通知、管理员消息页与权限隔离、Swagger 和控制台安全摘要正常。故障演练还确认：
+
+- RabbitMQ Broker 暂停期间验证码仍返回 202，Outbox 按 `1s/5s/30s/2m` 发布退避保留；Broker 恢复后同一 eventId 自动 `confirmed → delivered`，验证码仍在有效期内可用。
+- 三个消费者暂停时博客提交成功，审核通知在主 quorum queue 以 `consumers=0/messages_ready=1` 积压；恢复消费者后变为 `consumers=1/messages_ready=0` 并自动送达。
+- 使用仅对本次进程生效的无效发件地址制造 `MAIL_PERMANENT`，审核事务仍成功，通知进入 DEAD；恢复正常邮件配置后，管理员重试使同一 eventId 从 generation 0 提升到 1 并成功送达。
+
+### 13.20 当前契约、已知项与发布安全
+
+- 验证码、博客提交和审核接口不等待 SMTP。HTTP 202 或业务成功表示事件已可靠写入 MySQL，不承诺邮件在响应前到达；RabbitMQ 不可用不返回 503，Outbox 无法持久化才属于受理失败。
+- 系统语义是“至少一次投递 + Inbox 幂等”，不宣称 SMTP 端到端 exactly-once。若 SMTP 已接收邮件而进程在写 DONE 前崩溃，可能收到内容相同、Message-ID 相同的重复邮件。
+- `CC4C_OUTBOX_DISPATCHER_ENABLED=false` 和 `CC4C_MESSAGE_CONSUMERS_ENABLED=false` 只用于暂停发布或消费，不能删除消息。生产 vhost 和 namespace 禁止 purge、删除或原地重建拓扑；数据库 Outbox 是人工恢复事实来源。
+- 密钥轮换必须先把新密钥加入可读 key ring，再切换活动写 key ID；旧 Outbox、Inbox 与 DLQ 超过保留期前不得删除旧密钥。密钥不得复用安全 Pepper。
+- 回滚到 `bc7dcf8` 时旧代码可忽略 V6 两张附加表，但必须先停止 Dispatcher/Consumer并保留所有未完成 Outbox，待恢复方面五代码后继续处理；不得执行 Flyway `repair` 或伪造 down migration。
+- Flyway 11.7.2 在 MySQL 8.4 上仍提示官方测试至 8.1；V1–V6、重复迁移、`validate` 和结构断言实际通过。`npm ci` 仍报告 10 个既有依赖漏洞（4 个中等、6 个高危），Vite 仍提示主包超过 500 KiB。
+- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件；`.env.*.local`、Rabbit definitions、数据库备份、邮件内容、日志、target、node_modules、dist 和 temp 均不得进入 Git。
+- 方面五尚未暂存、提交或推送；任何 Git 收口需用户另行明确授权。Actuator、Prometheus、Grafana、压测观测、容器、Testcontainers 和 CI 仍属于方面六与方面七。

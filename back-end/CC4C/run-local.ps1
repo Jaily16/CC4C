@@ -19,6 +19,15 @@ $requiredNames = @(
     'CC4C_ALLOWED_ORIGINS',
     'CC4C_MAIL_USERNAME',
     'CC4C_MAIL_PASSWORD',
+    'CC4C_RABBITMQ_URL',
+    'CC4C_RABBITMQ_NAMESPACE',
+    'CC4C_MODERATION_NOTIFICATION_RECIPIENTS',
+    'CC4C_MESSAGING_ACTIVE_KEY_ID',
+    'CC4C_MESSAGING_PAYLOAD_KEYS',
+    'CC4C_MESSAGING_CONFIRM_TIMEOUT',
+    'CC4C_MESSAGING_CONSUMER_RETRY_DELAYS',
+    'CC4C_OUTBOX_DISPATCHER_ENABLED',
+    'CC4C_MESSAGE_CONSUMERS_ENABLED',
     'CC4C_API_DOCS_ENABLED',
     'CC4C_SAVE_IMG_PATH',
     'CC4C_REQUEST_IMG_PATH',
@@ -72,6 +81,12 @@ if ($values['CC4C_API_DOCS_ENABLED'] -notin @('true', 'false')) {
 }
 if ($values['CC4C_BUSINESS_CACHE_ENABLED'] -notin @('true', 'false')) {
     throw 'CC4C_BUSINESS_CACHE_ENABLED must be true or false.'
+}
+if ($values['CC4C_OUTBOX_DISPATCHER_ENABLED'] -notin @('true', 'false')) {
+    throw 'CC4C_OUTBOX_DISPATCHER_ENABLED must be true or false.'
+}
+if ($values['CC4C_MESSAGE_CONSUMERS_ENABLED'] -notin @('true', 'false')) {
+    throw 'CC4C_MESSAGE_CONSUMERS_ENABLED must be true or false.'
 }
 if ($values['CC4C_CACHE_NAMESPACE'] -eq $values['CC4C_SESSION_NAMESPACE']) {
     throw 'CC4C_CACHE_NAMESPACE must differ from CC4C_SESSION_NAMESPACE.'

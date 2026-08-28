@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本已完成 V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”、方面三“安全与身份体系”和方面四“缓存、数据库与性能优化”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V5 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside，私有内容、搜索、收藏、评论及审核列表不缓存。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面五至方面七尚未实施。
+当前版本已完成 V3 方面一“基础版本与依赖现代化”、方面二“模块化单体、API 与数据治理”、方面三“安全与身份体系”、方面四“缓存、数据库与性能优化”和方面五“异步事件与可靠性”。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V6 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面六与方面七尚未实施。
 
 ## 平台亮点
 
@@ -111,8 +111,9 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
 | API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
 | 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
-| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V5、Redis Cache-Aside |
-| 序列化与服务 | Jackson、JavaMail、文件资源读写 |
+| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V6、Redis Cache-Aside |
+| 异步可靠性 | RabbitMQ 4.3.5、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
+| 序列化与服务 | Jackson、AES-256-GCM、JavaMail、文件资源读写 |
 
 ## 系统架构
 
@@ -121,12 +122,12 @@ flowchart TB
     Browser[用户 / 管理员 · Vue 3 SPA] -->|CC4C_SESSION · CSRF · Axios| HTTP[Spring Security · DTO · OpenAPI]
 
     subgraph Backend[Spring Boot 3.5 模块化单体]
-        Shared[shared<br/>响应、分页、异常、CORS、文件与配置]
-        Identity[identity<br/>认证、用户、管理员、验证码]
+        Shared[shared<br/>响应、分页、异常、缓存、Outbox 与 AMQP]
+        Identity[identity<br/>认证、用户、管理员、验证码邮件消费者]
         Catalog[catalog<br/>语言、课程、课程模块]
         Community[community<br/>博客、草稿]
         Interaction[interaction<br/>评论、回复、收藏]
-        Moderation[moderation<br/>博客审核]
+        Moderation[moderation<br/>博客审核、通知消费者与消息恢复]
 
         Identity --> Shared
         Catalog --> Shared
@@ -147,10 +148,15 @@ flowchart TB
     HTTP --> Interaction
     HTTP --> Moderation
     Backend -->|MyBatis-Plus · HikariCP| DB[(MySQL)]
+    DB -->|租约扫描 · SKIP LOCKED| Dispatcher[Outbox Dispatcher]
+    Dispatcher -->|持久消息 · Confirm · mandatory| Rabbit[(RabbitMQ quorum queues)]
+    Rabbit -->|手动 ACK · Inbox 幂等| Consumers[Identity / Moderation Consumers]
+    Consumers -->|UTF-8 纯文本邮件| SMTP[SMTP]
+    Consumers -->|DONE / DEAD / generation| DB
     Identity -->|Session、验证码、限流| SecurityRedis[(安全 Redis)]
     Catalog -->|公开课程缓存| BusinessRedis[(业务缓存 Redis)]
     Community -->|已审核博客缓存| BusinessRedis
-    Flyway[Flyway V1–V5] -. 结构、基线数据、密码列与复合索引 .-> DB
+    Flyway[Flyway V1–V6] -. 结构、基线数据、索引与 Outbox/Inbox .-> DB
 ```
 
 Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
@@ -179,7 +185,7 @@ CC4C/
 │  │  └─ moderation/                # 博客审核
 │  ├─ src/main/resources/
 │  │  ├─ application-example.yml    # 可提交的脱敏配置模板
-│  │  └─ db/migration/              # Flyway V1–V5 迁移
+│  │  └─ db/migration/              # Flyway V1–V6 迁移
 │  ├─ src/test/                     # 后端自动化测试
 │  ├─ run-tests.ps1                 # 测试环境校验与 Maven 门禁
 │  ├─ run-aspect4-benchmark.ps1      # 隔离性能库与缓存的方面四基准
@@ -190,7 +196,7 @@ CC4C/
 │  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
 │  ├─ test-database-admin-setup.sql # 专用测试库授权模板
 │  └─ README.md                     # Flyway 初始化、备份与恢复说明
-├─ docs/                            # 迭代文档与 README 图片
+├─ docs/                            # 迭代文档、异步消息故障手册与 README 图片
 └─ README.md
 ```
 
@@ -203,6 +209,7 @@ CC4C/
 - Node.js 18+ 与 npm
 - MySQL 8.x
 - Redis 7.x
+- RabbitMQ 4.3.x（本次验收版本 4.3.5）
 
 ### 2. 克隆仓库
 
@@ -223,7 +230,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
   ON <database_name>.* TO '<application_user>'@'127.0.0.1';
 ```
 
-首次启动时 Flyway 会依次执行 V1–V5，创建 16 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列，并增加课程/博客收藏分页所需的复合索引。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
+首次启动时 Flyway 会依次执行 V1–V6，创建 18 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列，并建立异步 Outbox/Inbox。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
 
 ### 4. 配置后端运行环境
 
@@ -252,6 +259,15 @@ Copy-Item .env.runtime.example .env.runtime.local
 | `CC4C_ALLOWED_ORIGINS` | 允许携带凭据的精确前端来源列表，禁止通配符 |
 | `CC4C_MAIL_USERNAME` | 邮件服务账号 |
 | `CC4C_MAIL_PASSWORD` | 邮件服务授权信息 |
+| `CC4C_RABBITMQ_URL` | 运行 RabbitMQ AMQP/AMQPS 地址；必须包含显式 vhost |
+| `CC4C_RABBITMQ_NAMESPACE` | durable exchange、quorum queue 与 DLQ 的独占命名空间 |
+| `CC4C_MODERATION_NOTIFICATION_RECIPIENTS` | 逗号分隔、去重后的博客审核通知邮箱 |
+| `CC4C_MESSAGING_ACTIVE_KEY_ID` | 当前 Outbox 载荷写入密钥 ID |
+| `CC4C_MESSAGING_PAYLOAD_KEYS` | AES-256-GCM 密钥环；活动密钥和轮换期旧密钥均由本机秘密配置提供 |
+| `CC4C_MESSAGING_CONFIRM_TIMEOUT` | Publisher Confirm 等待上限 |
+| `CC4C_MESSAGING_CONSUMER_RETRY_DELAYS` | 三段消费者重试间隔，默认 `30s,5m,30m` |
+| `CC4C_OUTBOX_DISPATCHER_ENABLED` | 是否启动 Outbox Dispatcher；故障隔离时可设为 `false` 暂停发布 |
+| `CC4C_MESSAGE_CONSUMERS_ENABLED` | 是否启动消息消费者；可设为 `false` 保留 Broker 积压 |
 | `CC4C_REQUEST_AVATAR_PATH` | 前端可访问的头像资源地址 |
 | `CC4C_REQUEST_IMG_PATH` | 前端可访问的内容图片地址 |
 | `CC4C_SAVE_AVATAR_PATH` | 本机头像保存目录 |
@@ -270,7 +286,9 @@ cd back-end/CC4C
 .\run-local.ps1
 ```
 
-安全 Redis 不可连接、Pepper 不足 32 字符、CORS 含通配符、Java 不是 21、JAR 缺失或数据库仍含明文/未知格式密码时，应用会快速失败，不会降级到内存会话或旧密码比较。业务缓存 Redis 不可用时，公开读取会在短暂熔断旁路后回源 MySQL，不影响安全 Redis 的会话与限流语义。既有数据库升级必须先停止后端并备份，应用 V4 后使用 `migrate-passwords.ps1` 离线转换密码；脚本要求备份路径、SHA-256 和精确数据库名确认，且重复执行不会再次转换 `{bcrypt}` 值。
+安全 Redis 不可连接、Pepper 不足 32 字符、CORS 含通配符、消息 namespace 或 AES 密钥环非法、审核邮箱缺失、Java 不是 21、JAR 缺失或数据库仍含明文/未知格式密码时，应用会快速失败，不会降级到内存会话或旧密码比较。RabbitMQ 暂时不可连接不会阻止 Web 应用受理验证码、博客提交或审核事务，事件会保留在 MySQL Outbox 并按有限退避恢复；业务缓存 Redis 不可用时，公开读取会在短暂熔断旁路后回源 MySQL。既有数据库升级必须先停止后端并备份，应用 V4 后使用 `migrate-passwords.ps1` 离线转换密码；脚本要求备份路径、SHA-256 和精确数据库名确认，且重复执行不会再次转换 `{bcrypt}` 值。
+
+异步消息的 Broker 故障、消费者暂停、SMTP 死信、管理员重试/忽略、密钥轮换和代码回滚步骤见 [CC4C 异步消息故障手册](docs/CC4C异步消息故障手册.md)。
 
 后端默认地址：`http://localhost:4080`
 
@@ -306,16 +324,16 @@ npm ci
 npm run build
 ```
 
-后端测试必须连接相互独立的主测试库、空迁移库、安全 Redis 和业务缓存 Redis。先由管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、六个变量任一为空、库名不符合约束或两个数据库 URL 相同时都会快速失败，不会回退到开发库：
+后端测试必须连接相互独立的主测试库、空迁移库、安全 Redis、业务缓存 Redis和专用 RabbitMQ test vhost。先由管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、八个变量任一为空、库名或 vhost 不符合约束时都会快速失败，不会回退到开发环境：
 
 ```powershell
 cd back-end/CC4C
 Copy-Item .env.test.example .env.test.local
-# 填写四个 CC4C_TEST_DB_* 变量、CC4C_TEST_REDIS_URL 和 CC4C_TEST_CACHE_REDIS_URL
+# 填写四个 CC4C_TEST_DB_* 变量、两个 Redis 变量、CC4C_TEST_RABBITMQ_URL 和 vhost 确认值
 .\run-tests.ps1 clean verify
 ```
 
-主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾。测试门禁每次分别生成独立的 Session 与业务缓存 namespace，只清理本次 namespace，禁止 `FLUSHDB` 或 `FLUSHALL`。门禁会验证现有库和空库 V1–V5、密码迁移、安全体系、Cache-Aside、并发击穿保护、故障回源、事务后失效、批量查询及既有业务回归。当前验收基线为 80 项测试全部通过。
+主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾；RabbitMQ vhost 必须显式以 `_test` 结尾并与确认值一致。测试门禁每次分别生成独立的 Session、业务缓存和 Rabbit namespace，只清理本轮精确资源，禁止 `FLUSHDB`、`FLUSHALL`、默认 vhost 或全局队列清理。门禁会验证 V1–V6、密码迁移、安全体系、Cache-Aside、Outbox 事务原子性、Publisher Confirm、返回消息、幂等消费、重试/DLQ、管理员恢复和既有业务回归。当前验收基线为 125 项测试全部通过。
 
 ### 方面四独立性能基准
 
@@ -336,6 +354,9 @@ cd back-end/CC4C
 - 认证只信任服务端 Redis Session 和 `CC4C_SESSION`；旧 `user_email`、`admin` Cookie 会被清除，不能作为身份依据。
 - 所有浏览器写请求必须携带 CSRF Token；生产 HTTPS 环境必须设置 `CC4C_SESSION_COOKIE_SECURE=true`，CORS 只能配置精确来源。
 - 安全 Redis 与业务缓存使用不同 namespace；生产环境应使用独立实例。业务缓存只覆盖公开课程和已审核博客，认证、私有内容与权限结果不得缓存。
+- Outbox 和 RabbitMQ 载荷使用 AES-256-GCM 加密；明文邮箱、验证码、邮件正文、Cookie、Session ID 和消息密钥不得写入数据库摘要、管理 API 或日志。
+- 消息语义为至少一次投递，不宣称端到端 exactly-once；Publisher Confirm 与消费者 ACK 分开处理，外部 SMTP 不确定窗口可能产生内容相同的重复邮件。
+- RabbitMQ 生产 namespace 禁止 purge、删除 vhost 或原地重建队列；失败恢复以数据库 Outbox 为事实来源，并通过受保护的管理员接口显式重试或忽略。
 - 不要在源码、README、截图、Issue 或日志中放入 Token、Cookie、数据库密码、SMTP 授权码等敏感信息。
 - GitHub 只应保留脱敏的 `application-example.yml`；如怀疑密钥泄露，请先轮换密钥，再清理历史记录。
 - `node_modules/`、`dist/`、`target/`、`temp/` 和运行日志均属于本地产物，不应提交。

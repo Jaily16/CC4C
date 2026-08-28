@@ -11,6 +11,8 @@ import com.cc4c.identity.IdentityDtos.VerificationPurpose;
 import com.cc4c.identity.api.AccountRole;
 import com.cc4c.identity.api.CurrentActor;
 import com.cc4c.identity.api.IdentityLookup;
+import com.cc4c.identity.api.IdentityNotificationLookup;
+import com.cc4c.identity.api.NotificationContact;
 import com.cc4c.identity.api.UserSnapshot;
 import com.cc4c.shared.BusinessCode;
 import com.cc4c.shared.BusinessException;
@@ -26,7 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Service
-public class IdentityService implements IdentityLookup {
+public class IdentityService implements IdentityLookup, IdentityNotificationLookup {
     private final UserMapper userMapper;
     private final AdministratorMapper administratorMapper;
     private final PasswordEncoder passwordEncoder;
@@ -193,6 +195,14 @@ public class IdentityService implements IdentityLookup {
         UserEntity user = userMapper.selectById(userId);
         return Optional.ofNullable(user)
                 .map(value -> new UserSnapshot(value.getId(), value.getName(), value.getAvatar()));
+    }
+
+    @Override
+    public Optional<NotificationContact> findNotificationContact(long userId) {
+        UserEntity user = userMapper.selectById(userId);
+        return Optional.ofNullable(user)
+                .filter(value -> value.getEmail() != null && !value.getEmail().isBlank())
+                .map(value -> new NotificationContact(value.getId(), value.getEmail()));
     }
 
     private UserEntity findByEmail(String email) {

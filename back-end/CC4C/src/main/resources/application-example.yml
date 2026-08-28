@@ -37,6 +37,19 @@ spring:
           auth: true
           ssl:
             enable: true
+  rabbitmq:
+    addresses: "${CC4C_RABBITMQ_URL}"
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 5
+        concurrency: 1
+        default-requeue-rejected: false
+        missing-queues-fatal: false
   servlet:
     multipart:
       #文件传输的大小上限
@@ -54,6 +67,16 @@ springdoc:
 
 #自定义配置属性
 cc4c:
+  messaging:
+    namespace: "${CC4C_RABBITMQ_NAMESPACE}"
+    active-key-id: "${CC4C_MESSAGING_ACTIVE_KEY_ID}"
+    payload-keys: "${CC4C_MESSAGING_PAYLOAD_KEYS}"
+    moderation-recipients: "${CC4C_MODERATION_NOTIFICATION_RECIPIENTS}"
+    confirm-timeout: "${CC4C_MESSAGING_CONFIRM_TIMEOUT:5s}"
+    consumer-retry-delays: "${CC4C_MESSAGING_CONSUMER_RETRY_DELAYS:30s,5m,30m}"
+    poll-interval: "${CC4C_MESSAGING_POLL_INTERVAL:500ms}"
+    dispatcher-enabled: "${CC4C_OUTBOX_DISPATCHER_ENABLED:true}"
+    consumers-enabled: "${CC4C_MESSAGE_CONSUMERS_ENABLED:true}"
   cache:
     enabled: "${CC4C_BUSINESS_CACHE_ENABLED}"
     redis-url: "${CC4C_CACHE_REDIS_URL:}"

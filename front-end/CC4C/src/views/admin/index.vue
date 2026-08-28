@@ -67,7 +67,7 @@
 import { computed, reactive, ref } from 'vue';
 import axios, { resetCsrfToken } from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
-import { Checked, DataAnalysis, Plus } from '@element-plus/icons-vue';
+import { Bell, Checked, DataAnalysis, Plus } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiErrorMessage } from '@/utils/apiError';
 import store from '@/store';
@@ -83,6 +83,7 @@ const menuItems = [
   { path: '/admin/CoursesAndBlogs', label: '内容数据概览', shortLabel: '概览', icon: DataAnalysis },
   { path: '/admin/addCourse', label: '发布新课程', shortLabel: '课程', icon: Plus },
   { path: '/admin/checkBlog', label: '审核社区博客', shortLabel: '审核', icon: Checked },
+  { path: '/admin/messaging', label: '异步消息恢复', shortLabel: '消息', icon: Bell },
 ];
 const activePath = computed(() => route.path);
 
@@ -154,7 +155,7 @@ async function changePassword() {
 
 @media (max-width: 1024px) {
   .admin-sidebar { display: none; }
-  .admin-mobile-nav { position: fixed; z-index: 45; top: 68px; right: 0; left: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid #dfe6f0; background: #fff; }
+  .admin-mobile-nav { position: fixed; z-index: 45; top: 68px; right: 0; left: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #dfe6f0; background: #fff; }
   .admin-mobile-nav a { display: flex; gap: 7px; align-items: center; justify-content: center; min-height: 52px; color: var(--cc4c-muted); font-size: .82rem; font-weight: 700; text-decoration: none; }
   .admin-mobile-nav__active { color: var(--cc4c-primary) !important; background: #eef4ff; box-shadow: inset 0 -3px var(--cc4c-primary); }
   .admin-main { padding: 142px 22px 28px; }

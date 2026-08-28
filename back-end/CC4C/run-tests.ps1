@@ -11,7 +11,9 @@ $requiredTestVariableNames = @(
     'CC4C_TEST_DB_USERNAME',
     'CC4C_TEST_DB_PASSWORD',
     'CC4C_TEST_REDIS_URL',
-    'CC4C_TEST_CACHE_REDIS_URL'
+    'CC4C_TEST_CACHE_REDIS_URL',
+    'CC4C_TEST_RABBITMQ_URL',
+    'CC4C_TEST_RABBITMQ_VHOST_CONFIRM'
 )
 
 if (-not (Test-Path -LiteralPath $testEnvironmentPath -PathType Leaf)) {
@@ -71,6 +73,24 @@ if ($mainTestDatabaseName.Equals($emptyTestDatabaseName, [System.StringCompariso
     throw "CC4C_TEST_DB_URL and CC4C_TEST_EMPTY_DB_URL must target different databases."
 }
 
+try {
+    $rabbitUri = [System.Uri]::new($testEnvironmentValues['CC4C_TEST_RABBITMQ_URL'])
+} catch {
+    throw 'CC4C_TEST_RABBITMQ_URL must be a valid AMQP URI with an explicit test vhost.'
+}
+if ($rabbitUri.Scheme -notin @('amqp', 'amqps')) {
+    throw 'CC4C_TEST_RABBITMQ_URL must use the amqp or amqps scheme.'
+}
+$rabbitVhost = [System.Uri]::UnescapeDataString($rabbitUri.AbsolutePath.TrimStart('/'))
+$confirmedRabbitVhost = $testEnvironmentValues['CC4C_TEST_RABBITMQ_VHOST_CONFIRM'].Trim().TrimStart('/')
+if ([string]::IsNullOrWhiteSpace($rabbitVhost) -or
+    -not $rabbitVhost.EndsWith('_test', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "CC4C_TEST_RABBITMQ_URL must target an explicit vhost whose name ends with '_test'."
+}
+if (-not $rabbitVhost.Equals($confirmedRabbitVhost, [System.StringComparison]::Ordinal)) {
+    throw 'CC4C_TEST_RABBITMQ_VHOST_CONFIRM must exactly match the decoded vhost in CC4C_TEST_RABBITMQ_URL.'
+}
+
 if ($MavenArguments.Count -eq 0) {
     $MavenArguments = @('test')
 }
@@ -79,9 +99,12 @@ $testEnvironmentValues['CC4C_TEST_REDIS_NAMESPACE'] =
     'cc4c:test:' + [Guid]::NewGuid().ToString('N')
 $testEnvironmentValues['CC4C_TEST_CACHE_REDIS_NAMESPACE'] =
     $testEnvironmentValues['CC4C_TEST_REDIS_NAMESPACE'] + ':cache'
+$testEnvironmentValues['CC4C_TEST_RABBITMQ_NAMESPACE'] =
+    'cc4c.test.messaging.' + [Guid]::NewGuid().ToString('N')
 $requiredTestVariableNames += @(
     'CC4C_TEST_REDIS_NAMESPACE',
-    'CC4C_TEST_CACHE_REDIS_NAMESPACE'
+    'CC4C_TEST_CACHE_REDIS_NAMESPACE',
+    'CC4C_TEST_RABBITMQ_NAMESPACE'
 )
 
 $javaVersionOutput = & java -version 2>&1

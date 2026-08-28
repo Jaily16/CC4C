@@ -98,6 +98,11 @@ const router = createRouter({
           path: 'checkBlog',
           name: 'checkBlog',
           component: () => import('@/views/admin/CheckBlogView.vue'),
+        },
+        {
+          path: 'messaging',
+          name: 'adminMessaging',
+          component: () => import('@/views/admin/MessagingView.vue'),
         }
       ]
     },

@@ -15,12 +15,13 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
         String database = databaseName(url);
         assertTrue(database.endsWith("_test"));
         assertFalse(database.endsWith("_flyway_test"));
-        assertEquals(16, scalar(url, """
+        long tablesBeforeMigration = scalar(url, """
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_type = 'BASE TABLE'
                   AND table_name <> 'flyway_schema_history'
-                """));
+                """);
+        assertTrue(tablesBeforeMigration == 16 || tablesBeforeMigration == 18);
         assertEquals(0, scalar(url, """
                 SELECT COUNT(*) FROM (
                     SELECT comment_id FROM (
@@ -55,11 +56,22 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
 
         long currentVersion = scalar(url,
                 "SELECT COALESCE(MAX(CAST(version AS UNSIGNED)), 0) FROM flyway_schema_history");
-        int expectedMigrations = Math.toIntExact(Math.max(0, 5 - currentVersion));
+        int expectedMigrations = Math.toIntExact(Math.max(0, 6 - currentVersion));
         assertEquals(expectedMigrations, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(5, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
+        assertEquals(6, scalar(url, "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"));
+        assertEquals(18, scalar(url, """
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_type = 'BASE TABLE'
+                  AND table_name <> 'flyway_schema_history'
+                """));
+        assertEquals(2, scalar(url, """
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('async_outbox', 'async_inbox')
+                """));
         assertEquals(2, scalar(url, """
                 SELECT COUNT(DISTINCT index_name)
                 FROM information_schema.statistics

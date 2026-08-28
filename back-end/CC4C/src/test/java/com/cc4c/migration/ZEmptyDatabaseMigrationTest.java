@@ -18,11 +18,11 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
 
         var flyway = flyway(url, false);
         flyway.clean();
-        assertEquals(5, flyway.migrate().migrationsExecuted);
+        assertEquals(6, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);
 
-        assertEquals(16, scalar(url, """
+        assertEquals(18, scalar(url, """
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_type = 'BASE TABLE'

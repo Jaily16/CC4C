@@ -104,7 +104,7 @@
 
 <script setup>
 import { onBeforeUnmount, reactive, ref } from 'vue';
-import axios from '@/plugins/axiosInstance';
+import axios, { resetCsrfToken } from '@/plugins/axiosInstance';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
@@ -216,9 +216,9 @@ async function getVCode() {
       return;
     }
     startRecoveryCountdown();
-    ElMessage.success('验证码已发送');
+    ElMessage.success('验证码请求已受理，邮件可能稍有延迟');
   } catch (error) {
-    recoveryError.value = apiErrorMessage(error, '验证码发送失败，请稍后重试');
+    recoveryError.value = apiErrorMessage(error, '验证码请求受理失败，请稍后重试');
     ElMessage.error(recoveryError.value);
     console.error(error);
   } finally {
@@ -247,6 +247,7 @@ async function findPassword() {
       return;
     }
 
+    resetCsrfToken();
     ElMessage.success('密码修改成功');
     findForm.password = '';
     iCode.value = '';

@@ -1,19 +1,24 @@
 package com.cc4c.functional;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.cc4c.identity.internal.EmailSender;
 import com.cc4c.identity.internal.VerificationCodeGenerator;
 import com.cc4c.identity.internal.VerificationCodeService;
 import com.cc4c.shared.BusinessCache;
+import com.cc4c.shared.MessagingTopology;
+import com.cc4c.support.RabbitTestResources;
 import com.cc4c.identity.IdentityDtos.VerificationPurpose;
 import com.cc4c.identity.api.AccountRole;
 import com.cc4c.identity.api.Cc4cPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.TestInstance;
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.Cursor;
@@ -22,6 +27,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -33,6 +39,8 @@ import org.springframework.session.Session;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,9 +49,13 @@ import java.util.UUID;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-abstract class FunctionalTestSupport {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+public abstract class FunctionalTestSupport {
     protected static final String TEST_REDIS_NAMESPACE =
             "cc4c:test:" + UUID.randomUUID().toString().replace("-", "");
+    protected static final String TEST_RABBIT_NAMESPACE =
+            "cc4c.test.messaging." + UUID.randomUUID().toString().replace("-", "");
 
     @DynamicPropertySource
     static void registerTestDatabaseProperties(DynamicPropertyRegistry registry) {
@@ -55,6 +67,8 @@ abstract class FunctionalTestSupport {
         registry.add("cc4c.cache.namespace", () -> TEST_REDIS_NAMESPACE + ":cache");
         registry.add("spring.session.redis.namespace", () -> TEST_REDIS_NAMESPACE);
         registry.add("cc4c.security.key-prefix", () -> TEST_REDIS_NAMESPACE + ":security");
+        registry.add("spring.rabbitmq.addresses", () -> requiredEnvironmentVariable("CC4C_TEST_RABBITMQ_URL"));
+        registry.add("cc4c.messaging.namespace", () -> TEST_RABBIT_NAMESPACE);
     }
 
     static String requiredEnvironmentVariable(String name) {
@@ -84,13 +98,19 @@ abstract class FunctionalTestSupport {
     protected BusinessCache businessCache;
 
     @Autowired
+    private AmqpAdmin rabbitAdmin;
+
+    @Autowired
+    private MessagingTopology messagingTopology;
+
+    @Autowired
     private FindByIndexNameSessionRepository<? extends Session> sessionRepository;
 
     @MockitoBean
-    protected EmailSender emailSender;
+    protected VerificationCodeGenerator verificationCodeGenerator;
 
     @MockitoBean
-    protected VerificationCodeGenerator verificationCodeGenerator;
+    protected JavaMailSender javaMailSender;
 
     @Autowired
     protected VerificationCodeService verificationCodeService;
@@ -101,13 +121,17 @@ abstract class FunctionalTestSupport {
 
     protected void issueVerificationCode(
             String email, VerificationPurpose purpose, String code) {
-        org.mockito.Mockito.when(verificationCodeGenerator.generate()).thenReturn(code);
-        org.mockito.Mockito.when(emailSender.send(
-                        org.mockito.ArgumentMatchers.eq(code),
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.eq(email)))
-                .thenReturn(true);
-        verificationCodeService.send(email, purpose);
+        Instant issuedAt = Instant.now();
+        boolean activated = verificationCodeService.activateForDelivery(
+                email,
+                purpose,
+                code,
+                UUID.randomUUID().toString(),
+                issuedAt,
+                issuedAt.plus(Duration.ofMinutes(10)));
+        if (!activated) {
+            throw new IllegalStateException("Unable to activate functional-test verification code");
+        }
     }
 
     @AfterEach
@@ -143,6 +167,11 @@ abstract class FunctionalTestSupport {
                 connection.keyCommands().del(keys.toArray(byte[][]::new));
             }
         }
+    }
+
+    @AfterAll
+    void removeOnlyThisTestNamespaceFromRabbit() {
+        RabbitTestResources.deleteKnownNamespaceResources(rabbitAdmin, messagingTopology);
     }
 
     protected UserFixture createUser() {

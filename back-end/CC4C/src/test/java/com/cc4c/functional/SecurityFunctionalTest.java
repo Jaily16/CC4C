@@ -28,10 +28,6 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -205,6 +201,7 @@ class SecurityFunctionalTest extends FunctionalTestSupport {
     void verificationEmailResponsesAreGenericAndCooldownReturnsRetryAfter() throws Exception {
         UserFixture existing = createUser();
         String missing = unique("missing_") + "@example.com";
+        long ineligibleBefore = countOutboxEvents("identity.verification-email.requested.v1");
 
         mockMvc.perform(post("/users/email").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -216,15 +213,16 @@ class SecurityFunctionalTest extends FunctionalTestSupport {
                         .content("{\"email\":\"" + missing + "\",\"purpose\":\"PASSWORD_RESET\"}"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data").value(true));
-        verify(emailSender, never()).send(anyString(), anyString(), anyString());
+        assertEquals(ineligibleBefore, countOutboxEvents("identity.verification-email.requested.v1"));
 
         String recipient = unique("limited_") + "@example.com";
         when(verificationCodeGenerator.generate()).thenReturn(CODE);
-        when(emailSender.send(eq(CODE), anyString(), eq(recipient))).thenReturn(true);
+        long before = countOutboxEvents("identity.verification-email.requested.v1");
         String payload = "{\"email\":\"" + recipient + "\",\"purpose\":\"REGISTER\"}";
         mockMvc.perform(post("/users/email").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isAccepted());
+        assertEquals(before + 1, countOutboxEvents("identity.verification-email.requested.v1"));
         mockMvc.perform(post("/users/email").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isTooManyRequests())
@@ -315,5 +313,12 @@ class SecurityFunctionalTest extends FunctionalTestSupport {
                         .content("{\"email\":\"" + email + "\",\"verificationCode\":\""
                                 + code + "\",\"newPassword\":\"" + password + "\"}"))
                 .andExpect(status().is(expectedStatus));
+    }
+
+    private long countOutboxEvents(String eventType) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM async_outbox WHERE event_type = ?",
+                Long.class,
+                eventType);
     }
 }
