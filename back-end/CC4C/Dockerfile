@@ -16,7 +16,7 @@ RUN mkdir -p /root/.m2/repository \
     && mvn -B -ntp -Paspect6-gatling -DskipTests test-compile \
     && mvn -B -ntp -Paspect6-gatling io.gatling:gatling-maven-plugin:4.21.10:help
 
-FROM eclipse-temurin:21.0.12_8-jre-jammy@sha256:eebd356ad7358b7094758e5787a6726f332917cfd56feab6457c56dab895cdbf
+FROM eclipse-temurin:22.0.2_9-jre-jammy@sha256:dbcae8b5dd4d63f81739a538ec2c09797735f04a21d814f9071b62f018326043
 RUN groupadd --system --gid 10001 cc4c \
     && useradd --system --uid 10001 --gid cc4c --home-dir /app --shell /usr/sbin/nologin cc4c \
     && mkdir -p /app /var/lib/cc4c/uploads/blog /var/lib/cc4c/uploads/avatar \
