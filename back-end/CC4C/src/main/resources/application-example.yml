@@ -29,17 +29,19 @@ spring:
       repository-type: indexed
       namespace: "${CC4C_SESSION_NAMESPACE}"
   mail:
-    host: smtp.qq.com
+    host: "${CC4C_MAIL_HOST:mailpit}"
     password: "${CC4C_MAIL_PASSWORD:}"
-    username: "${CC4C_MAIL_USERNAME:}"
+    username: "${CC4C_MAIL_USERNAME:no-reply@cc4c.local}"
     default-encoding: UTF-8
-    port: 465
+    port: "${CC4C_MAIL_PORT:1025}"
     properties:
       mail:
         smtp:
-          auth: true
+          auth: "${CC4C_MAIL_AUTH:false}"
           ssl:
-            enable: true
+            enable: "${CC4C_MAIL_SSL_ENABLED:false}"
+          starttls:
+            enable: "${CC4C_MAIL_STARTTLS_ENABLED:false}"
   rabbitmq:
     addresses: "${CC4C_RABBITMQ_URL}"
     publisher-confirm-type: correlated

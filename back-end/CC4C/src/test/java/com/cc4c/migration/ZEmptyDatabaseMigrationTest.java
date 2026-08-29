@@ -1,5 +1,6 @@
 package com.cc4c.migration;
 
+import com.cc4c.support.Cc4cTestInfrastructure;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,14 +11,15 @@ class ZEmptyDatabaseMigrationTest extends FlywayTestSupport {
 
     @Test
     void dedicatedEmptyDatabaseMigratesFromV1AndIsRepeatable() throws Exception {
-        String mainUrl = required("CC4C_TEST_DB_URL");
-        String url = required("CC4C_TEST_EMPTY_DB_URL");
+        String mainUrl = Cc4cTestInfrastructure.mysqlUrl();
+        String schema = Cc4cTestInfrastructure.emptySchema();
+        Cc4cTestInfrastructure.recreateManagedSchema(schema);
+        String url = Cc4cTestInfrastructure.mysqlUrl(schema);
         String database = databaseName(url);
         assertTrue(database.endsWith("_flyway_test"));
         assertNotEquals(databaseName(mainUrl), database);
 
-        var flyway = flyway(url, false);
-        flyway.clean();
+        var flyway = flyway(url, true);
         assertEquals(7, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertTrue(flyway.validateWithResult().validationSuccessful);

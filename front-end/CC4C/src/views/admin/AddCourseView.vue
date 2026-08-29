@@ -72,6 +72,8 @@
         <div class="course-editor" :class="{ 'course-editor--error': formErrors.description }">
           <md-editor
             v-model="courseForm.description"
+            :sanitize="sanitizeMarkdownHtml"
+            :marked-heading-id="markdownHeadingId"
             :toolbars-exclude="['link', 'mermaid', 'katex', 'github']"
             @on-save="codeSave"
             @on-upload-img="onUploadImg"
@@ -129,6 +131,7 @@ import { Loading, Plus } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { apiErrorMessage } from '@/utils/apiError';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 
 
 const languages = [

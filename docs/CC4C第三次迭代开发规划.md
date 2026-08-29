@@ -1,6 +1,6 @@
 # CC4C 第三次迭代开发规划
 
-> 状态：方面一至方面三已于 2026-08-27 完成；方面四至方面六已于 2026-08-28 完成实现、自动验证、性能/故障门禁和用户浏览器验收；方面七“容器化、自动化测试与持续交付”尚未实施。
+> 状态：方面一至方面三已于 2026-08-27 完成；方面四至方面六已于 2026-08-28 完成；方面七已于 2026-08-29 完成实现、自动验证、容器性能/故障门禁和用户浏览器验收。V3 七个方面均已完成。
 
 ## 1. 规划背景与基线
 
@@ -8,7 +8,7 @@ CC4C 已完成两轮迭代：V1 建立并验证了认证、课程、博客、评
 
 V3 以 Git 提交 `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`）为规划基线，重点从“功能可用、界面完整”提升到“架构清晰、安全可靠、可观测、可测试、可复现”。本轮预计按 6–8 周的作品级工程规模推进，但每个方面都需要在新的计划对话中独立完成源码检查、实施设计和验收确认。
 
-本文件定义总体方向、顺序和验收证据。方面一至方面六的完成状态以本文件第 5 节、《CC4C 项目迭代修改记录》和 `docs/reports/v3/` 中的真实验证记录为准；方面七仍只表示规划目标。
+本文件定义总体方向、顺序和验收证据。七个方面的完成状态以本文件第 5 节、《CC4C 项目迭代修改记录》和 `docs/reports/v3/` 中的真实验证记录为准。
 
 ## 2. 当前状态与升级原则
 
@@ -21,7 +21,7 @@ V3 以 Git 提交 `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `542
 - 数据库结构与公开目录基线已由 Flyway V1–V7 接管，历史 SQL 仅保留作参考；V5 增加收藏分页复合索引，V6 增加加密消息 Outbox/Inbox，V7 增加兼容历史积压的请求关联 ID，查询索引以实际 SQL 和 `EXPLAIN FORMAT=JSON` 为依据。
 - 方面三已经接入 Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验；认证只信任不透明的 `CC4C_SESSION`，旧业务 Cookie 会被主动清除。
 - Redis 安全连接保存服务端会话、验证码摘要和安全限流计数；方面四以独立连接及 namespace 为公开课程和已审核博客增加 Cache-Aside，私有内容和权限结果不缓存。
-- 已形成固定数据规模、随机种子、并发组合和性能门禁的可重复本地对照；Actuator/Micrometer、Prometheus/Grafana、结构化日志、请求关联、告警规则和 Gatling 证据已完成。容器编排、Testcontainers 与持续集成闭环尚未实施。
+- 已形成固定数据规模、随机种子、并发组合和性能门禁的可重复对照；Actuator/Micrometer、Prometheus/Grafana、结构化日志、请求关联、告警规则和 Gatling 证据已完成。Docker Compose、Testcontainers、GitHub Actions 质量/发布工作流和 tag-only GHCR 发布定义已落地并通过本地门禁；远程 Actions、Git 标签和 GHCR 发布仍需单独授权后才会发生。
 - 前端已有较完整的 Vue 3 页面，活动调用统一复用 Axios 1.19.0 客户端，支持公开的 `VITE_API_BASE_URL` 和分页响应。
 
 ### 2.2 升级原则
@@ -89,7 +89,7 @@ flowchart LR
 | 四：缓存、数据库与性能优化 | 已完成；自动验证、性能门禁和用户浏览器验收通过 |
 | 五：异步事件与可靠性 | 已完成；自动验证、故障恢复和用户浏览器验收通过 |
 | 六：可观测性与性能证据 | 已完成；自动验证、性能门禁、故障演练和用户浏览器验收通过 |
-| 七：容器化、自动化测试与持续交付 | 未实施 |
+| 七：容器化、自动化测试与持续交付 | 已完成；自动验证、容器性能/故障门禁和用户浏览器验收通过 |
 
 ### 方面一：基础版本与依赖现代化（已完成）
 
@@ -224,7 +224,7 @@ V3 优先保留现有 URL 和业务语义；若接口契约必须调整，应同
 - 用户已确认三个 Dashboard、业务请求关联、Swagger 与管理指标认证正常。故障演练覆盖共享 Redis、RabbitMQ、消费者暂停、MySQL 应用连接隔离、安全 Redis、SMTP DEAD 与管理员恢复；所有精确服务均恢复，临时端口已关闭。
 - 脱敏性能、告警与故障证据见 [方面六报告](reports/v3/aspect6/README.md)。上述本机结果不代表生产容量，方面七仍未实施。
 
-### 方面七：容器化、自动化测试与持续交付（未实施）
+### 方面七：容器化、自动化测试与持续交付（已完成）
 
 目标是让开发环境、测试和质量门禁可以由其他人稳定复现。
 
@@ -234,11 +234,22 @@ V3 优先保留现有 URL 和业务语义；若接口契约必须调整，应同
 - 输出 ADR、运行手册、架构图、OpenAPI 和性能测试报告。
 - 全部能力真实落地后，再使用事实和实测数据更新 README。
 
+完成证据（2026-08-29）：
+
+- Compose 编排前端、后端、MySQL、两个 Redis、RabbitMQ、Mailpit、Prometheus 和 Grafana；宿主端口只绑定回环地址，MySQL/Redis/AMQP 完全不发布，持久卷在普通 `down`/`up` 后保留。
+- 后端测试改为 Testcontainers 1.21.4，单 JVM 启动 MySQL 8.4.11、两个 Redis 7.4.10 和 RabbitMQ 4.3.5；154/154 项测试通过，Flyway V1–V7、六模块边界和现有业务回归均通过，测试不读取本机服务或 `.env.test.local`。
+- 前端升级至 Node 24.18.0、npm 11.16.0、Vue 3.5.42、Vite 8.2.2 和 Element Plus 2.14.5；Markdown 输出统一经 sanitize-html 处理，安全测试、两类 npm audit 与生产构建均通过，High/Critical 为 0。
+- 多阶段镜像使用非 root、只读根文件系统、最小 capability、tmpfs 和 Compose secrets。最终 JAR/镜像不含本机 `application.yml`；本地后端/前端镜像 ID 分别为 `sha256:0bb9658...` 与 `sha256:103fc30...`，未创建 Git 标签、未推送或发布 GHCR。
+- GitHub Actions 已定义 PR/main 质量门禁、Testcontainers、审计、Trivy、Compose smoke、OpenAPI 漂移和 SemVer tag-only 多架构发布、SBOM/provenance/attestation；第三方 Action 固定完整 SHA。本地 actionlint、Compose、Prometheus/Grafana、OpenAPI 与 Trivy 等价门禁通过，远程工作流尚未运行。
+- 容器 `PublicReadSmoke` 为 10,656 请求、0 错误、p95 5 ms、p99 18 ms；`PublicReadStandard` 三轮中位数为 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。结果只代表本机受控环境，不表示生产容量。
+- 用户完成深层路由刷新、Mailpit 注册/找回与验证码单次消费、登录/Session/CSRF、收藏/评论/回复、草稿/上传/提交、管理员审核/异步消息、上传和数据库卷持久化、Actuator/Prometheus/Grafana、Swagger/控制台/网络脱敏的浏览器验收。
+- 交付、性能、供应链和浏览器证据见 [方面七报告](reports/v3/aspect7/README.md)，部署及回滚步骤见 [容器运行手册](CC4C容器运行手册.md)。
+
 ## 6. 性能验证框架
 
 ### 6.1 可重复环境
 
-- 方面六使用本机原生 Prometheus/Grafana、专用 MySQL/Redis/RabbitMQ namespace 完成验证；Docker Compose 与容器化复现留到方面七，不作为方面六已完成证据。
+- 方面六使用本机原生 Prometheus/Grafana、专用 MySQL/Redis/RabbitMQ namespace 完成历史基线；方面七随后以隔离 Compose 服务和容器性能 profile 复现并补充交付证据。
 - 测试数据通过脚本生成，记录随机种子、记录数量和数据分布。
 - 基线与优化版本使用同一硬件、JVM 参数、容器资源、数据库数据和负载脚本。
 - 每次报告记录 Git 提交、Java/容器版本和是否启用缓存、索引或异步能力。

@@ -2,9 +2,9 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
-    url: ${CC4C_TEST_DB_URL}
-    username: ${CC4C_TEST_DB_USERNAME}
-    password: ${CC4C_TEST_DB_PASSWORD}
+    url: jdbc:mysql://testcontainers-not-configured.invalid:3306/cc4c_test
+    username: testcontainers
+    password: testcontainers
     hikari:
       connection-timeout: 3000
       validation-timeout: 1000
@@ -14,7 +14,7 @@ spring:
     validate-on-migrate: true
   data:
     redis:
-      url: ${CC4C_TEST_REDIS_URL}
+      url: redis://testcontainers-not-configured.invalid:6379
       connect-timeout: 2s
       timeout: 2s
   session:
@@ -26,7 +26,7 @@ spring:
   mail:
     username: test-sender@example.com
   rabbitmq:
-    addresses: ${CC4C_TEST_RABBITMQ_URL}
+    addresses: amqp://testcontainers:testcontainers@testcontainers-not-configured.invalid:5672/cc4c_test
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -59,7 +59,7 @@ cc4c:
     consumers-enabled: false
   cache:
     enabled: true
-    redis-url: ${CC4C_TEST_CACHE_REDIS_URL}
+    redis-url: redis://testcontainers-not-configured.invalid:6379
     namespace: ${CC4C_TEST_CACHE_REDIS_NAMESPACE:cc4c:test:cache:manual}
     test-cleanup-enabled: true
   security:

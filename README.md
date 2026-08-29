@@ -4,9 +4,9 @@
   <p>面向编程学习者的课程发现、内容阅读与技术交流平台</p>
 
   <p>
-    <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.2-42b883?logo=vuedotjs&logoColor=white" />
-    <img alt="Element Plus" src="https://img.shields.io/badge/Element_Plus-2.2-409eff" />
-    <img alt="Vite" src="https://img.shields.io/badge/Vite-3.0-646cff?logo=vite&logoColor=white" />
+    <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.5.42-42b883?logo=vuedotjs&logoColor=white" />
+    <img alt="Element Plus" src="https://img.shields.io/badge/Element_Plus-2.14.5-409eff" />
+    <img alt="Vite" src="https://img.shields.io/badge/Vite-8.2.2-646cff?logo=vite&logoColor=white" />
     <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.16-6db33f?logo=springboot&logoColor=white" />
     <img alt="Java" src="https://img.shields.io/badge/Java-21-ed8b00?logo=openjdk&logoColor=white" />
     <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.x-4479a1?logo=mysql&logoColor=white" />
@@ -17,7 +17,7 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本已完成 V3 方面一至方面六，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性以及可观测性与性能证据。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。前端继续使用 Vue 3，并通过 Axios 1.19.0 统一处理会话、CSRF、分页和错误响应。V3 方面七“容器化与持续交付”尚未实施。
+当前版本已完成 V3 七个方面，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性、可观测性与性能证据，以及容器化与持续交付。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。Docker Compose 提供完整本地环境，Testcontainers 隔离后端集成测试，GitHub Actions 定义质量与 SemVer tag-only 发布门禁。前端使用 Vue 3.5、Vite 8 和 Axios 1.19.0，并统一处理会话、CSRF、分页、错误响应与 Markdown 输出净化。
 
 ## 平台亮点
 
@@ -104,16 +104,17 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 
 | 层级 | 技术 |
 | --- | --- |
-| 前端框架 | Vue 3、Vue Router、Vuex |
-| UI 与交互 | Element Plus、Element Plus Icons、响应式 CSS |
+| 前端框架 | Vue 3.5.42、Vue Router、Vuex |
+| UI 与交互 | Element Plus 2.14.5、Element Plus Icons、响应式 CSS |
 | 内容编辑 | md-editor-v3、sanitize-html |
-| 网络与构建 | Axios 1.19.0、Vite |
+| 网络与构建 | Node 24.18.0、npm 11.16.0、Axios 1.19.0、Vite 8.2.2 |
 | 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
 | API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
 | 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
 | 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V7、Redis Cache-Aside |
 | 异步可靠性 | RabbitMQ 4.3.5、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
 | 可观测与压测 | Actuator、Micrometer、Prometheus 3.13.2、Grafana 13.1.0、ECS JSON、Gatling 3.15.1 |
+| 测试与交付 | Testcontainers 1.21.4、Docker Compose、Mailpit 1.31.0、GitHub Actions、Trivy、GHCR 发布定义 |
 | 序列化与服务 | Jackson、AES-256-GCM、JavaMail、文件资源读写 |
 
 ## 系统架构
@@ -167,6 +168,8 @@ flowchart TB
 
 Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
 
+Compose 网络、secret、持久卷、Testcontainers 和 GitHub Actions 发布链路见 [容器交付架构](docs/CC4C容器交付架构.md)。
+
 ## 仓库结构
 
 ```text
@@ -203,18 +206,33 @@ CC4C/
 │  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
 │  ├─ test-database-admin-setup.sql # 专用测试库授权模板
 │  └─ README.md                     # Flyway 初始化、备份与恢复说明
-├─ observability/                   # Prometheus 规则、Grafana Provisioning 与本机受控脚本
-├─ docs/                            # 迭代文档、故障手册、README 图片与脱敏报告
+├─ deploy/                          # 本机秘密生成、管理员引导、Rabbit 初始化与容器性能脚本
+├─ observability/                   # Prometheus 规则、Grafana Provisioning 与受控脚本
+├─ .github/                         # 质量、发布工作流与 Dependabot 配置
+├─ compose.yml                      # 完整本地环境；默认 Mailpit、隔离网络和持久卷
+├─ compose.smtp.yml                 # 可选外部 SMTP 覆盖
+├─ docs/                            # 迭代文档、ADR、运行手册、OpenAPI 与脱敏报告
 └─ README.md
 ```
 
 ## 本地运行
 
+### 推荐：完整 Docker Compose 环境
+
+安装 Docker Desktop 后，可由脚本生成只存在本机的 secret 文件，再启动完整环境：
+
+```powershell
+.\deploy\scripts\prepare-local.ps1
+docker compose -p cc4c-v3 up --build -d --wait
+```
+
+默认邮件由 Mailpit 捕获，不需要真实 SMTP。前端、后端、Actuator、Grafana、Prometheus、RabbitMQ 管理页和 Mailpit 分别绑定 `127.0.0.1` 的 5173、4080、4081、3000、9090、15672 和 8025；MySQL、两个 Redis、AMQP 与 Rabbit 指标端口不向宿主机发布。普通停止使用 `docker compose -p cc4c-v3 down`，不得添加 `-v`。完整启动、管理员引导、外部 SMTP、备份、回滚和安全重置见 [容器运行手册](docs/CC4C容器运行手册.md)。
+
 ### 1. 环境要求
 
 - JDK 21
 - Maven 3.6.3+
-- Node.js 18+ 与 npm
+- Node.js 24.18.0 与 npm 11.16.0（仅手工运行前端时需要）
 - MySQL 8.x
 - Redis 7.x
 - RabbitMQ 4.3.x（本次验收版本 4.3.5）
@@ -354,16 +372,14 @@ npm ci
 npm run build
 ```
 
-后端测试必须连接相互独立的主测试库、空迁移库、安全 Redis、业务缓存 Redis和专用 RabbitMQ test vhost。先由管理员按 [数据库说明](database/README.md) 创建并授权测试库，再使用受控脚本；`.env.test.local` 缺失、八个变量任一为空、库名或 vhost 不符合约束时都会快速失败，不会回退到开发环境：
+后端标准测试使用 Testcontainers 1.21.4，在单个测试 JVM 中启动 MySQL 8.4.11、两个 Redis 7.4.10 和 RabbitMQ 4.3.5。测试不读取 `.env.test.local`，也不会连接或清理本机数据库、Redis 或 RabbitMQ；需要 Java 21 和可用的 Docker Engine：
 
 ```powershell
 cd back-end/CC4C
-Copy-Item .env.test.example .env.test.local
-# 填写四个 CC4C_TEST_DB_* 变量、两个 Redis 变量、CC4C_TEST_RABBITMQ_URL 和 vhost 确认值
 .\run-tests.ps1 clean verify
 ```
 
-主测试库名必须以 `_test` 结尾但不能以 `_flyway_test` 结尾；空迁移库必须以 `_flyway_test` 结尾；RabbitMQ vhost 必须显式以 `_test` 结尾并与确认值一致。测试门禁每次分别生成独立的 Session、业务缓存和 Rabbit namespace，只清理本轮精确资源，禁止 `FLUSHDB`、`FLUSHALL`、默认 vhost 或全局队列清理。门禁会验证 V1–V7、密码迁移、安全体系、Cache-Aside、Outbox 事务原子性、Publisher Confirm、返回消息、幂等消费、重试/DLQ、请求关联、管理端权限、指标/健康、日志脱敏和既有业务回归。当前验收基线为 150 项测试全部通过。
+MySQL 容器从空库执行 V1–V7；迁移测试另建容器内临时库验证空库、V1 已有库、重复 migrate 和 validate。Redis/Rabbit namespace 每轮独立，Testcontainers reuse 禁用，由 Ryuk 清理本轮资源。门禁覆盖密码迁移、安全体系、Cache-Aside、Outbox 原子性、Publisher Confirm、幂等消费、重试/DLQ、请求关联、管理端权限、指标/健康、日志脱敏、六模块和既有业务回归。当前验收基线为 154 项测试全部通过。
 
 ### 方面四独立性能基准
 
@@ -380,11 +396,16 @@ cd back-end/CC4C
 
 Gatling 场景只允许连接 loopback 和名称精确以 `_perf_test` 结尾的性能库。三轮 `PublicReadStandard` 中位数显示：观测关闭/开启均为 0 错误，p95 均为 5 ms，p99 从 7 ms 变为 8 ms，吞吐从 869.98 req/s 变为 868.91 req/s；p99 退化 14.29%、吞吐下降 0.12%，均通过门禁。`AuthenticatedMixed` 共 158,023 请求、0 错误、p95 11 ms；`StepCapacity` 共 885,823 请求、0 错误、p95 9 ms。故障修复后的当前构建 smoke 为 10,469 请求、0 错误、p95 7 ms、p99 19 ms。完整环境、负载、指标、告警和故障演练证据见 [方面六报告](docs/reports/v3/aspect6/README.md)。
 
+### 方面七容器性能与交付证据
+
+显式 performance profile 使用隔离的 `cc4c_perf_test`、固定种子 `20260827` 和关闭 Dispatcher/Consumer 的后端容器。`PublicReadSmoke` 为 10,656 请求、0 错误、p95 5 ms、p99 18 ms；`PublicReadStandard` 三轮中位数为 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。后端 Testcontainers 154/154 通过，前端安全测试、两类 npm audit、生产构建、Trivy 源码/镜像扫描、Compose/OpenAPI/Prometheus/Grafana 门禁均通过。完整限制和供应链状态见 [方面七报告](docs/reports/v3/aspect7/README.md)；本地镜像尚未推送或发布到 GHCR。
+
 ## 安全说明
 
 - `back-end/CC4C/src/main/resources/application.yml` 是本机真实配置，已被 Git 忽略，禁止提交。
 - Maven 构建显式排除 `application.yml`；最终 JAR 只允许包含脱敏的 `application-example.yml`。
 - `.env.runtime.local`、`.env.test.local` 与前端 `.env.local` 仅限本机使用，禁止提交；`.env.example` 文件不得包含秘密。
+- Compose secret 只存在 `deploy/secrets/local/`，后端入口仅在进程启动时读取挂载文件；不得把 secret 值写进 Compose 环境、镜像层、日志或命令行。普通 `down` 不删除卷，只有带精确项目名和二次输入确认的 `reset-local.ps1` 可以执行本项目卷重置。
 - 认证只信任服务端 Redis Session 和 `CC4C_SESSION`；旧 `user_email`、`admin` Cookie 会被清除，不能作为身份依据。
 - 所有浏览器写请求必须携带 CSRF Token；生产 HTTPS 环境必须设置 `CC4C_SESSION_COOKIE_SECURE=true`，CORS 只能配置精确来源。
 - 安全 Redis 与业务缓存使用不同 namespace；生产环境应使用独立实例。业务缓存只覆盖公开课程和已审核博客，认证、私有内容与权限结果不得缓存。
@@ -396,6 +417,8 @@ Gatling 场景只允许连接 loopback 和名称精确以 `_perf_test` 结尾的
 - 不要在源码、README、截图、Issue 或日志中放入 Token、Cookie、数据库密码、SMTP 授权码等敏感信息。
 - GitHub 只应保留脱敏的 `application-example.yml`；如怀疑密钥泄露，请先轮换密钥，再清理历史记录。
 - `node_modules/`、`dist/`、`target/`、`temp/` 和运行日志均属于本地产物，不应提交。
+- 后端和前端镜像均以非 root、只读根文件系统、`no-new-privileges` 和最小 capability 运行；宿主访问端口只绑定回环地址，MySQL、Redis 与 AMQP 保持内部隔离。
+- GitHub Actions 发布只响应严格 SemVer 标签，定义多架构 GHCR 镜像、SBOM、最大 provenance 和 attestation；创建提交、推送、打标签和发布镜像仍分别需要明确授权。
 - 提交前建议执行 `git status` 和敏感信息扫描，确认暂存区只包含预期文件。
 
 ---

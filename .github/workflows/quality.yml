@@ -1,0 +1,203 @@
+name: quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Test with isolated containers
+        shell: pwsh
+        working-directory: back-end/CC4C
+        run: ./run-tests.ps1
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: front-end/CC4C/package-lock.json
+      - name: Install, audit and build
+        working-directory: front-end/CC4C
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+          npm ci
+          npm run test:security
+          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=high
+          npm run build
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3 # v4.8.0
+        with:
+          fail-on-severity: high
+
+  delivery-config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate CI-only secret files
+        shell: pwsh
+        run: ./deploy/scripts/prepare-local.ps1
+      - name: Validate Compose without expanding secrets
+        run: |
+          docker compose -p cc4c-ci config --quiet
+          printf 'ci-invalid-smtp-user' > deploy/secrets/local/smtp_username
+          printf 'ci-invalid-smtp-password' > deploy/secrets/local/smtp_password
+          CC4C_MAIL_HOST=smtp.invalid CC4C_MAIL_PORT=587 \
+            docker compose -p cc4c-ci -f compose.yml -f compose.smtp.yml config --quiet
+          docker compose -p cc4c-ci config > /tmp/cc4c-compose.yml
+          for secret in deploy/secrets/local/*; do
+            if grep -Fq "$(cat "$secret")" /tmp/cc4c-compose.yml; then
+              echo "Compose expanded a secret value" >&2
+              exit 1
+            fi
+          done
+      - name: Validate Prometheus rules and tests
+        run: |
+          docker run --rm --entrypoint /bin/promtool \
+            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            -v "$PWD/deploy/secrets/local:/run/secrets:ro" \
+            prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
+            check config /etc/prometheus/prometheus.compose.yml
+          docker run --rm --entrypoint /bin/promtool \
+            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
+            check rules /etc/prometheus/rules/cc4c-alerts.yml
+          docker run --rm --entrypoint /bin/promtool \
+            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
+            test rules /etc/prometheus/tests/cc4c-alerts.test.yml
+      - name: Validate Grafana JSON
+        shell: pwsh
+        run: |
+          Get-ChildItem observability/grafana/dashboards/*.json | ForEach-Object {
+            Get-Content -Raw $_.FullName | ConvertFrom-Json | Out-Null
+          }
+
+  source-scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  compose-smoke:
+    needs: [backend, frontend, delivery-config, source-scan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Generate CI-only secret files
+        shell: pwsh
+        run: ./deploy/scripts/prepare-local.ps1
+      - name: Start isolated delivery stack
+        run: docker compose -p cc4c-ci up --build -d --wait --wait-timeout 420
+      - name: Verify services, security and API snapshot
+        run: |
+          curl --fail --silent http://127.0.0.1:5173/admin/messaging >/dev/null
+          curl --fail --silent http://127.0.0.1:4081/actuator/health/readiness >/dev/null
+          curl --fail --silent http://127.0.0.1:8025/readyz >/dev/null
+          curl --fail --silent http://127.0.0.1:9090/-/ready >/dev/null
+          curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4081/actuator/prometheus)"
+          test "$status" = 401
+          curl --fail --silent --user "cc4c_observer:$(cat deploy/secrets/local/management_password)" \
+            http://127.0.0.1:4081/actuator/prometheus >/dev/null
+          mysql_time_zone="$(docker compose -p cc4c-ci exec -T mysql sh -ec \
+            'MYSQL_PWD="$(cat /run/secrets/mysql_root_password)" mysql -uroot -Nse "SELECT CONCAT(@@GLOBAL.time_zone,0x3A,@@SESSION.time_zone)"')"
+          test "$mysql_time_zone" = "+08:00:+08:00"
+          node deploy/scripts/openapi-snapshot.mjs check
+          test "$(docker compose -p cc4c-ci exec -T backend id -u)" = 10001
+          test "$(docker compose -p cc4c-ci exec -T frontend id -u)" != 0
+          rabbit_users="$(docker compose -p cc4c-ci exec -T rabbitmq sh -ec \
+            'RABBITMQ_ERLANG_COOKIE="$(cat /run/secrets/rabbit_erlang_cookie)" rabbitmqctl -q list_users')"
+          if grep -Eq '^(guest|cc4c_bootstrap)[[:space:]]' <<<"$rabbit_users"; then
+            echo 'Temporary RabbitMQ user remained after initialization' >&2
+            exit 1
+          fi
+          grep -Eq '^cc4c_app[[:space:]]' <<<"$rabbit_users"
+          grep -Eq '^cc4c_monitor[[:space:]]' <<<"$rabbit_users"
+          docker compose -p cc4c-ci restart rabbitmq
+          docker compose -p cc4c-ci up -d --wait --wait-timeout 180 rabbitmq
+          rabbit_users="$(docker compose -p cc4c-ci exec -T rabbitmq sh -ec \
+            'RABBITMQ_ERLANG_COOKIE="$(cat /run/secrets/rabbit_erlang_cookie)" rabbitmqctl -q list_users')"
+          if grep -Eq '^(guest|cc4c_bootstrap)[[:space:]]' <<<"$rabbit_users"; then
+            echo 'Temporary RabbitMQ user reappeared after restart' >&2
+            exit 1
+          fi
+      - name: Verify image contents and persistent upload volumes
+        run: |
+          mkdir -p temp/ci-image
+          backend_id="$(docker create cc4c/backend:aspect7)"
+          trap 'docker rm -f "$backend_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$backend_id:/app/cc4c.jar" temp/ci-image/cc4c.jar
+          if unzip -Z1 temp/ci-image/cc4c.jar | grep -Fxq 'BOOT-INF/classes/application.yml'; then
+            echo 'Forbidden application.yml found in backend image' >&2
+            exit 1
+          fi
+          docker compose -p cc4c-ci exec -T backend sh -ec \
+            'printf persisted > /var/lib/cc4c/uploads/blog/ci-persistence-marker'
+          docker compose -p cc4c-ci restart backend frontend
+          docker compose -p cc4c-ci up -d --wait --wait-timeout 240
+          test "$(curl --fail --silent http://127.0.0.1:5173/blogImg/ci-persistence-marker)" = persisted
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: cc4c/backend:aspect7
+          scan-type: image
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: cc4c/frontend:aspect7
+          scan-type: image
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Remove only the CI Compose project
+        if: always()
+        run: docker compose -p cc4c-ci down --volumes --remove-orphans

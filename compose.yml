@@ -1,0 +1,614 @@
+name: cc4c-v3
+
+services:
+  mysql:
+    image: mysql:8.4.11@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    environment:
+      MYSQL_DATABASE: cc4c
+      MYSQL_USER: cc4c
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_app_password
+    secrets:
+      - mysql_root_password
+      - mysql_app_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - MYSQL_PWD="$$(cat /run/secrets/mysql_root_password)" mysqladmin ping -h 127.0.0.1 -uroot --silent
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  redis-security:
+    image: redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$(cat /run/secrets/redis_security_password)"
+    secrets:
+      - redis_security_password
+    volumes:
+      - redis_security_data:/data
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - REDISCLI_AUTH="$$(cat /run/secrets/redis_security_password)" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  redis-cache:
+    image: redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$(cat /run/secrets/redis_cache_password)"
+    secrets:
+      - redis_cache_password
+    volumes:
+      - redis_cache_data:/data
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - REDISCLI_AUTH="$$(cat /run/secrets/redis_cache_password)" redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.3.5-management@sha256:45226f38499559b9f56875c752cc6689ff90e8f20796fe80fd9bc28d64723031
+    hostname: rabbitmq
+    entrypoint:
+      - /bin/bash
+      - /opt/cc4c/rabbit-entrypoint.sh
+    configs:
+      - source: rabbitmq_config
+        target: /opt/cc4c/rabbitmq.conf.template
+      - source: rabbitmq_entrypoint
+        target: /opt/cc4c/rabbit-entrypoint.sh
+      - source: rabbitmq_password_hasher
+        target: /opt/cc4c/rabbit-password-hash.escript
+    secrets:
+      - rabbit_bootstrap_password
+      - rabbit_erlang_cookie
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    tmpfs:
+      - /run/cc4c:size=1m,mode=0700
+    networks:
+      - app
+      - observability
+      - rabbit-host
+    ports:
+      - 127.0.0.1:${CC4C_RABBITMQ_MANAGEMENT_PORT:-15672}:15672
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - RABBITMQ_ERLANG_COOKIE="$$(tr -d '\r\n' < /run/secrets/rabbit_erlang_cookie)" rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  rabbit-init:
+    image: rabbitmq:4.3.5-management@sha256:45226f38499559b9f56875c752cc6689ff90e8f20796fe80fd9bc28d64723031
+    entrypoint:
+      - /bin/bash
+      - /opt/cc4c/rabbit-init.sh
+    configs:
+      - source: rabbitmq_init
+        target: /opt/cc4c/rabbit-init.sh
+      - source: rabbitmq_password_hasher
+        target: /opt/cc4c/rabbit-password-hash.escript
+    secrets:
+      - rabbit_bootstrap_password
+      - rabbit_app_password
+      - rabbit_monitor_password
+    tmpfs:
+      - /run/cc4c:size=1m,mode=0700
+    networks:
+      - app
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  mailpit:
+    image: axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    environment:
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+    networks:
+      - app
+      - mailpit-host
+    ports:
+      - 127.0.0.1:8025:8025
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  storage-init:
+    image: cc4c/backend:aspect7
+    user: "0:0"
+    entrypoint:
+      - /bin/bash
+      - -ec
+    command:
+      - |
+        chown -R 10001:10001 /var/lib/cc4c/uploads/blog /var/lib/cc4c/uploads/avatar
+        find /var/lib/cc4c/uploads/blog /var/lib/cc4c/uploads/avatar -type d -exec chmod 0755 {} +
+        find /var/lib/cc4c/uploads/blog /var/lib/cc4c/uploads/avatar -type f -exec chmod 0644 {} +
+    volumes:
+      - blog_uploads:/var/lib/cc4c/uploads/blog
+      - avatar_uploads:/var/lib/cc4c/uploads/avatar
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  backend:
+    image: cc4c/backend:aspect7
+    build:
+      context: ./back-end/CC4C
+      dockerfile: Dockerfile
+    environment:
+      CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      CC4C_DB_USERNAME: cc4c
+      CC4C_SESSION_NAMESPACE: cc4c:v3:session:compose
+      CC4C_SESSION_COOKIE_SECURE: "false"
+      CC4C_ALLOWED_ORIGINS: http://localhost:5173
+      CC4C_BCRYPT_STRENGTH: "12"
+      CC4C_BUSINESS_CACHE_ENABLED: "true"
+      CC4C_CACHE_NAMESPACE: cc4c:v3:cache:compose
+      CC4C_RABBITMQ_NAMESPACE: cc4c.v3.messaging.local
+      CC4C_MESSAGING_ACTIVE_KEY_ID: local-v1
+      CC4C_MODERATION_NOTIFICATION_RECIPIENTS: reviewer@cc4c.local
+      CC4C_API_DOCS_ENABLED: "true"
+      CC4C_OBSERVABILITY_ENABLED: "true"
+      CC4C_OBSERVABILITY_ENVIRONMENT: compose
+      CC4C_MANAGEMENT_ADDRESS: 0.0.0.0
+      CC4C_MANAGEMENT_PORT: "4081"
+      CC4C_MANAGEMENT_USERNAME: cc4c_observer
+      CC4C_LOG_FORMAT: ecs
+      CC4C_MAIL_HOST: mailpit
+      CC4C_MAIL_PORT: "1025"
+      CC4C_MAIL_USERNAME: no-reply@cc4c.local
+      CC4C_MAIL_AUTH: "false"
+      CC4C_MAIL_SSL_ENABLED: "false"
+      CC4C_MAIL_STARTTLS_ENABLED: "false"
+      CC4C_SAVE_IMG_PATH: /var/lib/cc4c/uploads/blog
+      CC4C_REQUEST_IMG_PATH: http://localhost:5173/blogImg/
+      CC4C_SAVE_AVATAR_PATH: /var/lib/cc4c/uploads/avatar
+      CC4C_REQUEST_AVATAR_PATH: http://localhost:5173/avatar/
+    secrets:
+      - mysql_app_password
+      - redis_security_password
+      - redis_cache_password
+      - rabbit_app_password
+      - security_pepper
+      - messaging_payload_key
+      - management_password
+    volumes:
+      - blog_uploads:/var/lib/cc4c/uploads/blog
+      - avatar_uploads:/var/lib/cc4c/uploads/avatar
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    networks:
+      - app
+      - observability
+      - backend-host
+    ports:
+      - 127.0.0.1:4080:4080
+      - 127.0.0.1:4081:4081
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis-security:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      rabbit-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - exec 3<>/dev/tcp/127.0.0.1/4081 && printf 'GET /actuator/health/readiness HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  frontend:
+    image: cc4c/frontend:aspect7
+    build:
+      context: ./front-end/CC4C
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:4080
+    volumes:
+      - blog_uploads:/usr/share/nginx/html/blogImg:ro
+      - avatar_uploads:/usr/share/nginx/html/avatar:ro
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - frontend-host
+    ports:
+      - 127.0.0.1:5173:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.listen-address=0.0.0.0:9090
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_alerts
+        target: /etc/prometheus/rules/cc4c-alerts.yml
+    secrets:
+      - management_password
+      - rabbit_monitor_password
+    volumes:
+      - prometheus_data:/prometheus
+    networks:
+      - observability
+      - prometheus-host
+    ports:
+      - 127.0.0.1:9090:9090
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbit-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.1.0@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63
+    environment:
+      GF_SECURITY_ADMIN_USER: cc4c_grafana_admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      CC4C_PROMETHEUS_URL: http://prometheus:9090
+      CC4C_GRAFANA_DASHBOARD_PATH: /var/lib/grafana/dashboards
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - observability
+      - grafana-host
+    ports:
+      - 127.0.0.1:3000:3000
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  perf-init:
+    profiles:
+      - performance
+    image: mysql:8.4.11@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    entrypoint:
+      - /bin/bash
+      - /opt/cc4c/perf-init.sh
+    configs:
+      - source: perf_init
+        target: /opt/cc4c/perf-init.sh
+    secrets:
+      - mysql_root_password
+    networks:
+      - app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  backend-perf:
+    profiles:
+      - performance
+    image: cc4c/backend:aspect7
+    build:
+      context: ./back-end/CC4C
+      dockerfile: Dockerfile
+    environment:
+      CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c_perf_test?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      CC4C_DB_USERNAME: cc4c
+      CC4C_SESSION_NAMESPACE: cc4c:v3:session:compose-perf
+      CC4C_SESSION_COOKIE_SECURE: "false"
+      CC4C_ALLOWED_ORIGINS: http://localhost:5173
+      CC4C_BCRYPT_STRENGTH: "4"
+      CC4C_BUSINESS_CACHE_ENABLED: "true"
+      CC4C_CACHE_NAMESPACE: cc4c:v3:cache:compose-perf
+      CC4C_RABBITMQ_NAMESPACE: cc4c.v3.messaging.perf
+      CC4C_MESSAGING_ACTIVE_KEY_ID: local-v1
+      CC4C_MODERATION_NOTIFICATION_RECIPIENTS: reviewer@cc4c.local
+      CC4C_OUTBOX_DISPATCHER_ENABLED: "false"
+      CC4C_MESSAGE_CONSUMERS_ENABLED: "false"
+      CC4C_API_DOCS_ENABLED: "false"
+      CC4C_OBSERVABILITY_ENABLED: "true"
+      CC4C_OBSERVABILITY_ENVIRONMENT: compose-perf
+      CC4C_MANAGEMENT_ADDRESS: 0.0.0.0
+      CC4C_MANAGEMENT_PORT: "4081"
+      CC4C_MANAGEMENT_USERNAME: cc4c_observer
+      CC4C_LOG_FORMAT: ecs
+      CC4C_MAIL_HOST: mailpit
+      CC4C_MAIL_PORT: "1025"
+      CC4C_MAIL_USERNAME: no-reply@cc4c.local
+      CC4C_MAIL_AUTH: "false"
+      CC4C_MAIL_SSL_ENABLED: "false"
+      CC4C_MAIL_STARTTLS_ENABLED: "false"
+      CC4C_SAVE_IMG_PATH: /var/lib/cc4c/uploads/blog
+      CC4C_REQUEST_IMG_PATH: http://localhost:5173/blogImg/
+      CC4C_SAVE_AVATAR_PATH: /var/lib/cc4c/uploads/avatar
+      CC4C_REQUEST_AVATAR_PATH: http://localhost:5173/avatar/
+    secrets:
+      - mysql_app_password
+      - redis_security_password
+      - redis_cache_password
+      - rabbit_app_password
+      - security_pepper
+      - messaging_payload_key
+      - management_password
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /var/lib/cc4c/uploads:size=32m,mode=0700,uid=10001,gid=10001
+    networks:
+      - app
+    depends_on:
+      perf-init:
+        condition: service_completed_successfully
+      redis-security:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      rabbit-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - exec 3<>/dev/tcp/127.0.0.1/4081 && printf 'GET /actuator/health/readiness HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  performance-tools:
+    profiles:
+      - performance
+    image: cc4c/performance-tools:aspect7
+    build:
+      context: ./back-end/CC4C
+      dockerfile: Dockerfile
+      target: performance-tools
+    entrypoint:
+      - /bin/bash
+      - /opt/cc4c/performance-entrypoint.sh
+    configs:
+      - source: performance_entrypoint
+        target: /opt/cc4c/performance-entrypoint.sh
+    environment:
+      CC4C_PERF_DB_URL: jdbc:mysql://mysql:3306/cc4c_perf_test?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      CC4C_PERF_DB_USERNAME: cc4c
+      CC4C_PERF_DB_RESET_CONFIRM: cc4c_perf_test
+      CC4C_PERF_BASE_URL: http://backend-perf:4080
+      CC4C_CONTAINER_PERF_CONFIRM: backend-perf
+      CC4C_PERF_SESSION_NAMESPACE: cc4c:v3:session:compose-perf
+      CC4C_PERF_CACHE_NAMESPACE: cc4c:v3:cache:compose-perf
+      CC4C_PERF_RABBITMQ_NAMESPACE: cc4c.v3.messaging.perf
+    secrets:
+      - mysql_app_password
+      - redis_cache_password
+      - admin_bootstrap_password
+      - management_password
+    volumes:
+      - ./temp/cc4c-v3-aspect7-gatling:/workspace/target/gatling
+    networks:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  admin-bootstrap:
+    profiles:
+      - bootstrap
+    image: cc4c/backend:aspect7
+    environment:
+      CC4C_LAUNCH_MODE: admin-bootstrap
+      CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      CC4C_DB_USERNAME: cc4c
+      CC4C_ADMIN_BOOTSTRAP_CONFIRM_DATABASE: cc4c
+      CC4C_ADMIN_BOOTSTRAP_ID: ${CC4C_ADMIN_BOOTSTRAP_ID:-invalid}
+      CC4C_BCRYPT_STRENGTH: "12"
+    secrets:
+      - mysql_app_password
+      - admin_bootstrap_password
+    networks:
+      - app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+networks:
+  app:
+    internal: true
+  observability:
+    internal: true
+  rabbit-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  mailpit-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  frontend-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  prometheus-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  grafana-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  backend-host:
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+  egress:
+
+volumes:
+  mysql_data:
+  redis_security_data:
+  redis_cache_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+  blog_uploads:
+  avatar_uploads:
+
+configs:
+  rabbitmq_config:
+    file: ./deploy/rabbitmq/rabbitmq.conf
+  rabbitmq_entrypoint:
+    file: ./deploy/scripts/rabbit-entrypoint.sh
+  rabbitmq_init:
+    file: ./deploy/scripts/rabbit-init.sh
+  rabbitmq_password_hasher:
+    file: ./deploy/scripts/rabbit-password-hash.escript
+  prometheus_config:
+    file: ./observability/prometheus/prometheus.compose.yml
+  prometheus_alerts:
+    file: ./observability/prometheus/rules/cc4c-alerts.yml
+  perf_init:
+    file: ./deploy/scripts/perf-init.sh
+  performance_entrypoint:
+    file: ./deploy/scripts/performance-entrypoint.sh
+
+secrets:
+  mysql_root_password:
+    file: ./deploy/secrets/local/mysql_root_password
+  mysql_app_password:
+    file: ./deploy/secrets/local/mysql_app_password
+  redis_security_password:
+    file: ./deploy/secrets/local/redis_security_password
+  redis_cache_password:
+    file: ./deploy/secrets/local/redis_cache_password
+  rabbit_bootstrap_password:
+    file: ./deploy/secrets/local/rabbit_bootstrap_password
+  rabbit_app_password:
+    file: ./deploy/secrets/local/rabbit_app_password
+  rabbit_monitor_password:
+    file: ./deploy/secrets/local/rabbit_monitor_password
+  rabbit_erlang_cookie:
+    file: ./deploy/secrets/local/rabbit_erlang_cookie
+  security_pepper:
+    file: ./deploy/secrets/local/security_pepper
+  messaging_payload_key:
+    file: ./deploy/secrets/local/messaging_payload_key
+  management_password:
+    file: ./deploy/secrets/local/management_password
+  grafana_admin_password:
+    file: ./deploy/secrets/local/grafana_admin_password
+  admin_bootstrap_password:
+    file: ./deploy/secrets/local/admin_bootstrap_password

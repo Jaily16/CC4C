@@ -3,6 +3,7 @@ package com.cc4c.shared;
 import com.cc4c.functional.FunctionalTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,9 +37,16 @@ class EncryptedBrokerPayloadFunctionalTest extends FunctionalTestSupport {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
+    @Autowired
+    private AmqpAdmin rabbitAdmin;
+
     @Test
     void dispatchedRabbitEnvelopeContainsNeitherRecipientNorVerificationCode() {
-        Instant occurredAt = Instant.now();
+        jdbcTemplate.update("DELETE FROM async_inbox");
+        jdbcTemplate.update("DELETE FROM async_outbox");
+        rabbitAdmin.purgeQueue(topology.verificationQueue(), false);
+
+        Instant occurredAt = Instant.now().minusSeconds(1);
         String eventId = transactionalOutbox.append(
                 AsyncEventTypes.VERIFICATION_EMAIL_REQUESTED,
                 "verification",

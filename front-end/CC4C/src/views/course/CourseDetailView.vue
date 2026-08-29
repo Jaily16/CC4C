@@ -33,7 +33,13 @@
 
           <div class="course-reading__layout">
             <div class="course-reading__article">
-              <md-editor v-model="text" :editor-id="editorState.id" preview-only />
+              <md-editor
+                v-model="text"
+                :editor-id="editorState.id"
+                :sanitize="sanitizeMarkdownHtml"
+                :marked-heading-id="markdownHeadingId"
+                preview-only
+              />
             </div>
           </div>
         </article>
@@ -53,7 +59,11 @@
             <span>课程目录</span>
             <small>点击章节跳转</small>
           </div>
-          <md-catalog :editor-id="editorState.id" :scroll-element="scrollElement" />
+          <md-catalog
+            :editor-id="editorState.id"
+            :scroll-element="scrollElement"
+            :marked-heading-id="markdownHeadingId"
+          />
         </nav>
       </el-popover>
     </div>
@@ -140,6 +150,7 @@ import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
 import { apiErrorMessage } from '@/utils/apiError';

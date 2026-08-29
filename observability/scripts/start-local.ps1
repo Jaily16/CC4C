@@ -69,6 +69,7 @@ $previous = @{
     GF_SERVER_HTTP_ADDR = $env:GF_SERVER_HTTP_ADDR
     GF_SERVER_HTTP_PORT = $env:GF_SERVER_HTTP_PORT
     CC4C_GRAFANA_DASHBOARD_PATH = $env:CC4C_GRAFANA_DASHBOARD_PATH
+    CC4C_PROMETHEUS_URL = $env:CC4C_PROMETHEUS_URL
 }
 try {
     $env:GF_SECURITY_ADMIN_USER = $values.GRAFANA_ADMIN_USER
@@ -80,6 +81,7 @@ try {
     $env:GF_SERVER_HTTP_ADDR = '127.0.0.1'
     $env:GF_SERVER_HTTP_PORT = '3000'
     $env:CC4C_GRAFANA_DASHBOARD_PATH = Join-Path $observabilityRoot 'grafana\dashboards'
+    $env:CC4C_PROMETHEUS_URL = 'http://127.0.0.1:9090'
     $grafana = Join-Path $values.GRAFANA_HOME 'bin\grafana.exe'
     $grafanaProcess = Start-Process -FilePath $grafana -WindowStyle Hidden -PassThru `
       -WorkingDirectory $values.GRAFANA_HOME -ArgumentList @(

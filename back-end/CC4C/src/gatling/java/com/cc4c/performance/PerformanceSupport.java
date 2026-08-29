@@ -98,9 +98,14 @@ final class PerformanceSupport {
     private static String baseUrl() {
         String raw = required("CC4C_PERF_BASE_URL");
         URI uri = URI.create(raw);
+        boolean loopback = "localhost".equalsIgnoreCase(uri.getHost())
+                || "127.0.0.1".equals(uri.getHost());
+        boolean confirmedComposeTarget = "backend-perf".equalsIgnoreCase(uri.getHost())
+                && "backend-perf".equals(System.getenv("CC4C_CONTAINER_PERF_CONFIRM"));
         if (!"http".equalsIgnoreCase(uri.getScheme())
-                || !("localhost".equalsIgnoreCase(uri.getHost()) || "127.0.0.1".equals(uri.getHost()))) {
-            throw new IllegalStateException("CC4C_PERF_BASE_URL must be loopback HTTP");
+                || (!loopback && !confirmedComposeTarget)) {
+            throw new IllegalStateException(
+                    "CC4C_PERF_BASE_URL must be loopback HTTP or the explicitly confirmed Compose backend");
         }
         return raw.replaceAll("/+$", "");
     }

@@ -1,5 +1,6 @@
 package com.cc4c.migration;
 
+import com.cc4c.support.Cc4cTestInfrastructure;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,9 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
 
     @Test
     void existingTestDatabaseIsExplicitlyBaselinedAndMigrated() throws Exception {
-        String url = required("CC4C_TEST_DB_URL");
+        String schema = Cc4cTestInfrastructure.existingSchema();
+        prepareExistingV1Schema(schema);
+        String url = Cc4cTestInfrastructure.mysqlUrl(schema);
         String database = databaseName(url);
         assertTrue(database.endsWith("_test"));
         assertFalse(database.endsWith("_flyway_test"));
@@ -44,7 +47,10 @@ class AExistingDatabaseMigrationTest extends FlywayTestSupport {
                 WHERE table_schema = DATABASE() AND table_name = 'flyway_schema_history'
                 """) == 0) {
             flyway = org.flywaydb.core.Flyway.configure()
-                    .dataSource(url, required("CC4C_TEST_DB_USERNAME"), required("CC4C_TEST_DB_PASSWORD"))
+                    .dataSource(
+                            url,
+                            Cc4cTestInfrastructure.mysqlUsername(),
+                            Cc4cTestInfrastructure.mysqlPassword())
                     .locations("classpath:db/migration")
                     .baselineVersion(MigrationVersion.fromVersion("1"))
                     .baselineDescription("Existing CC4C schema")

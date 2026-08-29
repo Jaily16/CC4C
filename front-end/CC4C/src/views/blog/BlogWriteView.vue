@@ -52,6 +52,8 @@
             <div class="markdown-editor" :class="{ 'markdown-editor--error': contentError }">
               <md-editor
                 v-model="text"
+                :sanitize="sanitizeMarkdownHtml"
+                :marked-heading-id="markdownHeadingId"
                 :toolbars-exclude="['link', 'mermaid', 'katex', 'github']"
                 @on-save="codeSave"
                 @on-upload-img="onUploadImg"
@@ -83,6 +85,7 @@ import 'md-editor-v3/lib/style.css';
 import axios from '@/plugins/axiosInstance';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 import store from '@/store';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';

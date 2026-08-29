@@ -79,11 +79,21 @@
               </div>
             </header>
             <div class="course-reader__article">
-              <md-editor v-model="text" :editor-id="editorState.id" preview-only />
+              <md-editor
+                v-model="text"
+                :editor-id="editorState.id"
+                :sanitize="sanitizeMarkdownHtml"
+                :marked-heading-id="markdownHeadingId"
+                preview-only
+              />
             </div>
             <details class="course-reader__catalog">
               <summary>文章目录</summary>
-              <md-catalog :editor-id="editorState.id" :scroll-element="scrollElement" />
+              <md-catalog
+                :editor-id="editorState.id"
+                :scroll-element="scrollElement"
+                :marked-heading-id="markdownHeadingId"
+              />
             </details>
           </PageFeedback>
         </section>
@@ -145,6 +155,7 @@ import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 

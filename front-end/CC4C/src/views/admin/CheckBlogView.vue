@@ -62,7 +62,13 @@
             <el-button type="primary" plain @click="selectBlog(selectedBlog)">重新加载正文</el-button>
           </el-alert>
           <div v-else class="review-preview__content">
-            <md-editor v-model="text" :editor-id="editorId" :preview-only="true" />
+            <md-editor
+              v-model="text"
+              :editor-id="editorId"
+              :sanitize="sanitizeMarkdownHtml"
+              :marked-heading-id="markdownHeadingId"
+              :preview-only="true"
+            />
           </div>
 
           <footer class="review-actions">
@@ -97,6 +103,7 @@ import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 
 const blogList = ref([]);
 const selectedBlog = ref(null);

@@ -43,7 +43,13 @@
           </header>
 
           <div class="blog-reading__article">
-            <md-editor v-model="text" :editor-id="editorState.id" preview-only />
+            <md-editor
+              v-model="text"
+              :editor-id="editorState.id"
+              :sanitize="sanitizeMarkdownHtml"
+              :marked-heading-id="markdownHeadingId"
+              preview-only
+            />
           </div>
         </article>
       </PageFeedback>
@@ -62,7 +68,11 @@
             <span>文章目录</span>
             <small>点击章节跳转</small>
           </div>
-          <md-catalog :editor-id="editorState.id" :scroll-element="scrollElement" />
+          <md-catalog
+            :editor-id="editorState.id"
+            :scroll-element="scrollElement"
+            :marked-heading-id="markdownHeadingId"
+          />
         </nav>
       </el-popover>
     </div>
@@ -149,6 +159,7 @@ import 'md-editor-v3/lib/style.css';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
+import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 import ContentActionBar from '@/components/common/ContentActionBar.vue';
 import PageFeedback from '@/components/common/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';

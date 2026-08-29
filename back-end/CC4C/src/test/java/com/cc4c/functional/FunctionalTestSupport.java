@@ -5,6 +5,7 @@ import com.cc4c.identity.internal.VerificationCodeGenerator;
 import com.cc4c.identity.internal.VerificationCodeService;
 import com.cc4c.shared.BusinessCache;
 import com.cc4c.shared.MessagingTopology;
+import com.cc4c.support.Cc4cTestInfrastructure;
 import com.cc4c.support.RabbitTestResources;
 import com.cc4c.identity.IdentityDtos.VerificationPurpose;
 import com.cc4c.identity.api.AccountRole;
@@ -19,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.Cursor;
@@ -51,6 +53,7 @@ import java.util.UUID;
 @Transactional
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Import(Cc4cTestInfrastructure.class)
 public abstract class FunctionalTestSupport {
     protected static final String TEST_REDIS_NAMESPACE =
             "cc4c:test:" + UUID.randomUUID().toString().replace("-", "");
@@ -59,24 +62,13 @@ public abstract class FunctionalTestSupport {
 
     @DynamicPropertySource
     static void registerTestDatabaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> requiredEnvironmentVariable("CC4C_TEST_DB_URL"));
-        registry.add("spring.datasource.username", () -> requiredEnvironmentVariable("CC4C_TEST_DB_USERNAME"));
-        registry.add("spring.datasource.password", () -> requiredEnvironmentVariable("CC4C_TEST_DB_PASSWORD"));
-        registry.add("spring.data.redis.url", () -> requiredEnvironmentVariable("CC4C_TEST_REDIS_URL"));
-        registry.add("cc4c.cache.redis-url", () -> requiredEnvironmentVariable("CC4C_TEST_CACHE_REDIS_URL"));
+        registry.add("spring.data.redis.url", Cc4cTestInfrastructure::securityRedisUrl);
+        registry.add("cc4c.cache.redis-url", Cc4cTestInfrastructure::cacheRedisUrl);
         registry.add("cc4c.cache.namespace", () -> TEST_REDIS_NAMESPACE + ":cache");
         registry.add("spring.session.redis.namespace", () -> TEST_REDIS_NAMESPACE);
         registry.add("cc4c.security.key-prefix", () -> TEST_REDIS_NAMESPACE + ":security");
-        registry.add("spring.rabbitmq.addresses", () -> requiredEnvironmentVariable("CC4C_TEST_RABBITMQ_URL"));
+        Cc4cTestInfrastructure.registerRabbitProperties(registry);
         registry.add("cc4c.messaging.namespace", () -> TEST_RABBIT_NAMESPACE);
-    }
-
-    static String requiredEnvironmentVariable(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Required test database environment variable is missing: " + name);
-        }
-        return value;
     }
 
     @Autowired

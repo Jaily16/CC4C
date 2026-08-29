@@ -61,24 +61,30 @@ V7 只向 `async_outbox` 增加可空的 `correlation_id VARCHAR(64)`，不修�
 
 该字段仅用于日志关联，不能用于身份、幂等或授权，也不得写入 Cookie、邮箱、验证码、SQL 或连接信息。回滚到 V6 代码时旧版本会忽略这个可空附加列；不得为回滚删除列或执行 Flyway `repair`。
 
-## 本地集成测试数据库
+## Testcontainers 集成测试数据库
 
-测试使用两个不同的专用数据库：
+方面七起，标准测试不再依赖本机测试数据库或 `.env.test.local`。`run-tests.ps1` 只校验 Java 21 和 Docker Engine，然后由 Testcontainers 1.21.4 在本轮测试 JVM 内启动 MySQL 8.4.11、两个 Redis 7.4.10 和 RabbitMQ 4.3.5。
 
-- 主测试库：名称必须以 `_test` 结尾，但不能以 `_flyway_test` 结尾，用于 V2 功能回归和现有库基线测试。
-- 空迁移库：名称必须以 `_flyway_test` 结尾，只用于从 V1 重建、重复迁移和 `validate`。
+- MySQL 容器的主库从空状态应用 Flyway V1–V7，并承载业务功能回归。
+- 迁移测试在同一隔离容器中创建随机临时库，分别验证空库初始化、模拟 V1 已有库升级、第二次 migrate 零新增和 validate。
+- 容器数据库名和凭据由测试基础设施动态注入，不从系统环境、本机 `.env` 或开发配置回退。
+- Testcontainers reuse 明确禁用，Ryuk 只清理本轮容器与网络；测试不会接触本机 MySQL、Redis、RabbitMQ 或任何 Compose 持久卷。
+- 任何 schema 删除只允许发生在已校验的容器临时库中，仍禁止 Flyway `clean/repair` 和数据库级无范围破坏操作。
 
-准备流程：
+执行方式：
 
-1. 由数据库管理员确认主测试库和测试账号已存在，再审阅并执行 `database/test-database-admin-setup.sql`，为主库补充迁移权限并创建空迁移库。
-2. 在 `back-end/CC4C` 复制 `.env.test.example` 为已忽略的 `.env.test.local`，填写四个数据库变量、两个 Redis 变量、`CC4C_TEST_RABBITMQ_URL` 和 `CC4C_TEST_RABBITMQ_VHOST_CONFIRM`。Rabbit vhost 必须显式以 `_test` 结尾，且不得使用默认 `/` vhost。
-3. 首次迁移已有测试库前执行 `./prepare-flyway-tests.ps1 -MySqlBin <mysql-bin>`，完成库名检查、数据预检、备份和 SHA-256 记录。
-4. 如需保留索引治理证据，在迁移前后分别执行 `./capture-query-plans.ps1 -Phase Before -MySqlBin <mysql-bin>` 和 `./capture-query-plans.ps1 -Phase After -MySqlBin <mysql-bin>`。
-5. 使用 Java 21 运行 `./run-tests.ps1 clean verify`。脚本会先单独执行两个迁移门禁，成功后才进入完整 Maven 测试。
+```powershell
+cd back-end/CC4C
+./run-tests.ps1 clean verify
+```
 
-`.env.test.local` 缺失、八个变量任一为空、URL 没有显式数据库名/vhost、名称后缀不合法或确认值不一致时，脚本会快速失败，不会读取开发环境配置或回退到其他变量。每次测试分别生成独立的 Session、业务缓存和 Rabbit namespace；Redis 只允许删除本次 namespace 下的键，RabbitMQ 只允许删除本轮随机 namespace 的已知拓扑，禁止 `FLUSHDB`、`FLUSHALL`、vhost 删除或无前缀队列清理。
+历史本机测试库授权、备份和恢复脚本仅保留为迁移追溯资料，不再是标准测试入口。
 
-只有名称精确满足 `_flyway_test` 约束的空迁移库允许由迁移测试清理。主 `*_test` 库、恢复库和其他数据库永远不会被测试自动清理。
+## Compose 数据卷与备份
+
+`compose.yml` 为 MySQL 使用项目级命名卷 `mysql_data`。普通 `docker compose -p cc4c-v3 down` 只停止并移除容器与网络，不删除数据库卷；禁止随手添加 `-v`。显式重置只能通过 `deploy/scripts/reset-local.ps1 -ConfirmProjectName cc4c-v3`，脚本还要求再次输入精确确认文本。
+
+升级镜像或进行破坏性维护前，必须从运行中的 MySQL 服务执行单事务备份并保存 SHA-256，同时备份博客和头像上传卷。回滚只允许切换到已记录的旧镜像 digest，并在新恢复库中验证备份；不得在原库执行 Flyway `clean/repair`、伪造 down migration 或手工删除 V1–V7 历史。
 
 ## 独立性能数据库
 

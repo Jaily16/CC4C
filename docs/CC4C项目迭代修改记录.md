@@ -1054,4 +1054,47 @@ flowchart LR
 - 所有故障操作均在精确 PID、容器或 CC4C-only 代理上使用 `try/finally`；结束时普通前端/后端、Prometheus/Grafana 恢复，13307 和临时 SMTP 2526 未监听。最终 DLQ 的合法保留消息未被 purge。
 - `CC4C_OBSERVABILITY_ENABLED=false` 可关闭自定义指标、采样和请求完成日志，管理端口可通过 `-1` 关闭。V7 只增加可空字段；回滚到 `5daf68c` 时旧代码会忽略该列，但不得执行 Flyway `repair` 或破坏性 down migration。
 - `npm ci` 仍报告 10 个既有漏洞（4 中等、6 高危），Vite 仍提示主 chunk 超过 500 KiB；方面六没有越界升级前端依赖。Flyway 11.7.2 对 MySQL 8.4 仍有“官方测试至 8.1”提示，但 V1–V7 实测通过。
-- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件。方面六尚未暂存、提交或推送，任何 Git 收口需用户另行明确授权；Docker、容器编排、Testcontainers 和 CI/CD 仍属于方面七。
+- 本机 `application.yml` 未读取、未修改、未暂存，最终 JAR 不包含该文件。方面六已在用户独立授权后创建本地提交 `f0f6fa1`，未推送；该提交成为方面七唯一基线。
+
+### 13.24 方面七实际变更
+
+#### Compose、镜像与秘密
+
+- 方面七以本地提交 `f0f6fa1` 为唯一基线，增加前端、后端、MySQL 8.4.11、两个 Redis 7.4.10、RabbitMQ 4.3.5、Mailpit 1.31.0、Prometheus 3.13.2 和 Grafana 13.1.0 的完整 Compose 编排。MySQL、Redis、AMQP 和 Rabbit 指标端口完全内部隔离；宿主可访问服务分别使用独占、禁止 masquerade 的桥接网络并只绑定 `127.0.0.1`。
+- 前后端采用多阶段 Dockerfile。后端运行 UID/GID 为 10001，前端使用非 root Nginx；两者均启用只读根文件系统、tmpfs、`no-new-privileges`、capability drop 和持久上传卷。Vue history fallback、静态安全 Header、资源缓存及博客/头像只读挂载已验证。
+- `prepare-local.ps1` 使用 CSPRNG 创建 13 个本机 secret 文件并保留已有值；Compose 只挂载 secret 文件，后端入口在启动时读取到进程环境，不写镜像层或日志。Rabbit 首次 bootstrap 用户在创建最小权限应用/监控账号后删除，重启不会重新出现 `guest` 或 bootstrap 账号。
+- 默认邮件由 Mailpit 捕获；`compose.smtp.yml` 只在显式选择时为后端附加 egress 网络和外部 SMTP secrets。一次性管理员引导器只在不存在有效管理员时创建 7 位 ID、BCrypt 12 管理员；重复相同 ID/密码幂等，冲突安全失败。
+- 普通 `down` 不删除 8 个项目卷；`reset-local.ps1` 固定项目名并要求二次文本确认。用户已验证完整 `down`/`up` 后数据库、账号、上传文件、Prometheus/Grafana 和业务状态保持。
+
+#### Testcontainers、前端升级与持续交付
+
+- 后端增加 Spring Boot Testcontainers、JUnit Jupiter、MySQL、RabbitMQ 和 Generic Redis 容器支持。单测试 JVM 并行启动 MySQL、两个 Redis 和 RabbitMQ，通过动态属性及独立 namespace 注入；不读取 `.env.test.local`、本机服务或开发数据库，reuse 禁用并由 Ryuk 清理。
+- Flyway 测试在容器内创建随机临时库，覆盖 V1–V7 空库、模拟 V1 已有库升级、重复 migrate 与 validate。六模块测试、功能回归、安全、缓存、消息和观测测试共 154 项全部通过。
+- 前端锁定 Node 24.18.0、npm 11.16.0、Vue 3.5.42、Vite 8.2.2、`@vitejs/plugin-vue` 6.0.8、Element Plus 2.14.5 和 sanitize-html 2.17.7；删除无运行引用的 editor.md。六处 Markdown 输出统一净化，标题 anchor 使用安全 ID，四项净化安全测试通过。
+- GitHub Actions 质量工作流覆盖 Testcontainers、前端审计/构建、Dependency Review、Prometheus/Grafana/Compose/OpenAPI、Trivy 源码/镜像和容器 smoke；发布工作流仅响应严格 SemVer tag，在重跑质量与容器性能后定义 `linux/amd64,linux/arm64` GHCR 镜像、SBOM、最大 provenance 和 attestation。第三方 Action 均固定完整提交 SHA，Dependabot 每周检查 Maven、npm、Docker 和 Actions。
+- OpenAPI 快照已规范化提交，CI 检查漂移、密码字段和悬空引用。当前没有推送、标签或 GHCR 发布；工作流远程运行状态不会被本地验证冒充。
+
+### 13.25 方面七验证与验收证据
+
+| 验证项 | 实际结果 |
+| --- | --- |
+| 工具链 | Windows 11 10.0.26200；Ryzen 7 9700X/16 逻辑处理器/31.1 GiB；Java 21.0.12.1；Docker Engine 28.0.4；Compose 2.34.0；Node 24.18.0；npm 11.16.0 |
+| 后端 Testcontainers | 154/154 通过，0 失败、0 错误、0 跳过；56 个报告；Testcontainers 1.21.4；JAR 构建成功 |
+| Flyway/模块 | V1–V7 空库、V1 已有库升级、重复 migrate/validate 通过；Spring Modulith 恰好六模块且无越界 |
+| 前端 | Markdown 安全测试 4/4、`npm ci`、两类 audit 和 Vite 生产构建通过；High/Critical 为 0 |
+| 镜像与 Compose | 9 个长期服务健康、8 个卷；后端镜像 `sha256:0bb9658...`、前端 `sha256:103fc30...`；非 root、只读根和持久上传通过 |
+| 安全/供应链 | Compose config 不展开 13 个 secret；Trivy 安全源码集合及前后端镜像 High/Critical 为 0；actionlint、Prometheus 20 条规则/测试、三份 Grafana JSON、OpenAPI 引用均通过 |
+| 容器性能 | Smoke 10,656 请求、0 错误、p95 5 ms、p99 18 ms；Standard 三轮中位数 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误 |
+| 故障恢复 | 业务缓存回源、Rabbit 中断/恢复、消费者暂停/恢复、MySQL/安全 Redis readiness、SMTP DEAD/管理员重试均通过，服务和卷均恢复 |
+| 浏览器 | 深层路由、Mailpit 注册/找回、Session/CSRF、收藏/评论/回复、草稿/上传/提交、管理员审核/消息、上传和数据卷持久化、三个 Grafana 面板、Swagger/控制台/网络脱敏全部由用户确认 |
+| 配置与 Git | JAR 只含脱敏 `application-example.yml`，不含本机 `application.yml`；`.env.*.local`、secret、卷数据、日志、target、dist、node_modules、temp 未进入暂存区 |
+
+完整证据、限制和复现命令见 `docs/reports/v3/aspect7/`；本机结果不表示生产容量。
+
+### 13.26 已知边界、回滚与发布安全
+
+- 本地镜像只存在内容寻址 image ID，`RepoDigests` 为空；未获得推送、Git 标签或 GHCR 发布授权，因此不记录虚构的 registry digest。正式发布后应把 Buildx 输出 digest 写入发布记录，而不是复用本地 image ID。
+- GitHub Actions 文件通过本地 actionlint 和等价门禁，但尚未在 GitHub-hosted Runner 执行。首次推送后必须以远程 run 作为最终 CI 证据，不能仅依赖本机结果。
+- Compose 默认面向安全本机开发，不等同生产部署：Cookie Secure 为 `false`、OpenAPI 开启、回环端口暴露且 Mailpit 无外部投递。生产必须使用 HTTPS、Secure Cookie、关闭 API 文档、独立秘密管理和经过审阅的外部 SMTP/网络策略。
+- 镜像升级前备份 MySQL 与上传卷并保存 SHA-256；回滚只切换到已记录旧 digest，不删除 V1–V7 历史、不执行 Flyway `clean/repair`。普通停止禁止 `down -v`，Rabbit 持久队列禁止 purge。
+- 当前方面七文件尚未暂存或提交。任何 `git add`、本地提交、推送、SemVer 标签或 GHCR 发布仍需要分别获得用户明确授权。

@@ -4,6 +4,6 @@ datasources:
     uid: cc4c-prometheus
     type: prometheus
     access: proxy
-    url: http://127.0.0.1:9090
+    url: ${CC4C_PROMETHEUS_URL}
     isDefault: true
     editable: false

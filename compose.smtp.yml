@@ -1,0 +1,19 @@
+services:
+  backend:
+    environment:
+      CC4C_MAIL_HOST: ${CC4C_MAIL_HOST:?set CC4C_MAIL_HOST}
+      CC4C_MAIL_PORT: ${CC4C_MAIL_PORT:?set CC4C_MAIL_PORT}
+      CC4C_MAIL_AUTH: ${CC4C_MAIL_AUTH:-true}
+      CC4C_MAIL_SSL_ENABLED: ${CC4C_MAIL_SSL_ENABLED:-false}
+      CC4C_MAIL_STARTTLS_ENABLED: ${CC4C_MAIL_STARTTLS_ENABLED:-true}
+    secrets:
+      - smtp_username
+      - smtp_password
+    networks:
+      - egress
+
+secrets:
+  smtp_username:
+    file: ./deploy/secrets/local/smtp_username
+  smtp_password:
+    file: ./deploy/secrets/local/smtp_password

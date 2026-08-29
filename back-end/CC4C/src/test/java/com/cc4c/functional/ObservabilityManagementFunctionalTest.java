@@ -1,5 +1,6 @@
 package com.cc4c.functional;
 
+import com.cc4c.support.Cc4cTestInfrastructure;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -30,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         })
 @AutoConfigureObservability
 @ActiveProfiles("test")
+@Import(Cc4cTestInfrastructure.class)
 class ObservabilityManagementFunctionalTest {
     private static final String NAMESPACE =
             "cc4c:test:observability:" + UUID.randomUUID().toString().replace("-", "");
@@ -42,21 +45,14 @@ class ObservabilityManagementFunctionalTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url",
-                () -> required("CC4C_TEST_DB_URL"));
-        registry.add("spring.datasource.username",
-                () -> required("CC4C_TEST_DB_USERNAME"));
-        registry.add("spring.datasource.password",
-                () -> required("CC4C_TEST_DB_PASSWORD"));
         registry.add("spring.data.redis.url",
-                () -> required("CC4C_TEST_REDIS_URL"));
+                Cc4cTestInfrastructure::securityRedisUrl);
         registry.add("cc4c.cache.redis-url",
-                () -> required("CC4C_TEST_CACHE_REDIS_URL"));
+                Cc4cTestInfrastructure::cacheRedisUrl);
         registry.add("cc4c.cache.namespace", () -> NAMESPACE + ":cache");
         registry.add("spring.session.redis.namespace", () -> NAMESPACE + ":session");
         registry.add("cc4c.security.key-prefix", () -> NAMESPACE + ":security");
-        registry.add("spring.rabbitmq.addresses",
-                () -> required("CC4C_TEST_RABBITMQ_URL"));
+        Cc4cTestInfrastructure.registerRabbitProperties(registry);
         registry.add("cc4c.messaging.namespace", () -> NAMESPACE + ":messaging");
     }
 
@@ -113,11 +109,4 @@ class ObservabilityManagementFunctionalTest {
         return "http://127.0.0.1:" + managementPort + path;
     }
 
-    private static String required(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Required test variable is missing: " + name);
-        }
-        return value;
-    }
 }
