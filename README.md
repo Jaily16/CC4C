@@ -9,7 +9,9 @@
     <img alt="Vite" src="https://img.shields.io/badge/Vite-8.2.2-646cff?logo=vite&logoColor=white" />
     <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.16-6db33f?logo=springboot&logoColor=white" />
     <img alt="Java" src="https://img.shields.io/badge/Java-21-ed8b00?logo=openjdk&logoColor=white" />
-    <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.x-4479a1?logo=mysql&logoColor=white" />
+    <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.4.11-4479a1?logo=mysql&logoColor=white" />
+    <img alt="V3" src="https://img.shields.io/badge/V3-Complete-2ea44f" />
+    <img alt="Backend tests" src="https://img.shields.io/badge/Backend_Tests-154%2F154-2ea44f" />
   </p>
 </div>
 
@@ -18,6 +20,8 @@
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
 当前版本已完成 V3 七个方面，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性、可观测性与性能证据，以及容器化与持续交付。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。Docker Compose 提供完整本地环境，Testcontainers 隔离后端集成测试，GitHub Actions 定义质量与 SemVer tag-only 发布门禁。前端使用 Vue 3.5、Vite 8 和 Axios 1.19.0，并统一处理会话、CSRF、分页、错误响应与 Markdown 输出净化。
+
+本次升级前后的精确版本、七方面分别解决的工程问题、性能数据、开发效率收益和发布边界见 [V3 技术栈升级总结](docs/CC4CV3技术栈升级总结.md)。
 
 ## 平台亮点
 
@@ -111,11 +115,28 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
 | API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
 | 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
-| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL、Flyway V1–V7、Redis Cache-Aside |
+| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL 8.4.11、Flyway V1–V7、Redis 7.4.10 Cache-Aside |
 | 异步可靠性 | RabbitMQ 4.3.5、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
 | 可观测与压测 | Actuator、Micrometer、Prometheus 3.13.2、Grafana 13.1.0、ECS JSON、Gatling 3.15.1 |
 | 测试与交付 | Testcontainers 1.21.4、Docker Compose、Mailpit 1.31.0、GitHub Actions、Trivy、GHCR 发布定义 |
 | 序列化与服务 | Jackson、AES-256-GCM、JavaMail、文件资源读写 |
+
+## V3 技术升级与工程收益
+
+| 升级方向 | 基线状态 | 当前方案 | 解决或优化的问题 |
+| --- | --- | --- | --- |
+| 运行基础 | Java 17、Spring Boot 2.6.11、`javax` | Java 21、Spring Boot 3.5.16、Jakarta | 进入受支持的现代框架体系，为 Security、Actuator、Testcontainers 等后续能力消除兼容障碍 |
+| 依赖与数据访问 | 重复 MyBatis Starter，另有 MPJ、Druid、Fastjson | MyBatis-Plus Boot 3 Starter、HikariCP、Jackson | 减少重复自动配置、版本冲突、依赖面与无效维护成本 |
+| 架构与 API | 技术分层单体、实体直接收发、接口约定分散 | 六模块 Spring Modulith、DTO、校验、分页、OpenAPI | 模块越界自动失败，输入输出、错误状态与数据库分页可验证 |
+| 数据治理 | 手工 SQL 与环境结构漂移 | Flyway V1–V7、约束、复合索引、迁移测试 | 空库与已有库使用同一结构来源，数据库升级可追踪、可重复 |
+| 身份安全 | 业务 Cookie 与明文密码比较 | Spring Security、Redis Session、BCrypt、CSRF、限流 | 阻止伪造身份、水平越权和凭据明文泄露，支持会话撤销与安全失败 |
+| 性能 | 热点反复查询、模块/评论 N+1 | Redis Cache-Aside、批量 SQL、稳定分页与复合索引 | 受控基准中目标 SELECT 10,995→0，热路径 p95 181.599→5.486 ms |
+| 异步可靠性 | 请求线程同步 SMTP | Outbox、RabbitMQ、Inbox、Confirm、重试/DLQ | Broker/SMTP 故障不再破坏业务事务，重复消息幂等，失败可由管理员恢复 |
+| 可观测性 | 零散日志、缺少运行证据 | Request ID、ECS JSON、Micrometer、Prometheus、Grafana、Gatling | API、JVM、数据库、缓存、安全和消息链路均可查询、告警和对照验证 |
+| 测试与交付 | 测试依赖本机服务、手工启动和发布检查 | Testcontainers、Docker Compose、Mailpit、GitHub Actions、Trivy | 测试环境隔离，一键复现完整栈，依赖/镜像/契约门禁自动化 |
+| 前端基础 | Vue 3.2、Vite 3、Axios 0.18、旧编辑器残留 | Vue 3.5.42、Vite 8.2.2、Axios 1.19.0、统一 Markdown 净化 | 清除 High/Critical 漏洞，统一 API、Session/CSRF 和 XSS 防护边界 |
+
+上述性能数字来自固定硬件、固定数据与固定负载的本机三轮中位数，只用于证明优化方向和防止回退，不代表生产容量。详细测试条件、限制与证据分别见 [方面六报告](docs/reports/v3/aspect6/README.md) 和 [方面七报告](docs/reports/v3/aspect7/README.md)。
 
 ## 系统架构
 

@@ -5,11 +5,11 @@
 | 项目 | 内容 |
 | --- | --- |
 | 项目名称 | CC4C |
-| 迭代主题 | 前后端功能稳定性与完整业务流程修复 |
-| 迭代日期 | 2026-07-31 |
-| 影响范围 | Spring Boot 后端、Vue 3 前端、功能测试、运行配置与项目文档 |
-| 迭代性质 | 缺陷修复、健壮性增强、测试体系整理，不新增业务功能 |
-| 文档状态 | 已完成 |
+| 迭代主题 | V1 功能稳定性、V2 界面与交互、V3 生产级工程化 |
+| 迭代日期 | 2026-07-31 至 2026-08-29 |
+| 影响范围 | Java/Spring Boot 后端、Vue 3 前端、MySQL/Redis/RabbitMQ、测试、可观测、容器与持续交付 |
+| 迭代性质 | 缺陷修复、体验升级、架构治理、安全、性能、可靠性和交付工程化 |
+| 文档状态 | V1–V3 均已完成；远程发布尚未执行 |
 
 ## 2. 迭代背景与目标
 
@@ -638,16 +638,16 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 
 ### 13.1 当前状态
 
-截至 2026-08-28，V3 方面一至方面四均已完成实现、自动验证、脱敏环境运行和用户浏览器验收。方面四以方面三提交 `ca628e1` 为唯一基线，在不改变 URL、DTO、状态码、安全 Cookie、CSRF 和模块边界的前提下加入 Redis Cache-Aside、批量查询、Flyway V5 复合索引及可重复性能基准；方面五至方面七尚未实施。
+截至 2026-08-29，V3 七个方面均已完成实现、自动验证和用户浏览器验收。实现从规划基线 `54262da` 线性演进到方面七提交 `a22a329`，覆盖 Java/Spring Boot 现代化、六模块单体、API 与数据库治理、安全认证、Redis 性能优化、RabbitMQ 异步可靠性、可观测与性能证据，以及容器化、Testcontainers 和持续交付定义。
 
 | 项目 | 当前记录 |
 | --- | --- |
 | 规划基线 | `54262dad4053adeb4019be7dd95eb644995bc3da`（短提交号 `54262da`） |
 | 规划文档 | [CC4C 第三次迭代开发规划](CC4C第三次迭代开发规划.md) |
-| 预计规模 | 6–8 周，按七个方面依次推进 |
-| 当前阶段 | 方面四已完成并通过自动、性能与用户浏览器验收 |
-| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V6、Spring Security、Spring Session Data Redis、BCrypt、Redis Cache-Aside、RabbitMQ 4.3.5、Transactional Outbox/Inbox、springdoc OpenAPI 2.8.17、Axios 1.19.0 |
-| 下一方面 | 异步事件与可靠性；尚未规划或实施 |
+| 实施范围 | 七个方面依次推进并分别建立本地提交 |
+| 当前阶段 | V3 实现、自动验证、性能/故障门禁、浏览器验收和方面七实现提交均已完成 |
+| 已落地基线 | Java 21、Spring Boot 3.5.16、MyBatis-Plus 3.5.17、Spring Modulith 1.4.12、Flyway V1–V7、Spring Security、Spring Session Redis、Redis Cache-Aside、RabbitMQ 4.3.5、Outbox/Inbox、Actuator/Micrometer、Prometheus/Grafana、Testcontainers、Docker Compose、GitHub Actions、Vue 3.5.42、Vite 8.2.2 |
+| 下一阶段 | 仅剩经独立授权的远程推送、GitHub-hosted Actions、SemVer 标签和 GHCR 发布，不属于本地 V3 实现完成条件 |
 
 ### 13.2 已确定的总体路线
 
@@ -659,7 +659,7 @@ Task 1–7 的页面验收截图位于当前 Codex 任务的浏览器注释记�
 6. Actuator、Micrometer、Prometheus、Grafana 与 Gatling 性能证据。
 7. Docker Compose、Testcontainers 和 GitHub Actions 持续交付。
 
-Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 已在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway V1–V3 已在方面二落地；Spring Security、Spring Session Redis、BCrypt、CSRF、安全限流和 Flyway V4 已在方面三落地；Redis 业务缓存、批量查询、Flyway V5 及隔离性能基准已在方面四落地。RabbitMQ、Actuator、容器和持续交付仍是后续目标，不能在代码、README 或对外说明中表述为已经完成。
+Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17 在方面一落地；Spring Modulith 1.4.12、DTO/校验/分页/OpenAPI 和 Flyway V1–V3 在方面二落地；Spring Security、Spring Session Redis、BCrypt、CSRF、安全限流和 Flyway V4 在方面三落地；Redis 业务缓存、批量查询、Flyway V5 及隔离性能基准在方面四落地；RabbitMQ、Outbox/Inbox 和 Flyway V6 在方面五落地；Actuator、Micrometer、Prometheus、Grafana、Gatling 和 Flyway V7 在方面六落地；Testcontainers、Docker Compose、Mailpit、前端安全升级和 GitHub Actions 交付定义在方面七落地。各阶段当时记录的“后续未实施”只表示历史检查点，不再代表当前工程状态。
 
 ### 13.3 安全与实施边界
 
@@ -1097,4 +1097,36 @@ flowchart LR
 - GitHub Actions 文件通过本地 actionlint 和等价门禁，但尚未在 GitHub-hosted Runner 执行。首次推送后必须以远程 run 作为最终 CI 证据，不能仅依赖本机结果。
 - Compose 默认面向安全本机开发，不等同生产部署：Cookie Secure 为 `false`、OpenAPI 开启、回环端口暴露且 Mailpit 无外部投递。生产必须使用 HTTPS、Secure Cookie、关闭 API 文档、独立秘密管理和经过审阅的外部 SMTP/网络策略。
 - 镜像升级前备份 MySQL 与上传卷并保存 SHA-256；回滚只切换到已记录旧 digest，不删除 V1–V7 历史、不执行 Flyway `clean/repair`。普通停止禁止 `down -v`，Rabbit 持久队列禁止 purge。
-- 当前方面七文件尚未暂存或提交。任何 `git add`、本地提交、推送、SemVer 标签或 GHCR 发布仍需要分别获得用户明确授权。
+- 方面七已在用户独立授权后创建本地提交 `a22a329`（`chore: containerize and automate CC4C delivery`），父提交为方面六 `f0f6fa1`；提交后工作区干净，本机 `application.yml`、secret、卷数据和构建产物均未进入提交。尚未执行远程推送、SemVer 标签或 GHCR 发布。
+
+### 13.27 V3 最终收口与本地 main 集成
+
+#### 七方面提交链
+
+| 方面 | 提交 | 主题 |
+| --- | --- | --- |
+| 一 | `b1b9c1b` | 基础版本与依赖现代化 |
+| 二 | `57d769b` | 模块化单体、API 与数据治理 |
+| 三 | `ca628e1` | 安全认证与会话体系 |
+| 四 | `bc7dcf8` | Redis 缓存与性能门禁 |
+| 五 | `5daf68c` | 可靠异步消息 |
+| 六 | `f0f6fa1` | 可观测性与性能证据 |
+| 七 | `a22a329` | 容器化与持续交付定义 |
+
+上述七个提交均已是本地 `main` 的祖先，提交历史从 `54262da` 线性前进，因此不存在需要合并的独立功能分支，也不创建空的 self-merge commit。收尾文档直接在 `main` 上维护，使代码、README、规划、修改记录和报告处于同一版本线。
+
+#### 最终验证结论
+
+- 后端 Testcontainers 完整门禁 154/154，通过 Flyway V1–V7、六模块、功能、安全、缓存、消息和观测回归。
+- 前端 Markdown 安全测试 4/4，完整与生产依赖 High/Critical 为 0，Vite 生产构建通过。
+- 容器 smoke 10,656 请求、0 错误、p95 5 ms、p99 18 ms；标准场景三轮中位数 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。
+- 业务缓存、RabbitMQ、消费者、MySQL、安全 Redis 和 SMTP 故障演练均按设计恢复。
+- 用户最终确认深层路由、Mailpit、Session/CSRF、业务流程、管理员流程、上传与数据持久化、观测链路、Swagger、控制台和网络契约正常。
+- 详细技术选型、问题与收益见 [V3 技术栈升级总结](CC4CV3技术栈升级总结.md)，交付证据见 [方面七报告](reports/v3/aspect7/README.md)。
+
+#### 发布边界
+
+- 当前完成的是本地 `main` 集成，不等同于远程发布。
+- `origin/main` 尚未接收 V3 提交；GitHub-hosted Actions 尚未运行。
+- 未创建 SemVer 标签，GHCR 镜像、SBOM、provenance 和 attestation 均未发布。
+- 后续若获得推送或发布授权，必须记录真实远程工作流 URL、镜像 registry digest 和标签，而不能复用本地 image ID。

@@ -8,6 +8,7 @@
 - 后端 JAR 与镜像不含本机 `application.yml`。
 - OpenAPI 快照、Prometheus 配置/规则/规则测试、Grafana Dashboard JSON 和工作流 actionlint 均通过。
 - GitHub Actions 第三方 Action 固定到完整提交 SHA；Dependabot 覆盖 Maven、npm、Docker 与 Actions。
+- 方面七实现已作为本地 `main` 提交 `a22a329` 保存，提交前暂存区秘密、禁止路径和不可变引用审查通过。
 
 ## 质量工作流
 
@@ -34,7 +35,7 @@
 
 ## 尚未发生
 
-- 方面七文件尚未提交或推送。
+- 方面七实现已经提交到本地 `main`，但尚未推送到远程。
 - 没有创建 SemVer Git 标签。
 - GitHub-hosted Actions 尚未运行。
 - GHCR 镜像、SBOM、provenance 和 attestation 尚未发布。
