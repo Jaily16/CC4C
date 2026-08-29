@@ -4,6 +4,7 @@ import com.cc4c.functional.FunctionalTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -36,9 +37,9 @@ class AsyncStateRepositoryFunctionalTest extends FunctionalTestSupport {
                 inbox.claim("consumer", eventId, 0, "worker-b", future));
 
         jdbcTemplate.update("""
-                UPDATE async_inbox SET lease_until = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 SECOND)
+                UPDATE async_inbox SET lease_until = ?
                 WHERE consumer_name = 'consumer' AND event_id = ? AND generation = 0
-                """, eventId);
+                """, Timestamp.from(Instant.now().minusSeconds(1)), eventId);
         assertEquals(InboxClaim.ACQUIRED,
                 inbox.claim("consumer", eventId, 0, "worker-b", future));
         inbox.markDone("consumer", eventId, 0);

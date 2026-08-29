@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -193,9 +194,9 @@ class AsyncMessagingFunctionalTest extends FunctionalTestSupport {
                 "SELECT event_id FROM async_outbox ORDER BY id DESC LIMIT 1", String.class);
         jdbcTemplate.update("""
                 UPDATE async_outbox
-                SET status = 'DEAD', expires_at = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 SECOND)
+                SET status = 'DEAD', expires_at = ?
                 WHERE event_id = ?
-                """, eventId);
+                """, Timestamp.from(Instant.now().minusSeconds(1)), eventId);
 
         AdminFixture administrator = createAdmin();
         mockMvc.perform(post("/admin/messaging/messages/{eventId}/retry", eventId)
