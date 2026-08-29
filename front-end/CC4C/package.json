@@ -15,7 +15,7 @@
     "test:security": "node --test tests/markdownSanitizer.test.mjs"
   },
   "dependencies": {
-    "axios": "1.19.0",
+    "axios": "1.20.0",
     "element-plus": "2.14.5",
     "md-editor-v3": "^2.5.0",
     "sanitize-html": "2.17.7",
