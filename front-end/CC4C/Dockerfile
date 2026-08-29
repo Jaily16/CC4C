@@ -10,7 +10,7 @@ ARG VITE_API_BASE_URL=http://localhost:4080
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
-FROM nginx:1.28.3-alpine3.23@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+FROM nginx:1.31.2-alpine3.23@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
 RUN apk del --no-cache \
         nginx-module-acme \
         nginx-module-geoip \
