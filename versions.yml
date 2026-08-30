@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "cc4c",
+    "displayName": "CC4C",
+    "version": "4.0.0-SNAPSHOT",
+    "springApplicationName": "CC4C"
+  },
+  "toolchain": {
+    "java": 21,
+    "maven": "3.9.16",
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
+  "backend": {
+    "springBoot": "3.5.16",
+    "mybatisPlus": "3.5.17",
+    "springModulith": "1.4.12",
+    "springdoc": "2.8.17",
+    "gatling": "3.15.1",
+    "gatlingMavenPlugin": "4.21.10",
+    "mavenEnforcer": "3.6.3",
+    "rabbitAmqpClientOverride": "5.33.1",
+    "nettyRuntimeOverride": "4.1.136.Final",
+    "nettyGatlingProfile": "4.2.14.Final"
+  },
+  "frontend": {
+    "vue": "3.5.42",
+    "vite": "8.2.2",
+    "axios": "1.19.0",
+    "elementPlus": "2.14.5"
+  },
+  "data": {
+    "mysql": "8.4.11",
+    "redis": "7.4.10-alpine3.21",
+    "rabbitmq": "4.3.5",
+    "mailpit": "1.31.0"
+  },
+  "observability": {
+    "prometheus": "3.13.2",
+    "grafana": "13.1.0"
+  },
+  "test": {
+    "testcontainers": "1.21.4",
+    "temurinJre": "21.0.12_8",
+    "nginx": "1.28.3"
+  },
+  "quality": {
+    "spotlessMavenPlugin": "2.44.5",
+    "palantirJavaFormat": "2.68.0",
+    "eslint": "10.9.1",
+    "eslintJs": "10.0.1",
+    "eslintPluginVue": "10.10.0",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "eslintConfigPrettier": "10.1.8"
+  },
+  "images": {
+    "mavenBuild": "maven:3.9.16-eclipse-temurin-21@sha256:8f6ac126f7810bb5549c4cd122d2bf0e9cda5bdeb0838aa928f09e779fd8bef8",
+    "javaRuntime": "eclipse-temurin:21.0.12_8-jre-jammy@sha256:eebd356ad7358b7094758e5787a6726f332917cfd56feab6457c56dab895cdbf",
+    "nodeBuild": "node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436",
+    "nginx": "nginx:1.28.3-alpine3.23@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236",
+    "mysql": "mysql:8.4.11@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb",
+    "redis": "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+    "rabbitmq": "rabbitmq:4.3.5-management@sha256:45226f38499559b9f56875c752cc6689ff90e8f20796fe80fd9bc28d64723031",
+    "mailpit": "axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24",
+    "prometheus": "prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69",
+    "grafana": "grafana/grafana:13.1.0@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63"
+  },
+  "localImages": {
+    "backend": "cc4c/backend:4.0.0-SNAPSHOT",
+    "frontend": "cc4c/frontend:4.0.0-SNAPSHOT",
+    "performanceTools": "cc4c/performance-tools:4.0.0-SNAPSHOT"
+  },
+  "actions": {
+    "checkout": {
+      "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "version": "v6.0.2"
+    },
+    "setupJava": {
+      "uses": "actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654",
+      "version": "v5.2.0"
+    },
+    "setupNode": {
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "version": "v7.0.0"
+    },
+    "dependencyReview": {
+      "uses": "actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3",
+      "version": "v4.8.0"
+    },
+    "setupQemu": {
+      "uses": "docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392",
+      "version": "v3.6.0"
+    },
+    "setupBuildx": {
+      "uses": "docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435",
+      "version": "v3.11.1"
+    },
+    "login": {
+      "uses": "docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef",
+      "version": "v3.6.0"
+    },
+    "buildPush": {
+      "uses": "docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf",
+      "version": "v7.2.0"
+    },
+    "attest": {
+      "uses": "actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a",
+      "version": "v3.0.0"
+    },
+    "trivyAction": {
+      "uses": "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
+      "version": "v0.36.0",
+      "cliVersion": "v0.73.0"
+    }
+  },
+  "compatibility": {
+    "composeProject": "cc4c",
+    "legacyComposeProject": "cc4c-v3",
+    "ciComposeProject": "cc4c-ci",
+    "performanceComposeProject": "cc4c-perf",
+    "volumePrefix": "cc4c",
+    "legacyVolumePrefix": "cc4c-v3",
+    "composeMigration": "aspect5",
+    "flywayMigrations": "V1-V7",
+    "messageSchema": "*.v1"
+  }
+}

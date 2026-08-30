@@ -6,6 +6,10 @@
 /front-end/CC4C/dist/
 /front-end/CC4C/.env.local
 /front-end/CC4C/.env.*.local
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env.local
+/frontend/.env.*.local
 
 # Back-end build and functional-test output
 /back-end/CC4C/target/
@@ -13,8 +17,12 @@
 /back-end/CC4C/.env.test.local
 /back-end/CC4C/.env.runtime.local
 /back-end/CC4C/.env.performance.local
+/backend/target/
+/backend/src/main/resources/application.yml
+/backend/.env.*.local
 /.env.observability.local
 /observability/.env.observability.local
+/infrastructure/observability/.env.observability.local
 /deploy/secrets/local/
 /deploy/secrets/runtime/
 

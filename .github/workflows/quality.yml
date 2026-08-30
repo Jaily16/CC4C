@@ -15,6 +15,91 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  versions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Validate version baseline
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          node scripts/check-versions.mjs
+          node --test scripts/check-versions.test.mjs
+
+  structure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Validate repository structure
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          node scripts/check-structure.mjs
+          node --test scripts/check-structure.test.mjs
+
+  code-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Check backend formatting
+        working-directory: backend
+        run: mvn -B -ntp spotless:check
+      - name: Check frontend formatting and lint
+        working-directory: frontend
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+          npm ci
+          npm run lint
+          npm run format:check
+      - name: Check source quality rules
+        run: node scripts/check-source-quality.mjs
+
+  deployment-modes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Validate Compose and host deployment modes
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          node scripts/check-deployment-modes.mjs
+          node --test scripts/check-deployment-modes.test.mjs
+
+  documentation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Validate documentation links
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          node scripts/check-doc-links.mjs
+          node --test scripts/check-doc-links.test.mjs
+
   backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -27,8 +112,8 @@ jobs:
           cache: maven
       - name: Test with isolated containers
         shell: pwsh
-        working-directory: back-end/CC4C
-        run: ./run-tests.ps1
+        working-directory: backend
+        run: ../scripts/testing/run-backend-tests.ps1
 
   frontend:
     runs-on: ubuntu-24.04
@@ -39,14 +124,15 @@ jobs:
         with:
           node-version: 24.18.0
           cache: npm
-          cache-dependency-path: front-end/CC4C/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - name: Install, audit and build
-        working-directory: front-end/CC4C
+        working-directory: frontend
         run: |
           test "$(node --version)" = "v24.18.0"
           test "$(npm --version)" = "11.16.0"
           npm ci
           npm run test:security
+          npm run test:api
           npm audit --audit-level=high
           npm audit --omit=dev --audit-level=high
           npm run build
@@ -69,7 +155,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Generate CI-only secret files
         shell: pwsh
-        run: ./deploy/scripts/prepare-local.ps1
+        run: ./scripts/deployment/prepare-local.ps1
       - name: Validate Compose without expanding secrets
         run: |
           docker compose -p cc4c-ci config --quiet
@@ -87,22 +173,22 @@ jobs:
       - name: Validate Prometheus rules and tests
         run: |
           docker run --rm --entrypoint /bin/promtool \
-            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            -v "$PWD/infrastructure/observability/prometheus:/etc/prometheus:ro" \
             -v "$PWD/deploy/secrets/local:/run/secrets:ro" \
             prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
             check config /etc/prometheus/prometheus.compose.yml
           docker run --rm --entrypoint /bin/promtool \
-            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            -v "$PWD/infrastructure/observability/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
             check rules /etc/prometheus/rules/cc4c-alerts.yml
           docker run --rm --entrypoint /bin/promtool \
-            -v "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            -v "$PWD/infrastructure/observability/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 \
             test rules /etc/prometheus/tests/cc4c-alerts.test.yml
       - name: Validate Grafana JSON
         shell: pwsh
         run: |
-          Get-ChildItem observability/grafana/dashboards/*.json | ForEach-Object {
+          Get-ChildItem infrastructure/observability/grafana/dashboards/*.json | ForEach-Object {
             Get-Content -Raw $_.FullName | ConvertFrom-Json | Out-Null
           }
 
@@ -118,7 +204,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Prime Maven metadata for Trivy
-        working-directory: back-end/CC4C
+        working-directory: backend
         run: mvn -B -ntp -DskipTests dependency:go-offline
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -131,7 +217,7 @@ jobs:
           exit-code: '1'
 
   compose-smoke:
-    needs: [backend, frontend, delivery-config, source-scan]
+    needs: [backend, frontend, delivery-config, source-scan, versions, structure, code-quality, deployment-modes, documentation]
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -141,7 +227,7 @@ jobs:
           node-version: 24.18.0
       - name: Generate CI-only secret files
         shell: pwsh
-        run: ./deploy/scripts/prepare-local.ps1
+        run: ./scripts/deployment/prepare-local.ps1
       - name: Start isolated delivery stack
         run: docker compose -p cc4c-ci up --build -d --wait --wait-timeout 420
       - name: Verify services, security and API snapshot
@@ -158,7 +244,7 @@ jobs:
           mysql_time_zone="$(docker compose -p cc4c-ci exec -T mysql sh -ec \
             'MYSQL_PWD="$(cat /run/secrets/mysql_root_password)" mysql -uroot -Nse "SELECT CONCAT(@@GLOBAL.time_zone,0x3A,@@SESSION.time_zone)"')"
           test "$mysql_time_zone" = "+08:00:+08:00"
-          node deploy/scripts/openapi-snapshot.mjs check
+          node scripts/testing/openapi-snapshot.mjs check
           test "$(docker compose -p cc4c-ci exec -T backend id -u)" = 10001
           test "$(docker compose -p cc4c-ci exec -T frontend id -u)" != 0
           rabbit_users="$(docker compose -p cc4c-ci exec -T rabbitmq sh -ec \
@@ -180,7 +266,7 @@ jobs:
       - name: Verify image contents and persistent upload volumes
         run: |
           mkdir -p temp/ci-image
-          backend_id="$(docker create cc4c/backend:aspect7)"
+          backend_id="$(docker create cc4c/backend:4.0.0-SNAPSHOT)"
           trap 'docker rm -f "$backend_id" >/dev/null 2>&1 || true' EXIT
           docker cp "$backend_id:/app/cc4c.jar" temp/ci-image/cc4c.jar
           if unzip -Z1 temp/ci-image/cc4c.jar | grep -Fxq 'BOOT-INF/classes/application.yml'; then
@@ -195,7 +281,7 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.73.0
-          image-ref: cc4c/backend:aspect7
+          image-ref: cc4c/backend:4.0.0-SNAPSHOT
           scan-type: image
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
@@ -204,7 +290,7 @@ jobs:
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.73.0
-          image-ref: cc4c/frontend:aspect7
+          image-ref: cc4c/frontend:4.0.0-SNAPSHOT
           scan-type: image
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL

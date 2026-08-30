@@ -1,0 +1,5 @@
+node_modules/
+dist/
+public/avatar/
+public/blogImg/
+package-lock.json

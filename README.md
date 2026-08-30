@@ -1,17 +1,16 @@
 <div align="center">
-  <img src="front-end/CC4C/src/assets/logo/logo.svg" alt="CC4C Logo" width="168" />
+  <img src="frontend/src/assets/logo/logo.svg" alt="CC4C Logo" width="168" />
   <h1>CC4C · Course and Community for Coding</h1>
   <p>面向编程学习者的课程发现、内容阅读与技术交流平台</p>
 
   <p>
-    <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.5.42-42b883?logo=vuedotjs&logoColor=white" />
-    <img alt="Element Plus" src="https://img.shields.io/badge/Element_Plus-2.14.5-409eff" />
-    <img alt="Vite" src="https://img.shields.io/badge/Vite-8.2.2-646cff?logo=vite&logoColor=white" />
-    <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.16-6db33f?logo=springboot&logoColor=white" />
-    <img alt="Java" src="https://img.shields.io/badge/Java-21-ed8b00?logo=openjdk&logoColor=white" />
-    <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.4.11-4479a1?logo=mysql&logoColor=white" />
+    <a href="versions.yml"><img alt="Current version baseline" src="https://img.shields.io/badge/Version_Baseline-versions.yml-2ea44f" /></a>
+    <img alt="Vue" src="https://img.shields.io/badge/Vue-42b883?logo=vuedotjs&logoColor=white" />
+    <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-6db33f?logo=springboot&logoColor=white" />
+    <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" />
     <img alt="V3" src="https://img.shields.io/badge/V3-Complete-2ea44f" />
-    <img alt="Backend tests" src="https://img.shields.io/badge/Backend_Tests-154%2F154-2ea44f" />
+    <img alt="V4" src="https://img.shields.io/badge/V4-Validation-f0ad4e" />
+    <img alt="Backend tests" src="https://img.shields.io/badge/Backend_Tests-160%2F160-2ea44f" />
   </p>
 </div>
 
@@ -19,9 +18,15 @@
 
 CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术社区”构建的编程学习平台。项目将多语言课程、Markdown 内容阅读、博客创作、互动收藏与后台审核整合到同一套体验中，帮助学习者从发现内容、持续学习到沉淀与分享实践经验。
 
-当前版本已完成 V3 七个方面，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性、可观测性与性能证据，以及容器化与持续交付。后端运行于 Java 21、Spring Boot 3.5.16 和 MyBatis-Plus 3.5.17，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。Docker Compose 提供完整本地环境，Testcontainers 隔离后端集成测试，GitHub Actions 定义质量与 SemVer tag-only 发布门禁。前端使用 Vue 3.5、Vite 8 和 Axios 1.19.0，并统一处理会话、CSRF、分页、错误响应与 Markdown 输出净化。
+当前版本已完成 V3 七个方面，覆盖基础现代化、模块化与数据治理、安全认证、缓存与性能、异步可靠性、可观测性与性能证据，以及容器化与持续交付。后端运行于现代 Java/Spring Boot 技术栈和 MyBatis-Plus，并按六个领域模块组织；API 已引入 DTO、Bean Validation、统一分页、正确 HTTP 状态和 OpenAPI，数据库结构由 Flyway V1–V7 管理。认证使用 Spring Security、BCrypt、Spring Session Redis、不透明会话 Cookie 和 CSRF 防护；公开课程与已审核博客热点使用独立连接和命名空间的 Redis Cache-Aside。验证码、博客提交和审核通知通过 MySQL Transactional Outbox、RabbitMQ quorum queue、Inbox 幂等和管理员死信恢复异步处理。Actuator、Micrometer、Prometheus、Grafana、ECS JSON 日志和请求关联 ID 将 API、数据库、缓存、安全及消息链路转化为可复核指标，Gatling 提供固定数据和负载模型下的性能证据。Docker Compose 提供完整本地环境，Testcontainers 隔离后端集成测试，GitHub Actions 定义质量与 SemVer tag-only 发布门禁。前端使用 Vue、Vite 和 Axios，并统一处理会话、CSRF、分页、错误响应与 Markdown 输出净化。
 
-本次升级前后的精确版本、七方面分别解决的工程问题、性能数据、开发效率收益和发布边界见 [V3 技术栈升级总结](docs/CC4CV3技术栈升级总结.md)。
+本次升级前后的精确版本、七方面分别解决的工程问题、性能数据、开发效率收益和发布边界见 [V3 技术栈升级总结](docs/history/v3/technology-upgrade-summary.md)。
+
+当前版本、工具链、依赖、镜像 digest 与 Actions 固定引用见 [版本基线](versions.yml)。
+
+活动源码的格式、中文 Javadoc、日志脱敏和质量门禁见 [代码质量约定](docs/development/code-quality.md)。
+
+V3 成果已经合入并推送到 `origin/main`，提交 `8f29872` 对应的 [GitHub Actions 质量工作流](https://github.com/Jaily16/CC4C/actions/runs/33251873844) 已通过后端 Testcontainers、前端审计构建、配置校验、Trivy 源码/镜像扫描和完整 Compose 冒烟。V4 方面一至五已实施；方面六已通过本地静态、后端和前端质量门禁，隔离 Compose/宿主机验收与新的远程 CI 仍待执行。当前验证证据见 [V4 验证与发布准备报告](docs/development/v4-validation-report.md)，总体顺序和边界见 [第四次迭代开发规划](docs/development/v4-iteration-plan.md)。V3 的业务、消息、数据库和数据身份仍作为兼容基线。
 
 ## 平台亮点
 
@@ -39,68 +44,68 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/01-home.png" alt="CC4C 首页" />
+      <img src="docs/reference/images/readme/01-home.png" alt="CC4C 首页" />
       <br /><b>首页</b><br />品牌横幅、课程推荐、技术资源与社区内容入口。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/02-courses.png" alt="全部课程" />
+      <img src="docs/reference/images/readme/02-courses.png" alt="全部课程" />
       <br /><b>课程发现</b><br />语言筛选、课程搜索及结构统一的响应式课程卡片。
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/03-course-detail.png" alt="课程详情" />
+      <img src="docs/reference/images/readme/03-course-detail.png" alt="课程详情" />
       <br /><b>课程详情</b><br />Markdown 正文、收藏与评论操作，以及随页面保持可达的浮动目录。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/04-blogs.png" alt="全部博客" />
+      <img src="docs/reference/images/readme/04-blogs.png" alt="全部博客" />
       <br /><b>博客发现</b><br />公开文章统计、阅读量信息与清晰的文章卡片布局。
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/05-blog-detail.png" alt="博客详情" />
+      <img src="docs/reference/images/readme/05-blog-detail.png" alt="博客详情" />
       <br /><b>博客阅读</b><br />文章元信息、Markdown 阅读、浮动文章目录、收藏和讨论入口。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/06-profile.png" alt="个人资料" />
+      <img src="docs/reference/images/readme/06-profile.png" alt="个人资料" />
       <br /><b>个人资料</b><br />账户概览、专业与订阅语言信息，以及个性化学习建议。
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/07-favorites.png" alt="收藏中心" />
+      <img src="docs/reference/images/readme/07-favorites.png" alt="收藏中心" />
       <br /><b>收藏中心</b><br />在课程与博客之间切换，集中管理后续学习和阅读内容。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/08-blog-write.png" alt="博客创作" />
+      <img src="docs/reference/images/readme/08-blog-write.png" alt="博客创作" />
       <br /><b>博客创作</b><br />Markdown 编辑与预览、主题语言选择、字数反馈及草稿处理。
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/09-blog-manage.png" alt="文章管理" />
+      <img src="docs/reference/images/readme/09-blog-manage.png" alt="文章管理" />
       <br /><b>文章管理</b><br />统一查看已发布、待审核和未通过文章，快速进入详情或继续创作。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/10-admin-overview.png" alt="管理端概览" />
+      <img src="docs/reference/images/readme/10-admin-overview.png" alt="管理端概览" />
       <br /><b>管理端概览</b><br />课程、博客与待审核内容统计，以及内容列表和快捷操作。
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/11-admin-course.png" alt="管理端发布课程" />
+      <img src="docs/reference/images/readme/11-admin-course.png" alt="管理端发布课程" />
       <br /><b>课程发布</b><br />分区式课程信息表单、语言模块归属与 Markdown 正文编辑。
     </td>
     <td width="50%" valign="top">
-      <img src="docs/images/readme/12-admin-review.png" alt="管理端博客审核" />
+      <img src="docs/reference/images/readme/12-admin-review.png" alt="管理端博客审核" />
       <br /><b>博客审核</b><br />待审核文章列表、正文预览，以及通过或驳回操作。
     </td>
   </tr>
 </table>
 
 <p align="center">
-  <img src="docs/images/readme/13-login.png" alt="CC4C 登录页" width="78%" />
+  <img src="docs/reference/images/readme/13-login.png" alt="CC4C 登录页" width="78%" />
   <br /><b>统一登录入口</b>：清晰的品牌信息、表单校验、找回密码与管理端入口。
 </p>
 
@@ -108,17 +113,17 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 
 | 层级 | 技术 |
 | --- | --- |
-| 前端框架 | Vue 3.5.42、Vue Router、Vuex |
-| UI 与交互 | Element Plus 2.14.5、Element Plus Icons、响应式 CSS |
+| 前端框架 | Vue、Vue Router、Vuex |
+| UI 与交互 | Element Plus、Element Plus Icons、响应式 CSS |
 | 内容编辑 | md-editor-v3、sanitize-html |
-| 网络与构建 | Node 24.18.0、npm 11.16.0、Axios 1.19.0、Vite 8.2.2 |
-| 后端框架 | Spring Boot 3.5.16、Java 21、Jakarta Servlet、Spring Modulith 1.4.12 |
-| API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI 2.8.17 |
+| 网络与构建 | Node.js、npm、Axios、Vite |
+| 后端框架 | Spring Boot、Java、Jakarta Servlet、Spring Modulith |
+| API 治理 | DTO、Bean Validation、统一分页、springdoc OpenAPI |
 | 身份与安全 | Spring Security、Spring Session Data Redis、BCrypt、CSRF、角色与所有权校验 |
-| 数据访问与缓存 | MyBatis-Plus 3.5.17、HikariCP、MySQL 8.4.11、Flyway V1–V7、Redis 7.4.10 Cache-Aside |
-| 异步可靠性 | RabbitMQ 4.3.5、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
-| 可观测与压测 | Actuator、Micrometer、Prometheus 3.13.2、Grafana 13.1.0、ECS JSON、Gatling 3.15.1 |
-| 测试与交付 | Testcontainers 1.21.4、Docker Compose、Mailpit 1.31.0、GitHub Actions、Trivy、GHCR 发布定义 |
+| 数据访问与缓存 | MyBatis-Plus、HikariCP、MySQL、Flyway V1–V7、Redis Cache-Aside |
+| 异步可靠性 | RabbitMQ、Transactional Outbox/Inbox、Publisher Confirm、有限重试与死信恢复 |
+| 可观测与压测 | Actuator、Micrometer、Prometheus、Grafana、ECS JSON、Gatling |
+| 测试与交付 | Testcontainers、Docker Compose、Mailpit、GitHub Actions、Trivy、GHCR 发布定义 |
 | 序列化与服务 | Jackson、AES-256-GCM、JavaMail、文件资源读写 |
 
 ## V3 技术升级与工程收益
@@ -136,7 +141,7 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 | 测试与交付 | 测试依赖本机服务、手工启动和发布检查 | Testcontainers、Docker Compose、Mailpit、GitHub Actions、Trivy | 测试环境隔离，一键复现完整栈，依赖/镜像/契约门禁自动化 |
 | 前端基础 | Vue 3.2、Vite 3、Axios 0.18、旧编辑器残留 | Vue 3.5.42、Vite 8.2.2、Axios 1.19.0、统一 Markdown 净化 | 清除 High/Critical 漏洞，统一 API、Session/CSRF 和 XSS 防护边界 |
 
-上述性能数字来自固定硬件、固定数据与固定负载的本机三轮中位数，只用于证明优化方向和防止回退，不代表生产容量。详细测试条件、限制与证据分别见 [方面六报告](docs/reports/v3/aspect6/README.md) 和 [方面七报告](docs/reports/v3/aspect7/README.md)。
+上述性能数字来自固定硬件、固定数据与固定负载的本机三轮中位数，只用于证明优化方向和防止回退，不代表生产容量。详细测试条件、限制与证据分别见 [方面六报告](docs/history/reports/v3/aspect6/README.md) 和 [方面七报告](docs/history/reports/v3/aspect7/README.md)。
 
 ## 系统架构
 
@@ -189,13 +194,13 @@ flowchart TB
 
 Spring Modulith 测试会验证六个模块、允许的依赖方向和内部包边界；跨模块调用只通过公开的 `api` 包完成。
 
-Compose 网络、secret、持久卷、Testcontainers 和 GitHub Actions 发布链路见 [容器交付架构](docs/CC4C容器交付架构.md)。
+Compose 网络、secret、持久卷、Testcontainers 和 GitHub Actions 发布链路见 [容器交付架构](docs/architecture/container-delivery.md)。
 
 ## 仓库结构
 
 ```text
 CC4C/
-├─ front-end/CC4C/                  # Vue 3 前端应用
+├─ frontend/                        # Vue 3 前端应用
 │  ├─ public/                       # 公共静态资源
 │  ├─ src/
 │  │  ├─ assets/                    # 品牌与课程图片
@@ -205,7 +210,7 @@ CC4C/
 │  │  ├─ store/                     # Vuex 状态
 │  │  └─ views/                     # 用户端与管理端页面
 │  └─ package.json
-├─ back-end/CC4C/                   # Spring Boot 后端应用
+├─ backend/                         # Spring Boot 后端应用
 │  ├─ src/main/java/com/cc4c/
 │  │  ├─ shared/                    # 公共响应、分页、异常与基础设施
 │  │  ├─ identity/                  # 用户、管理员与验证码
@@ -217,22 +222,25 @@ CC4C/
 │  │  ├─ application-example.yml    # 可提交的脱敏配置模板
 │  │  └─ db/migration/              # Flyway V1–V7 迁移
 │  ├─ src/test/                     # 后端自动化测试
-│  ├─ src/gatling/                  # 方面六 Gatling Java DSL 场景
-│  ├─ run-tests.ps1                 # 测试环境校验与 Maven 门禁
-│  ├─ run-aspect4-benchmark.ps1      # 隔离性能库与缓存的方面四基准
-│  ├─ run-local.ps1                 # 从忽略的本机 .env 文件安全启动
-│  ├─ migrate-passwords.ps1          # 既有明文密码离线迁移入口
+│  ├─ src/gatling/                  # Gatling Java DSL 场景
 │  └─ pom.xml
-├─ database/
-│  ├─ legacy/cc4c.sql               # 仅供参考的历史 SQL
-│  ├─ test-database-admin-setup.sql # 专用测试库授权模板
-│  └─ README.md                     # Flyway 初始化、备份与恢复说明
-├─ deploy/                          # 本机秘密生成、管理员引导、Rabbit 初始化与容器性能脚本
-├─ observability/                   # Prometheus 规则、Grafana Provisioning 与受控脚本
+├─ infrastructure/                  # 数据库、RabbitMQ 与观测配置
+│  ├─ database/                     # 测试库脚本与数据库说明
+│  ├─ rabbitmq/                     # RabbitMQ 配置与初始化文件
+│  └─ observability/                # Prometheus 与 Grafana 配置
+├─ scripts/                         # 开发、测试、性能与部署脚本
+│  ├─ development/
+│  ├─ testing/
+│  ├─ performance/
+│  └─ deployment/
+├─ docs/architecture|development|operations|reference|history/
+├─ database/legacy/cc4c.sql         # 原地保留的历史 SQL
+├─ deploy/secrets/local/            # 本机秘密入口，保持旧路径兼容
+├─ observability/.env.observability.local # 本机观测配置，保持旧路径兼容
 ├─ .github/                         # 质量、发布工作流与 Dependabot 配置
 ├─ compose.yml                      # 完整本地环境；默认 Mailpit、隔离网络和持久卷
 ├─ compose.smtp.yml                 # 可选外部 SMTP 覆盖
-├─ docs/                            # 迭代文档、ADR、运行手册、OpenAPI 与脱敏报告
+├─ versions.yml                     # 当前版本与工具链唯一入口
 └─ README.md
 ```
 
@@ -243,20 +251,28 @@ CC4C/
 安装 Docker Desktop 后，可由脚本生成只存在本机的 secret 文件，再启动完整环境：
 
 ```powershell
-.\deploy\scripts\prepare-local.ps1
-docker compose -p cc4c-v3 up --build -d --wait
+ .\scripts\deployment\prepare-local.ps1
+docker compose -p cc4c up --build -d --wait
 ```
 
-默认邮件由 Mailpit 捕获，不需要真实 SMTP。前端、后端、Actuator、Grafana、Prometheus、RabbitMQ 管理页和 Mailpit 分别绑定 `127.0.0.1` 的 5173、4080、4081、3000、9090、15672 和 8025；MySQL、两个 Redis、AMQP 与 Rabbit 指标端口不向宿主机发布。普通停止使用 `docker compose -p cc4c-v3 down`，不得添加 `-v`。完整启动、管理员引导、外部 SMTP、备份、回滚和安全重置见 [容器运行手册](docs/CC4C容器运行手册.md)。
+默认邮件由 Mailpit 捕获，不需要真实 SMTP。前端、后端、Actuator、Grafana、Prometheus、RabbitMQ 管理页和 Mailpit 分别绑定 `127.0.0.1` 的 5173、4080、4081、3000、9090、15672 和 8025；MySQL、两个 Redis、AMQP 与 Rabbit 指标端口不向宿主机发布。普通停止使用 `docker compose -p cc4c down`，不得添加 `-v`。完整启动、管理员引导、外部 SMTP、备份、回滚和安全重置见 [容器运行手册](docs/operations/container-runbook.md)；项目/卷兼容迁移见 [Compose 身份迁移说明](docs/operations/compose-identity-migration.md)。
+
+### 宿主机双运行模式
+
+宿主机模式只管理 CC4C 后端、前端和可选的 Prometheus/Grafana；MySQL、两个 Redis、RabbitMQ 与 Mailpit/SMTP 必须由外部预先提供。先用精确数据库名执行预检，再按“数据库/Flyway → Redis → RabbitMQ → 邮件 → 后端 → 前端 → 观测”的顺序启动：
+
+```powershell
+.\scripts\development\host-preflight.ps1 -Component All -ConfirmDatabase <exact-database-name>
+.\scripts\development\start-host-stack.ps1 -ConfirmDatabase <exact-database-name> -FrontendMode Dev
+.\scripts\development\health-host-stack.ps1
+.\scripts\development\stop-host-stack.ps1
+```
+
+宿主机与 Compose 不得同时连接同一数据库、Redis namespace 或 RabbitMQ vhost；脚本只停止自己记录的精确 PID。静态前端需额外提供已验证的 Nginx 可执行文件和现有 `frontend/dist`。详见 [宿主机运行手册](docs/operations/host-runbook.md)。
 
 ### 1. 环境要求
 
-- JDK 21
-- Maven 3.6.3+
-- Node.js 24.18.0 与 npm 11.16.0（仅手工运行前端时需要）
-- MySQL 8.x
-- Redis 7.x
-- RabbitMQ 4.3.x（本次验收版本 4.3.5）
+- Java、Maven、Node.js、npm、MySQL、Redis、RabbitMQ：请按 [版本基线](versions.yml) 检查
 
 ### 2. 克隆仓库
 
@@ -277,14 +293,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
   ON <database_name>.* TO '<application_user>'@'127.0.0.1';
 ```
 
-首次启动时 Flyway 会依次执行 V1–V7，创建 18 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列、建立异步 Outbox/Inbox，并为 Outbox 增加兼容旧消息的可空请求关联 ID。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
+首次启动时 Flyway 会依次执行 V1–V7，创建 18 张表、写入公开课程目录基线、应用关系约束和查询索引、扩展用户及管理员密码列、建立异步 Outbox/Inbox，并为 Outbox 增加兼容旧消息的可空请求关联 ID。`baseline-on-migrate` 默认关闭；已有数据的非空库不得直接启动迁移，必须先按 [数据库说明](infrastructure/database/README.md) 完成检查、备份和显式基线。`database/legacy/cc4c.sql` 仅供历史参考，不再是初始化来源。
 
 ### 4. 配置后端运行环境
 
-仓库只跟踪脱敏的 `application-example.yml` 和 `.env.runtime.example`。本地运行时复制模板并填写忽略文件；`run-local.ps1` 会校验变量、Java 版本和 JAR，再显式加载脱敏配置。不要复制或提交本机 `application.yml`。
+仓库只跟踪脱敏的 `application-example.yml` 和 `.env.runtime.example`。本地运行时复制模板并填写忽略文件；`scripts/development/run-backend.ps1` 会校验变量、Java 版本和 JAR，再显式加载脱敏配置。不要复制或提交本机 `application.yml`。
 
 ```powershell
-cd back-end/CC4C
+cd backend
 Copy-Item .env.runtime.example .env.runtime.local
 # 只在本机编辑 .env.runtime.local，不要把真实值写入模板或文档
 ```
@@ -306,6 +322,8 @@ Copy-Item .env.runtime.example .env.runtime.local
 | `CC4C_SECURITY_PEPPER` | 至少 32 字符的随机安全 Pepper |
 | `CC4C_SESSION_COOKIE_SECURE` | HTTPS 部署必须为 `true`；本地 HTTP 可为 `false` |
 | `CC4C_ALLOWED_ORIGINS` | 允许携带凭据的精确前端来源列表，禁止通配符 |
+| `CC4C_MAIL_HOST` / `CC4C_MAIL_PORT` | Mailpit 或外部 SMTP 地址与端口 |
+| `CC4C_MAIL_AUTH` / `CC4C_MAIL_SSL_ENABLED` / `CC4C_MAIL_STARTTLS_ENABLED` | 邮件认证、TLS 和 STARTTLS 开关 |
 | `CC4C_MAIL_USERNAME` | 邮件服务账号 |
 | `CC4C_MAIL_PASSWORD` | 邮件服务授权信息 |
 | `CC4C_RABBITMQ_URL` | 运行 RabbitMQ AMQP/AMQPS 地址；必须包含显式 vhost |
@@ -337,14 +355,14 @@ Copy-Item .env.runtime.example .env.runtime.local
 先构建并验证 JAR，再由受控脚本启动：
 
 ```powershell
-cd back-end/CC4C
-.\run-tests.ps1 clean verify
-.\run-local.ps1
+cd D:\codex\CC4C_v2
+.\scripts\testing\run-backend-tests.ps1 clean verify
+.\scripts\development\run-backend.ps1
 ```
 
-安全 Redis 不可连接、Pepper 不足 32 字符、CORS 含通配符、消息 namespace 或 AES 密钥环非法、审核邮箱缺失、Java 不是 21、JAR 缺失或数据库仍含明文/未知格式密码时，应用会快速失败，不会降级到内存会话或旧密码比较。RabbitMQ 暂时不可连接不会阻止 Web 应用受理验证码、博客提交或审核事务，事件会保留在 MySQL Outbox 并按有限退避恢复；业务缓存 Redis 不可用时，公开读取会在短暂熔断旁路后回源 MySQL。既有数据库升级必须先停止后端并备份，应用 V4 后使用 `migrate-passwords.ps1` 离线转换密码；脚本要求备份路径、SHA-256 和精确数据库名确认，且重复执行不会再次转换 `{bcrypt}` 值。
+安全 Redis 不可连接、Pepper 不足 32 字符、CORS 含通配符、消息 namespace 或 AES 密钥环非法、审核邮箱缺失、Java 不是 21、JAR 缺失或数据库仍含明文/未知格式密码时，应用会快速失败，不会降级到内存会话或旧密码比较。RabbitMQ 暂时不可连接不会阻止 Web 应用受理验证码、博客提交或审核事务，事件会保留在 MySQL Outbox 并按有限退避恢复；业务缓存 Redis 不可用时，公开读取会在短暂熔断旁路后回源 MySQL。既有数据库升级必须先停止后端并备份，应用 Flyway V4 密码列迁移后使用 `migrate-passwords.ps1` 离线转换密码；脚本要求备份路径、SHA-256 和精确数据库名确认，且重复执行不会再次转换 `{bcrypt}` 值。
 
-异步消息的 Broker 故障、消费者暂停、SMTP 死信、管理员重试/忽略、密钥轮换和代码回滚步骤见 [CC4C 异步消息故障手册](docs/CC4C异步消息故障手册.md)。
+异步消息的 Broker 故障、消费者暂停、SMTP 死信、管理员重试/忽略、密钥轮换和代码回滚步骤见 [CC4C 异步消息故障手册](docs/operations/messaging-failure-runbook.md)。
 
 后端默认地址：`http://localhost:4080`
 
@@ -357,10 +375,10 @@ cd back-end/CC4C
 后端启用观测并监听 `127.0.0.1:4081`、RabbitMQ 已启用 `rabbitmq_prometheus` 后，复制脱敏模板并填写本机路径与独立监控凭据。预检要求 Prometheus/Grafana 尚未启动，只验证版本、端口、认证、配置和 20 条告警规则；启停脚本只管理自己记录的精确 PID。
 
 ```powershell
-Copy-Item observability/.env.observability.example observability/.env.observability.local
-.\observability\scripts\preflight.ps1
-.\observability\scripts\start-local.ps1
-# 验收结束后：.\observability\scripts\stop-local.ps1
+Copy-Item infrastructure/observability/.env.observability.example infrastructure/observability/.env.observability.local
+.\scripts\development\observability-preflight.ps1
+.\scripts\development\start-observability.ps1
+# 验收结束后：.\scripts\development\stop-observability.ps1
 ```
 
 匿名只能访问脱敏的 `health`、`liveness` 和 `readiness`；`dependencies`、`info` 与 `prometheus` 要求独立 `OBSERVABILITY` Basic 身份，USER/ADMIN 会话不能替代。Grafana 默认位于 `http://127.0.0.1:3000`，提供 API/JVM、DB/缓存/安全和异步消息三个固定 UID Dashboard。Prometheus/Grafana 本地密码、TSDB 和生成配置均保持忽略。
@@ -370,7 +388,7 @@ Copy-Item observability/.env.observability.example observability/.env.observabil
 先创建本机前端环境文件：
 
 ```powershell
-cd front-end/CC4C
+cd frontend
 Copy-Item .env.example .env.local
 ```
 
@@ -388,7 +406,7 @@ npm run dev
 前端生产构建：
 
 ```bash
-cd front-end/CC4C
+cd frontend
 npm ci
 npm run build
 ```
@@ -396,34 +414,34 @@ npm run build
 后端标准测试使用 Testcontainers 1.21.4，在单个测试 JVM 中启动 MySQL 8.4.11、两个 Redis 7.4.10 和 RabbitMQ 4.3.5。测试不读取 `.env.test.local`，也不会连接或清理本机数据库、Redis 或 RabbitMQ；需要 Java 21 和可用的 Docker Engine：
 
 ```powershell
-cd back-end/CC4C
-.\run-tests.ps1 clean verify
+cd D:\codex\CC4C_v2
+.\scripts\testing\run-backend-tests.ps1 clean verify
 ```
 
-MySQL 容器从空库执行 V1–V7；迁移测试另建容器内临时库验证空库、V1 已有库、重复 migrate 和 validate。Redis/Rabbit namespace 每轮独立，Testcontainers reuse 禁用，由 Ryuk 清理本轮资源。门禁覆盖密码迁移、安全体系、Cache-Aside、Outbox 原子性、Publisher Confirm、幂等消费、重试/DLQ、请求关联、管理端权限、指标/健康、日志脱敏、六模块和既有业务回归。当前验收基线为 154 项测试全部通过。
+MySQL 容器从空库执行 V1–V7；迁移测试另建容器内临时库验证空库、V1 已有库、重复 migrate 和 validate。Redis/Rabbit namespace 每轮独立，Testcontainers reuse 禁用，由 Ryuk 清理本轮资源。门禁覆盖密码迁移、安全体系、Cache-Aside、Outbox 原子性、Publisher Confirm、幂等消费、重试/DLQ、请求关联、管理端权限、指标/健康、日志脱敏、六模块和既有业务回归。当前验收基线为 160 项测试全部通过。
 
 ### 方面四独立性能基准
 
 性能基准不属于标准 `clean verify`，只允许连接名称精确以 `_perf_test` 结尾的独立数据库。复制 `.env.performance.example` 为已忽略的 `.env.performance.local`，填写独立数据库、Redis 和精确数据库名确认后运行：
 
 ```powershell
-cd back-end/CC4C
-.\run-aspect4-benchmark.ps1
+cd D:\codex\CC4C_v2
+.\scripts\performance\run-performance-benchmark.ps1
 ```
 
 工具使用固定种子 `20260827` 生成 2,000 用户、1,000 课程、20,000 博客以及合计 200,000 条收藏、评论与回复关系，只清理工具保留的有限 ID 区间，不执行 Flyway `clean`/`repair` 或 `DROP DATABASE`。方面六收口时的当前构建重跑结果：HTTP 错误为 0，热缓存命中率 100%，目标 SELECT 从 10,995 降至 0，三轮中位数 p95 从 181.599 ms 降至 5.486 ms；冷路径 p95 从 95.875 ms 变为 97.848 ms，约退化 2.06%。结果只代表本机受控对照，不表示生产容量；原始 JSON、Markdown 与 EXPLAIN 保存在已忽略的 `temp/`。
 
 ### 方面六 Gatling 与观测开销证据
 
-Gatling 场景只允许连接 loopback 和名称精确以 `_perf_test` 结尾的性能库。三轮 `PublicReadStandard` 中位数显示：观测关闭/开启均为 0 错误，p95 均为 5 ms，p99 从 7 ms 变为 8 ms，吞吐从 869.98 req/s 变为 868.91 req/s；p99 退化 14.29%、吞吐下降 0.12%，均通过门禁。`AuthenticatedMixed` 共 158,023 请求、0 错误、p95 11 ms；`StepCapacity` 共 885,823 请求、0 错误、p95 9 ms。故障修复后的当前构建 smoke 为 10,469 请求、0 错误、p95 7 ms、p99 19 ms。完整环境、负载、指标、告警和故障演练证据见 [方面六报告](docs/reports/v3/aspect6/README.md)。
+Gatling 场景只允许连接 loopback 和名称精确以 `_perf_test` 结尾的性能库。三轮 `PublicReadStandard` 中位数显示：观测关闭/开启均为 0 错误，p95 均为 5 ms，p99 从 7 ms 变为 8 ms，吞吐从 869.98 req/s 变为 868.91 req/s；p99 退化 14.29%、吞吐下降 0.12%，均通过门禁。`AuthenticatedMixed` 共 158,023 请求、0 错误、p95 11 ms；`StepCapacity` 共 885,823 请求、0 错误、p95 9 ms。故障修复后的当前构建 smoke 为 10,469 请求、0 错误、p95 7 ms、p99 19 ms。完整环境、负载、指标、告警和故障演练证据见 [方面六报告](docs/history/reports/v3/aspect6/README.md)。
 
 ### 方面七容器性能与交付证据
 
-显式 performance profile 使用隔离的 `cc4c_perf_test`、固定种子 `20260827` 和关闭 Dispatcher/Consumer 的后端容器。`PublicReadSmoke` 为 10,656 请求、0 错误、p95 5 ms、p99 18 ms；`PublicReadStandard` 三轮中位数为 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。后端 Testcontainers 154/154 通过，前端安全测试、两类 npm audit、生产构建、Trivy 源码/镜像扫描、Compose/OpenAPI/Prometheus/Grafana 门禁均通过。完整限制和供应链状态见 [方面七报告](docs/reports/v3/aspect7/README.md)；本地镜像尚未推送或发布到 GHCR。
+显式 performance profile 使用隔离的 `cc4c_perf_test`、固定种子 `20260827` 和关闭 Dispatcher/Consumer 的后端容器。`PublicReadSmoke` 为 10,656 请求、0 错误、p95 5 ms、p99 18 ms；`PublicReadStandard` 三轮中位数为 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。后端 Testcontainers 154/154 通过，前端安全测试、两类 npm audit、生产构建、Trivy 源码/镜像扫描、Compose/OpenAPI/Prometheus/Grafana 门禁均通过。完整限制和供应链状态见 [方面七报告](docs/history/reports/v3/aspect7/README.md)；本地镜像尚未推送或发布到 GHCR。
 
 ## 安全说明
 
-- `back-end/CC4C/src/main/resources/application.yml` 是本机真实配置，已被 Git 忽略，禁止提交。
+- `back-end/CC4C/src/main/resources/application.yml` 是本机真实配置，已被 Git 忽略，禁止提交；该旧路径在结构整理期间保持为本机兼容壳层。
 - Maven 构建显式排除 `application.yml`；最终 JAR 只允许包含脱敏的 `application-example.yml`。
 - `.env.runtime.local`、`.env.test.local` 与前端 `.env.local` 仅限本机使用，禁止提交；`.env.example` 文件不得包含秘密。
 - Compose secret 只存在 `deploy/secrets/local/`，后端入口仅在进程启动时读取挂载文件；不得把 secret 值写进 Compose 环境、镜像层、日志或命令行。普通 `down` 不删除卷，只有带精确项目名和二次输入确认的 `reset-local.ps1` 可以执行本项目卷重置。

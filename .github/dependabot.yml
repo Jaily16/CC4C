@@ -1,11 +1,11 @@
 version: 2
 updates:
   - package-ecosystem: maven
-    directory: /back-end/CC4C
+    directory: /backend
     schedule:
       interval: weekly
   - package-ecosystem: npm
-    directory: /front-end/CC4C
+    directory: /frontend
     schedule:
       interval: weekly
   - package-ecosystem: docker
@@ -13,11 +13,11 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /back-end/CC4C
+    directory: /backend
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /front-end/CC4C
+    directory: /frontend
     schedule:
       interval: weekly
   - package-ecosystem: github-actions

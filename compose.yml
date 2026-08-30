@@ -1,4 +1,4 @@
-name: cc4c-v3
+name: cc4c
 
 services:
   mysql:
@@ -149,7 +149,7 @@ services:
       - app
       - mailpit-host
     ports:
-      - 127.0.0.1:8025:8025
+      - 127.0.0.1:${CC4C_MAILPIT_UI_PORT:-8025}:8025
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 5s
@@ -160,7 +160,7 @@ services:
     restart: unless-stopped
 
   storage-init:
-    image: cc4c/backend:aspect7
+    image: cc4c/backend:4.0.0-SNAPSHOT
     user: "0:0"
     entrypoint:
       - /bin/bash
@@ -185,11 +185,12 @@ services:
     restart: "no"
 
   backend:
-    image: cc4c/backend:aspect7
+    image: cc4c/backend:4.0.0-SNAPSHOT
     build:
-      context: ./back-end/CC4C
+      context: ./backend
       dockerfile: Dockerfile
     environment:
+      SPRING_APPLICATION_NAME: CC4C
       CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       CC4C_DB_USERNAME: cc4c
       CC4C_SESSION_NAMESPACE: cc4c:v3:session:compose
@@ -269,9 +270,9 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: cc4c/frontend:aspect7
+    image: cc4c/frontend:4.0.0-SNAPSHOT
     build:
-      context: ./front-end/CC4C
+      context: ./frontend
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:4080
@@ -348,8 +349,8 @@ services:
       - grafana_admin_password
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - observability
       - grafana-host
@@ -392,11 +393,12 @@ services:
   backend-perf:
     profiles:
       - performance
-    image: cc4c/backend:aspect7
+    image: cc4c/backend:4.0.0-SNAPSHOT
     build:
-      context: ./back-end/CC4C
+      context: ./backend
       dockerfile: Dockerfile
     environment:
+      SPRING_APPLICATION_NAME: CC4C
       CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c_perf_test?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       CC4C_DB_USERNAME: cc4c
       CC4C_SESSION_NAMESPACE: cc4c:v3:session:compose-perf
@@ -471,9 +473,9 @@ services:
   performance-tools:
     profiles:
       - performance
-    image: cc4c/performance-tools:aspect7
+    image: cc4c/performance-tools:4.0.0-SNAPSHOT
     build:
-      context: ./back-end/CC4C
+      context: ./backend
       dockerfile: Dockerfile
       target: performance-tools
     entrypoint:
@@ -497,7 +499,7 @@ services:
       - admin_bootstrap_password
       - management_password
     volumes:
-      - ./temp/cc4c-v3-aspect7-gatling:/workspace/target/gatling
+      - "${CC4C_PERF_GATLING_HOST_PATH:-./temp/cc4c-v3-aspect7-gatling}:/workspace/target/gatling"
     networks:
       - app
     security_opt:
@@ -507,8 +509,9 @@ services:
   admin-bootstrap:
     profiles:
       - bootstrap
-    image: cc4c/backend:aspect7
+    image: cc4c/backend:4.0.0-SNAPSHOT
     environment:
+      SPRING_APPLICATION_NAME: CC4C
       CC4C_LAUNCH_MODE: admin-bootstrap
       CC4C_DB_URL: jdbc:mysql://mysql:3306/cc4c?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
       CC4C_DB_USERNAME: cc4c
@@ -569,21 +572,21 @@ volumes:
 
 configs:
   rabbitmq_config:
-    file: ./deploy/rabbitmq/rabbitmq.conf
+    file: ./infrastructure/rabbitmq/rabbitmq.conf
   rabbitmq_entrypoint:
-    file: ./deploy/scripts/rabbit-entrypoint.sh
+    file: ./infrastructure/rabbitmq/rabbit-entrypoint.sh
   rabbitmq_init:
-    file: ./deploy/scripts/rabbit-init.sh
+    file: ./infrastructure/rabbitmq/rabbit-init.sh
   rabbitmq_password_hasher:
-    file: ./deploy/scripts/rabbit-password-hash.escript
+    file: ./infrastructure/rabbitmq/rabbit-password-hash.escript
   prometheus_config:
-    file: ./observability/prometheus/prometheus.compose.yml
+    file: ./infrastructure/observability/prometheus/prometheus.compose.yml
   prometheus_alerts:
-    file: ./observability/prometheus/rules/cc4c-alerts.yml
+    file: ./infrastructure/observability/prometheus/rules/cc4c-alerts.yml
   perf_init:
-    file: ./deploy/scripts/perf-init.sh
+    file: ./scripts/performance/perf-init.sh
   performance_entrypoint:
-    file: ./deploy/scripts/performance-entrypoint.sh
+    file: ./scripts/performance/performance-entrypoint.sh
 
 secrets:
   mysql_root_password:

@@ -1,0 +1,121 @@
+groups:
+  - name: cc4c-availability
+    rules:
+      - alert: Cc4cBackendUnreachable
+        expr: up{job="cc4c-backend"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "CC4C backend metrics cannot be scraped" }
+      - alert: Cc4cHttp5xxRateHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001) > 0.01
+          and sum(increase(http_server_requests_seconds_count[5m])) >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C HTTP 5xx rate exceeds one percent" }
+      - alert: Cc4cApiP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C API p95 exceeds 500 ms" }
+
+  - name: cc4c-database-cache-security
+    rules:
+      - alert: Cc4cHikariPending
+        expr: hikaricp_connections_pending > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C requests are waiting for database connections" }
+      - alert: Cc4cHikariUtilizationHigh
+        expr: hikaricp_connections_active / clamp_min(hikaricp_connections_max, 1) > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C Hikari utilization exceeds ninety percent" }
+      - alert: Cc4cMybatisP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(cc4c_mybatis_operations_seconds_bucket[5m]))) > 0.2
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C MyBatis p95 exceeds 200 ms" }
+      - alert: Cc4cMybatisErrorRateHigh
+        expr: |
+          sum(rate(cc4c_mybatis_operations_seconds_count{outcome="error"}[5m]))
+          / clamp_min(sum(rate(cc4c_mybatis_operations_seconds_count[5m])), 0.000001) > 0.01
+          and sum(increase(cc4c_mybatis_operations_seconds_count[5m])) >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C MyBatis error rate exceeds one percent" }
+      - alert: Cc4cCacheHitRatioLow
+        expr: |
+          sum(rate(cc4c_cache_requests_total{outcome="hit"}[10m]))
+          / clamp_min(sum(rate(cc4c_cache_requests_total{outcome=~"hit|miss"}[10m])), 0.000001) < 0.85
+          and sum(increase(cc4c_cache_requests_total{outcome=~"hit|miss"}[10m])) >= 100
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C positive cache hit ratio is below eighty-five percent" }
+      - alert: Cc4cCacheFallbackIncreasing
+        expr: sum(increase(cc4c_cache_requests_total{outcome=~"error|bypass"}[2m])) > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C business cache is bypassing Redis" }
+      - alert: Cc4cAuthenticationFailuresHigh
+        expr: sum(rate(cc4c_security_authentication_attempts_total{outcome="failure"}[1m])) * 60 > 20
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C authentication failures are elevated" }
+      - alert: Cc4cRateLimitRejectionsHigh
+        expr: sum(rate(cc4c_security_rate_limit_rejections_total[1m])) * 60 > 10
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C rate-limit rejections are elevated" }
+
+  - name: cc4c-messaging-runtime
+    rules:
+      - alert: Cc4cOutboxBacklogOld
+        expr: cc4c_messaging_outbox_oldest_pending_seconds > 60
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C Outbox oldest pending message exceeds 60 seconds" }
+      - alert: Cc4cOutboxFailed
+        expr: sum(cc4c_messaging_outbox_messages{status=~"publish_failed|dead"}) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: "CC4C Outbox contains failed or dead messages" }
+      - alert: Cc4cMessagingSamplerStale
+        expr: cc4c_messaging_sampler_age_seconds > 30
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C asynchronous state sampler is stale" }
+      - alert: Cc4cRabbitBacklog
+        expr: sum(rabbitmq_queue_messages_ready) > 100
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C RabbitMQ ready backlog exceeds 100" }
+      - alert: Cc4cRabbitNoConsumers
+        expr: sum(rabbitmq_queue_messages_ready) > 0 and sum(rabbitmq_queue_consumers) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "CC4C RabbitMQ has pending messages but no consumers" }
+      - alert: Cc4cRabbitDeadLetters
+        expr: sum(rabbitmq_queue_messages{queue=~".*dead.*"}) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: "CC4C RabbitMQ dead-letter queue is not empty" }
+
+  - name: cc4c-jvm
+    rules:
+      - alert: Cc4cJvmHeapHigh
+        expr: sum(jvm_memory_used_bytes{area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{area="heap"}), 1) > 0.85
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C JVM heap utilization exceeds eighty-five percent" }
+      - alert: Cc4cProcessCpuHigh
+        expr: process_cpu_usage > 0.9
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C process CPU exceeds ninety percent" }
+      - alert: Cc4cGcPauseP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(jvm_gc_pause_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "CC4C GC pause p99 exceeds 500 ms" }

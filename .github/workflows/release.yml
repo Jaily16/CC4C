@@ -19,10 +19,10 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run isolated container performance gate
         shell: pwsh
-        run: ./deploy/scripts/run-container-performance.ps1 -StandardRounds 3
+        run: ./scripts/performance/run-container-performance.ps1 -StandardRounds 3
       - name: Remove only the release performance project
         if: always()
-        run: docker compose -p cc4c-v3 --profile performance down --volumes --remove-orphans
+        run: docker compose -p cc4c-perf --profile performance down --volumes --remove-orphans
 
   publish:
     needs: [quality, container-performance]
@@ -38,9 +38,9 @@ jobs:
       matrix:
         include:
           - component: backend
-            context: back-end/CC4C
+            context: backend
           - component: frontend
-            context: front-end/CC4C
+            context: frontend
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Validate SemVer tag

@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: CC4C Prometheus
+    uid: cc4c-prometheus
+    type: prometheus
+    access: proxy
+    url: ${CC4C_PROMETHEUS_URL}
+    isDefault: true
+    editable: false

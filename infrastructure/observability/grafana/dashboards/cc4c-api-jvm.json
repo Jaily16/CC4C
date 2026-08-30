@@ -1,0 +1,13 @@
+{
+  "uid": "cc4c-api-jvm", "title": "CC4C API and JVM", "schemaVersion": 41,
+  "time": {"from": "now-1h", "to": "now"}, "refresh": "15s", "tags": ["cc4c"],
+  "templating": {"list": []},
+  "panels": [
+    {"id":1,"type":"timeseries","title":"HTTP requests/s","gridPos":{"x":0,"y":0,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum(rate(http_server_requests_seconds_count[5m]))","legendFormat":"requests/s"}]},
+    {"id":2,"type":"timeseries","title":"HTTP p50 / p95 / p99","gridPos":{"x":12,"y":0,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))","legendFormat":"p50"},{"expr":"histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))","legendFormat":"p95"},{"expr":"histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))","legendFormat":"p99"}]},
+    {"id":3,"type":"timeseries","title":"JVM heap","gridPos":{"x":0,"y":8,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum(jvm_memory_used_bytes{area=\"heap\"})","legendFormat":"used"},{"expr":"sum(jvm_memory_max_bytes{area=\"heap\"})","legendFormat":"max"}]},
+    {"id":4,"type":"timeseries","title":"CPU and GC","gridPos":{"x":12,"y":8,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"process_cpu_usage","legendFormat":"process cpu"},{"expr":"rate(jvm_gc_pause_seconds_sum[5m])","legendFormat":"gc pause/s"}]},
+    {"id":5,"type":"timeseries","title":"HTTP status rates","gridPos":{"x":0,"y":16,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"sum by (status) (rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[5m]))","legendFormat":"HTTP {{status}}"}]},
+    {"id":6,"type":"timeseries","title":"Threads and Tomcat","gridPos":{"x":12,"y":16,"w":12,"h":8},"datasource":{"uid":"cc4c-prometheus"},"targets":[{"expr":"jvm_threads_live_threads","legendFormat":"JVM live threads"},{"expr":"tomcat_threads_busy_threads","legendFormat":"Tomcat busy"},{"expr":"tomcat_threads_current_threads","legendFormat":"Tomcat current"}]}
+  ]
+}
