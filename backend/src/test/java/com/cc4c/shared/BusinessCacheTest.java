@@ -106,7 +106,7 @@ class BusinessCacheTest {
             }
         }
         assertEquals(1, loads.get());
-        assertTrue(cache.metrics().snapshot().lockWaits() >= 1);
+        assertEquals(8, cache.metrics().snapshot().misses());
     }
 
     @Test
@@ -231,6 +231,7 @@ class BusinessCacheTest {
 
         @Override
         public String get(String key) {
+            String currentValue = values.get(key);
             CountDownLatch readGate = coordinatedDataReads;
             if (readGate != null && !key.endsWith(":generation") && !key.endsWith(":lock")) {
                 readGate.countDown();
@@ -247,7 +248,7 @@ class BusinessCacheTest {
                 readFailures.incrementAndGet();
                 throw new IllegalStateException("Redis unavailable");
             }
-            return values.get(key);
+            return currentValue;
         }
 
         @Override
