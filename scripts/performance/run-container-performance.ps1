@@ -28,6 +28,31 @@ $metricsHelperName = $null
 $metricsStagingPath = $null
 New-Item -ItemType Directory -Force -Path $performanceOutputRoot | Out-Null
 
+function Repair-GatlingOutputOwnership {
+    <#
+    Linux CI 上的性能镜像默认以 root 运行；其 bind mount 输出若保留 root
+    所有权，宿主机侧汇总器无法写入 summary.json。只在 Unix 主机上将本轮
+    隔离性能输出交还给当前运行用户，不触碰其他路径或 Docker 卷。
+    #>
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Unix) {
+        return
+    }
+
+    $hostUid = (& id -u).Trim()
+    $hostGid = (& id -g).Trim()
+    if ($LASTEXITCODE -ne 0 -or $hostUid -notmatch '^\d+$' -or $hostGid -notmatch '^\d+$') {
+        throw 'Unable to resolve the Unix host uid/gid for Gatling output ownership.'
+    }
+
+    $hostOwner = '{0}:{1}' -f $hostUid, $hostGid
+    & docker compose --ansi never -p $project --profile performance run `
+        --rm --no-deps --user 0:0 --entrypoint /bin/chown performance-tools `
+        -R $hostOwner /workspace/target/gatling | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to restore host ownership for container performance output.'
+    }
+}
+
 Push-Location -LiteralPath $workspaceRoot
 try {
     $env:CC4C_RABBITMQ_MANAGEMENT_PORT = [string] $RabbitManagementPort
@@ -63,6 +88,7 @@ try {
         '-Dgatling.simulationClass=com.cc4c.performance.PublicReadSmoke' `
         '-Dgatling.resultsFolder=/workspace/target/gatling/container/smoke'
     if ($LASTEXITCODE -ne 0) { throw 'Container PublicReadSmoke gate failed.' }
+    Repair-GatlingOutputOwnership
 
     for ($round = 1; $round -le $StandardRounds; $round++) {
         & docker compose -p $project --profile performance run --rm --no-deps performance-tools `
@@ -70,12 +96,14 @@ try {
             '-Dgatling.simulationClass=com.cc4c.performance.PublicReadWarmup' `
             "-Dgatling.resultsFolder=/workspace/target/gatling/container/round-$round/warmup"
         if ($LASTEXITCODE -ne 0) { throw "Container warm-up round $round failed." }
+        Repair-GatlingOutputOwnership
 
         & docker compose -p $project --profile performance run --rm --no-deps performance-tools `
             mvn -o -B -ntp -Pperformance-gatling gatling:test `
             '-Dgatling.simulationClass=com.cc4c.performance.PublicReadStandard' `
             "-Dgatling.resultsFolder=/workspace/target/gatling/container/round-$round/measurement"
         if ($LASTEXITCODE -ne 0) { throw "Container standard round $round failed." }
+        Repair-GatlingOutputOwnership
 
         $roundRoot = Join-Path $performanceOutputRoot "container/round-$round/measurement"
         $simulationLog = Get-ChildItem -LiteralPath $roundRoot -Filter simulation.log -Recurse |
