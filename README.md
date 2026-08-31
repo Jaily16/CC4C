@@ -26,7 +26,7 @@ CC4C（Course and Community for Coding）是一个围绕“学习课程 + 技术
 
 活动源码的格式、中文 Javadoc、日志脱敏和质量门禁见 [代码质量约定](docs/development/code-quality.md)。
 
-V3 成果已经合入并推送到 `origin/main`，提交 `8f29872` 对应的 [GitHub Actions 质量工作流](https://github.com/Jaily16/CC4C/actions/runs/33251873844) 已通过后端 Testcontainers、前端审计构建、配置校验、Trivy 源码/镜像扫描和完整 Compose 冒烟。V4 方面一至五已实施；方面六已通过本地静态、后端和前端质量门禁，隔离 Compose/宿主机验收与新的远程 CI 仍待执行。当前验证证据见 [V4 验证与发布准备报告](docs/development/v4-validation-report.md)，总体顺序和边界见 [第四次迭代开发规划](docs/development/v4-iteration-plan.md)。V3 的业务、消息、数据库和数据身份仍作为兼容基线。
+V3 成果已经合入并推送到 `origin/main`，提交 `8f29872` 对应的 [GitHub Actions 质量工作流](https://github.com/Jaily16/CC4C/actions/runs/33251873844) 已通过后端 Testcontainers、前端审计构建、配置校验、Trivy 源码/镜像扫描和完整 Compose 冒烟。V4 方面一至六已实施；远程 quality [33359828199](https://github.com/Jaily16/CC4C/actions/runs/33359828199) 与标签 release [33360497982](https://github.com/Jaily16/CC4C/actions/runs/33360497982) 已通过，`v4.0.0` 和 GHCR 镜像已发布。旧 `cc4c-v3_*` 源卷按授权保留，消息 retry/ignore 因无安全候选未执行。当前验证证据见 [V4 验证与发布准备报告](docs/development/v4-validation-report.md)，总体顺序和边界见 [第四次迭代开发规划](docs/development/v4-iteration-plan.md)。V3 的业务、消息、数据库和数据身份仍作为兼容基线。
 
 ## 平台亮点
 

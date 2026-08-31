@@ -15,11 +15,11 @@
 | 宿主机模式 | 隔离依赖上的 Dev 模式预检、启动、健康检查和精确 PID 停止通过 |
 | 静态 Nginx 模式 | 使用 `D:\tool\nginx-1.28.3\nginx.exe`（Nginx 1.28.3）验证通过并按精确 PID 停止 |
 | 浏览器业务写入 | 隔离 `cc4c-browser` 业务 smoke 通过；一次性用户/管理员数据和非敏感上传仅写入隔离资源 |
-| SemVer 标签 | `v4.0.0` 已创建并推送，当前暂指向失败发布尝试的 `a3e12df`；待修复提交通过后重新指向 |
-| GHCR 镜像 | 未发布 |
-| 远程 V4 质量工作流 | `quality #24` / `33356398667` 通过；标签触发的发布工作流质量阶段复现测试调度竞态，已移除非契约指标断言 |
+| SemVer 标签 | `v4.0.0` 已创建并推送，剥离提交指向 `ed3c7bb62b4402bd1a4e7aa616955f938cf2aaaf` |
+| GHCR 镜像 | 已发布：`ghcr.io/jaily16/cc4c-backend:4.0.0`、`ghcr.io/jaily16/cc4c-frontend:4.0.0`，均完成 provenance attestation |
+| 远程 V4 质量工作流 | 修复提交 quality `33359828199` 通过；标签 release `33360497982` 的质量、性能和 GHCR 发布全部通过 |
 
-当前工程本地质量、隔离运行、浏览器业务验收、修复后的本地后端全量测试和远程 quality #24 均通过；标签触发的发布工作流因测试调度竞态失败，修复后的重新验证、GHCR 发布仍待完成，不能将 V4 标记为最终发布完成。
+当前工程本地质量、隔离运行、浏览器业务验收、修复后的本地后端全量测试、远程 quality `33359828199` 和标签 release `33360497982` 均通过。V4 发布闭环已完成；消息 retry/ignore 和旧源卷删除仍按授权边界未执行。
 
 ## 外部证据与安全边界
 
@@ -59,8 +59,10 @@
 | 2026-08-31 04:38–04:40 | 发布失败修复后的本地并发测试与后端 `clean verify` | 并发测试连续 10/10 通过；后端 160/160，失败/错误/跳过均为 0，退出码 0；两个 4.0.0-SNAPSHOT JAR 已生成 |
 | 2026-08-31 03:38–03:47 | 隔离 `cc4c-browser` 浏览器业务 smoke | 通过注册/验证码邮件、登录/退出、课程/博客读取、收藏、评论/回复、管理员登录、博客审核、头像/博客图片上传；消息管理页为空，无可安全执行的 retry/ignore 候选 |
 | 2026-08-31 03:49 | 前端评论成功判定回归修复及 `npm run test:api` | 退出码 0；11/11，通过真实 `CommentResponse` DTO 成功路径回归测试 |
+| 2026-08-31 05:14:37–05:24:43 | 修复提交 `ed3c7bb62b4402bd1a4e7aa616955f938cf2aaaf` 的 GitHub Actions quality | 运行 `33359828199` 通过；所有必需 job 成功，`dependency-review` 按条件跳过；[运行详情](https://github.com/Jaily16/CC4C/actions/runs/33359828199) |
+| 2026-08-31 05:25:36–06:07:23 | `v4.0.0` 标签触发的 GitHub Actions release | 运行 `33360497982` 通过；质量复跑、Compose smoke、三轮容器性能、前后端多架构镜像推送和 provenance attestation 全部成功；[运行详情](https://github.com/Jaily16/CC4C/actions/runs/33360497982) |
 
-修复后本地验证已完成；quality #23 和标签发布工作流的失败结果均保留为证据。quality #24 已通过；本次发布失败暴露的是测试指标断言的调度依赖，现已按确定性并发语义修复，并完成本地 10/10 与 160/160 回归，修复提交通过新的远程门禁后才继续发布。
+quality #23、旧标签发布失败及权限问题均保留为历史证据；并发测试调度断言和 Linux 性能输出归属问题已分别修复。修复提交完成本地回归并通过 quality `33359828199`，随后标签 release `33360497982` 完成性能和 GHCR 发布。
 
 ## 后端与前端质量
 
@@ -90,6 +92,16 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 | 3 | 267116 | 0 | 1 ms | 3 ms | 6 ms | 884.49 req/s |
 
 三轮结束后只停止了 `cc4c-perf` 项目，未删除性能卷；确认 `cc4c-perf` 运行容器为 0，`cc4c-a7verify2` 仍为 9 个运行容器。最终指标文件存在且无 staging 文件，未覆盖 `temp/cc4c-v3-*` 历史证据。
+
+标签 release `33360497982` 的隔离容器性能三轮同样全部通过，来自 `container-performance` job 的实际摘要如下：
+
+| 轮次 | 请求数 | 错误数 | P50 | P95 | P99 | 吞吐 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 266884 | 0 | 1 ms | 4 ms | 9 ms | 883.72 req/s |
+| 2 | 267419 | 0 | 1 ms | 3 ms | 6 ms | 885.49 req/s |
+| 3 | 267291 | 0 | 1 ms | 3 ms | 8 ms | 885.07 req/s |
+
+这些数字仅是 GitHub Actions 隔离环境中的回归证据，不外推为生产容量；前次 Linux bind mount 权限失败已由性能输出归属修复解决。
 
 ## Compose 隔离验收与卷身份
 
@@ -142,10 +154,10 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 - 消息 retry/ignore 未执行：隔离消息管理页无待发送、发布失败或消费死信候选项；仅完成页面、筛选和空状态验收。
 - 未执行源卷删除：本轮授权明确 `DELETE_LEGACY_VOLUMES=NO`，旧 `cc4c-v3_*` 源卷继续保留。
-- 修复并发测试竞态后的远程 quality #24 已通过；标签 `v4.0.0` 已创建并推送，但其发布工作流因同一测试调度问题失败，必须在修复提交通过后重新指向该标签并重跑发布链路。
-- GHCR 镜像尚未发布；源卷仍保留，未执行 `DeleteSource`。
+- 修复并发测试竞态和 Linux 性能输出归属后的远程 quality `33359828199` 已通过；`v4.0.0` 已重新指向修复提交，release `33360497982` 已完成全部质量、性能和发布 job。
+- GHCR 已发布 `ghcr.io/jaily16/cc4c-backend:4.0.0` 与 `ghcr.io/jaily16/cc4c-frontend:4.0.0`；旧源卷仍保留，未执行 `DeleteSource`。
 
-本地收口提交和推送已完成；修复提交 `044d0f1` 已由 quality #24 验证，但标签触发的发布工作流复现了非确定性测试断言。当前工作区包含针对该断言的确定性测试修复及对应证据更新；需要新的远程质量通过后重新指向并发布 `v4.0.0`，报告仍如实保留质量失败、标签、GHCR 和源卷删除边界。
+修复提交 `ed3c7bb` 已推送到 `main` 并由 quality `33359828199` 验证；标签 release `33360497982` 已把 `v4.0.0` 对应代码发布到 GHCR。当前报告的本次更新将记录发布证据和最终文档状态；旧失败运行仍作为诊断证据保留。
 
 ## 提交前清单边界
 
@@ -153,4 +165,4 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 ## 验收结论
 
-本报告不把未执行项当作通过项，不宣称 V4 已最终发布完成。浏览器业务、Nginx、本地门禁和远程 quality #24 已完成；发布工作流因测试调度断言失败，下一步是提交确定性测试修复、通过新的质量门禁后重新发布 `v4.0.0` 并确认 GHCR，源卷继续保留。
+本报告不把未执行项当作通过项：消息 retry/ignore 因无候选未执行，旧 `cc4c-v3_*` 源卷因 `DELETE_LEGACY_VOLUMES=NO` 保留。除此之外，浏览器业务、Nginx、本地门禁、远程 quality、标签 release、三轮容器性能和 GHCR 发布均已完成；`v4.0.0` 的剥离提交为 `ed3c7bb62b4402bd1a4e7aa616955f938cf2aaaf`。
