@@ -13,13 +13,13 @@
 | Compose 卷迁移 | 四个已有 `cc4c-v3_*` 源卷已复制并在启动前验证；源卷仍保留 |
 | 源卷删除 | 未执行 `DeleteSource`，也未执行任何 `down -v` |
 | 宿主机模式 | 隔离依赖上的 Dev 模式预检、启动、健康检查和精确 PID 停止通过 |
-| 静态 Nginx 模式 | 未执行：当前没有用户提供的、已验证的 Nginx 1.28.3 可执行文件 |
-| 浏览器业务写入 | 待用户在动作前确认临时测试凭据输入；尚未写入凭据或业务数据 |
+| 静态 Nginx 模式 | 使用 `D:\tool\nginx-1.28.3\nginx.exe`（Nginx 1.28.3）验证通过并按精确 PID 停止 |
+| 浏览器业务写入 | 隔离 `cc4c-browser` 业务 smoke 通过；一次性用户/管理员数据和非敏感上传仅写入隔离资源 |
 | SemVer 标签 | 未创建 |
 | GHCR 镜像 | 未发布 |
 | 远程 V4 质量工作流 | 未执行；本轮未推送。运行 `33251873844` 仅为 V3/基线历史证据 |
 
-当前工程验证已经达到本地质量和隔离运行收口条件，但由于用户浏览器写入验收和远程 V4 CI 尚未完成，不能将 V4 标记为最终发布完成。
+当前工程已通过本地质量、隔离运行和浏览器业务验收；远程 V4 CI、推送、标签和 GHCR 发布仍未完成，不能将 V4 标记为最终发布完成。
 
 ## 外部证据与安全边界
 
@@ -42,24 +42,29 @@
 | 2026-08-30 15:53:18 | 基线 Git 状态、OpenAPI/Flyway 哈希、事件名和受保护路径元数据记录 | 通过；HEAD/origin 同步，暂存区为空 |
 | 2026-08-30 16:05:00–16:06:09 | `powershell -NoProfile -File scripts/testing/run-backend-tests.ps1 clean verify` | 退出码 0；160/160，失败/错误/跳过均为 0 |
 | 2026-08-30 16:07:11–16:07:35 | 前端 `npm ci`、lint、format:check、安全测试、API 测试、两次 audit、build | 全部退出码 0；安全 4/4、API 10/10、High/Critical 为 0 |
+| 2026-08-31 本次最终重跑（Java 21） | `powershell -NoProfile -File scripts/testing/run-backend-tests.ps1 clean verify` | 退出码 0；160/160，失败/错误/跳过均为 0；两个 4.0.0-SNAPSHOT JAR 已生成 |
+| 2026-08-31 本次最终重跑 | 前端 `npm ci`、lint、format:check、安全测试、API 测试、两次 audit、build | 全部退出码 0；安全 4/4、API 11/11、High/Critical 为 0 |
 | 2026-08-31 本次最终重跑 | 版本、结构、源码质量、部署模式、文档链接静态门禁及测试 | 全部退出码 0；14/14、9/9、8/8、9/9、7/7；29 个 Markdown 文件 |
+| 2026-08-31 本次最终重跑 | 默认与性能 profile 依赖树、`cc4c-ci` 与 `cc4c-perf` Compose 配置 | 退出码 0；默认 AMQP 5.33.1/Netty 4.1.136.Final，性能 Netty 4.2.14.Final |
 | 2026-08-31 本次最终重跑 | `powershell -NoProfile -File scripts/check-code-quality.ps1` | 退出码 0；Spotless 219 个 Java 文件、ESLint、Prettier 和源码质量通过 |
 | 2026-08-31 本次最终重跑 | 活动 PowerShell 文件语法解析 | 退出码 0；30/30 通过 |
 | 2026-08-31 本次最终重跑 | `docker compose -p cc4c config --quiet`、`cc4c-ci` 配置和 `cc4c-perf --profile performance` 配置 | 全部退出码 0 |
 | 2026-08-31 本次最终重跑 | `node scripts/testing/openapi-snapshot.mjs check` | 退出码 0；快照未改写 |
+| 2026-08-31 03:38–03:47 | 隔离 `cc4c-browser` 浏览器业务 smoke | 通过注册/验证码邮件、登录/退出、课程/博客读取、收藏、评论/回复、管理员登录、博客审核、头像/博客图片上传；消息管理页为空，无可安全执行的 retry/ignore 候选 |
+| 2026-08-31 03:49 | 前端评论成功判定回归修复及 `npm run test:api` | 退出码 0；11/11，通过真实 `CommentResponse` DTO 成功路径回归测试 |
 
 报告更新后已完成最终重跑；提交前仍以最后一次门禁输出和精确暂存清单为准。
 
 ## 后端与前端质量
 
-后端使用 Java 21 和 Maven 3.9.16 完成 `clean verify`。Surefire 实际结果为 160 个测试运行、160 个通过，失败 0、错误 0、跳过 0；生成：
+后端最终使用 Java 21 和 Maven 3.9.16 完成 `clean verify`。Surefire 实际结果为 160 个测试运行、160 个通过，失败 0、错误 0、跳过 0；生成：
 
 - `backend/target/cc4c-4.0.0-SNAPSHOT.jar`
 - `backend/target/cc4c-4.0.0-SNAPSHOT-admin-bootstrap.jar`
 
 离线依赖树确认默认运行时 AMQP Client 为 `5.33.1`、Netty 为 `4.1.136.Final`，性能 profile 使用 Netty `4.2.14.Final`。
 
-前端完成 `npm ci`、ESLint、Prettier 检查、Markdown 安全测试、API/当前用户/新增单元测试、完整和生产依赖审计及 Vite 生产构建。安全测试为 4/4，API 测试为 10/10，两次审计均无 High/Critical；构建只产生 canonical `frontend/dist`，`frontend/node_modules` 和 `frontend/dist` 不纳入提交。
+前端最终完成 `npm ci`、ESLint、Prettier 检查、Markdown 安全测试、API/当前用户/新增单元测试、完整和生产依赖审计及 Vite 生产构建。安全测试为 4/4，API 测试为 11/11，两次审计均无 High/Critical；构建只产生 canonical `frontend/dist`，`frontend/node_modules` 和 `frontend/dist` 不纳入提交。
 
 ## 性能验证
 
@@ -109,12 +114,14 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 - `host-preflight.ps1 -Component All` 及各组件预检通过；
 - `start-host-stack.ps1 -FrontendMode Dev` 启动后端和 Vite，健康检查通过；
 - `stop-host-stack.ps1` 只停止本轮记录的精确 PID，成功回收；
-- 静态模式在缺少 Nginx 路径时按设计退出 1，未启动进程；当前 PATH 和工具目录没有可供验收的 Nginx 1.28.3 可执行文件；
+- 使用 `pwsh -NoProfile -File scripts/development/start-frontend.ps1 -Mode Static -NginxPath D:\tool\nginx-1.28.3\nginx.exe -FrontendPort 15174` 启动 Static 模式，通过首页和路由回退检查后，由 `stop-frontend.ps1` 按状态文件中的 Nginx master/worker PID 集合成功回收；
+- Static HTTP 检查结果为 `/`、`/login`、`/courseDetail` 返回 200，`/blogImg/does-not-exist` 与 `/avatar/does-not-exist` 返回 404；
+- 过程中修正了 Windows Nginx 的 `daemon off;` 参数引用、运行前缀临时目录以及 master/worker 精确 PID 管理；修改仅限宿主机前端启停脚本；
 - 过程未自动启停 MySQL、Redis、RabbitMQ、Mailpit 或现有 `cc4c-a7verify2` 栈。
 
 隔离 Compose 和宿主机 Dev 前端均完成了所列路由 shell/重定向扫描，包含登录、注册、首页、课程、博客、收藏、用户信息、管理端和消息管理路径。Dev 模式的脱敏错误报告器产生了预期诊断事件，未输出请求头、Cookie、Token、请求体或响应正文。
 
-尚未执行需要输入测试邮箱、密码和验证码的浏览器业务写入 smoke。原因是浏览器工具要求在输入敏感测试数据前获得动作时确认；当前没有使用真实凭据，也没有向隔离数据库写入用户/博客/收藏/评论数据。该项需用户明确确认后再执行。
+浏览器业务写入 smoke 已在用户明确确认后完成。使用的邮箱、密码、验证码、管理员密码和业务文本均为一次性隔离数据，报告不记录其值；验证码从隔离 Mailpit 页面读取，未读取或输出 Cookie、Token、请求体或消息载荷。消息管理页面在“待发送与失败”筛选下为空，因此没有人为制造失败消息，也未调用 retry/ignore。
 
 ## 兼容性不变量
 
@@ -126,13 +133,12 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 ## 未执行项与发布边界
 
-- 未执行静态 Nginx 宿主机验收：没有用户提供的、已验证的 Nginx 1.28.3 可执行文件。
-- 未执行需要敏感测试数据输入的浏览器业务写入：等待用户动作时确认。
+- 消息 retry/ignore 未执行：隔离消息管理页无待发送、发布失败或消费死信候选项；仅完成页面、筛选和空状态验收。
 - 未执行远程 V4 GitHub Actions：本轮授权不含推送；现有 `33251873844` 不代表 V4 当前结果。
 - 未执行源卷删除：用户验收和远程质量工作流尚未完成，且本轮明确保留源卷。
 - 未创建 SemVer 标签、未推送、未发布 GHCR 镜像。
 
-本地收口提交仍可在所有已授权本地门禁通过后创建，但提交说明和报告必须继续如实保留上述未执行边界；V4 最终完成状态要等远程 CI 和用户验收完成后再收口。
+本地收口提交仍可在所有已授权本地门禁通过后创建，但提交说明和报告必须继续如实保留上述未执行边界；V4 最终完成状态要等远程 CI 和发布链路完成后再收口。
 
 ## 提交前清单边界
 
@@ -140,4 +146,4 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 ## 验收结论
 
-本报告不把未执行项当作通过项，不宣称 V4 已最终发布完成。下一步是重跑报告更新后的静态门禁和提交前 allowlist 检查；浏览器业务写入、静态 Nginx、远程 CI、推送、标签和 GHCR 发布仍分别受其授权边界约束。
+本报告不把未执行项当作通过项，不宣称 V4 已最终发布完成。浏览器业务和 Nginx 验收已完成；下一步是重跑最终本地门禁、精确提交并推送，等待远程 CI 后再创建 `v4.0.0` 标签并确认 GHCR 发布。

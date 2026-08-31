@@ -7,6 +7,11 @@ function resolve(value) {
   return typeof value === 'function' ? value() : unref(value);
 }
 
+function isSuccessfulMutation(response) {
+  const result = response?.data?.data;
+  return result === true || (result !== null && typeof result === 'object');
+}
+
 /**
  * 为课程和博客页面提供一致的两级评论状态机；请求构造仍由页面闭包负责。
  */
@@ -74,7 +79,7 @@ export function useCommentThread({
     commentSubmitting.value = true;
     try {
       const response = await createComment(content);
-      if (response?.data?.data !== true) {
+      if (!isSuccessfulMutation(response)) {
         commentInputError.value = response?.data?.msg || commentErrorMessage;
         return false;
       }
@@ -108,7 +113,7 @@ export function useCommentThread({
     replySubmitting.value = true;
     try {
       const response = await createReply(fatherId, content);
-      if (response?.data?.data !== true) {
+      if (!isSuccessfulMutation(response)) {
         replyInputError.value = response?.data?.msg || replyErrorMessage;
         return false;
       }

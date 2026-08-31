@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'host-environment.ps1')
 $started = $null
+$startedProcessIds = @()
 $expectedExecutable = $null
 $environmentPathSnapshot = $null
 
@@ -27,6 +28,20 @@ function Get-Cc4cProcessInfo {
 function ConvertTo-Cc4cNginxPath {
     param([Parameter(Mandatory = $true)][string] $Path)
     return ([System.IO.Path]::GetFullPath($Path)).Replace('\', '/')
+}
+
+function Get-Cc4cStaticNginxProcesses {
+    param(
+        [Parameter(Mandatory = $true)][string] $ExecutablePath,
+        [Parameter(Mandatory = $true)][string] $RunDirectory
+    )
+    $expectedPath = [System.IO.Path]::GetFullPath($ExecutablePath)
+    return @(Get-CimInstance Win32_Process -Filter "Name = 'nginx.exe'" -ErrorAction SilentlyContinue | Where-Object {
+        -not [string]::IsNullOrWhiteSpace([string] $_.ExecutablePath) -and
+        [System.IO.Path]::GetFullPath([string] $_.ExecutablePath) -ceq $expectedPath -and
+        ([string] $_.CommandLine) -like "*$RunDirectory*" -and
+        ([string] $_.CommandLine) -like '*nginx.conf*'
+    })
 }
 
 try {
@@ -79,6 +94,9 @@ try {
         if (-not (Test-Path -LiteralPath $expectedExecutable -PathType Leaf)) {
             throw 'The specified Nginx executable does not exist.'
         }
+        if ((Get-Cc4cStaticNginxProcesses -ExecutablePath $expectedExecutable -RunDirectory $runDirectory).Count -gt 0) {
+            throw 'An unrecorded Nginx process already uses the CC4C frontend run directory.'
+        }
         $distRoot = Join-Path $frontendRoot 'dist'
         if (-not (Test-Path -LiteralPath $distRoot -PathType Container)) {
             throw "Missing frontend dist directory: $distRoot"
@@ -87,6 +105,13 @@ try {
         $dist = ConvertTo-Cc4cNginxPath $distRoot
         $blog = ConvertTo-Cc4cNginxPath (Join-Path $frontendRoot 'public\blogImg')
         $avatar = ConvertTo-Cc4cNginxPath (Join-Path $frontendRoot 'public\avatar')
+        # Windows 版 Nginx 会在 prefix 下创建默认日志和请求临时目录；这些目录必须限定在本次运行的临时目录内。
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'logs') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'temp\client_body_temp') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'temp\proxy_temp') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'temp\fastcgi_temp') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'temp\uwsgi_temp') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $runDirectory 'temp\scgi_temp') -Force | Out-Null
         $config = @'
 worker_processes 1;
 error_log __RUN__/nginx.error.log;
@@ -111,26 +136,47 @@ http {
         $config = $config.Replace('__FRONTEND_PORT__', [string] $FrontendPort)
         [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
         $expectedMarker = 'nginx.conf'
-        $started = Start-Process -FilePath $expectedExecutable -WorkingDirectory $runDirectory -ArgumentList @('-p', $runDirectory, '-c', 'nginx.conf', '-g', 'daemon off;') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDirectory 'nginx.stdout.log') -RedirectStandardError (Join-Path $runDirectory 'nginx.stderr.log')
+        # 使用 ProcessStartInfo 保留 daemon off; 的完整参数，并避免 Windows PowerShell 对 ArgumentList 的二次拆分。
+        $startInfoObject = [System.Activator]::CreateInstance([System.Diagnostics.ProcessStartInfo])
+        $startInfoObject.FileName = $expectedExecutable
+        $startInfoObject.WorkingDirectory = $runDirectory
+        $startInfoObject.Arguments = '-p "' + $runDirectory + '" -c "nginx.conf" -g "daemon off;"'
+        $startInfoObject.UseShellExecute = $false
+        $startInfoObject.CreateNoWindow = $true
+        $started = New-Object -TypeName System.Diagnostics.Process
+        $started.StartInfo = $startInfoObject
+        if (-not $started.Start()) {
+            $started = $null
+        }
     }
     if ($null -eq $started) {
         throw 'The frontend process was not created.'
     }
     Start-Sleep -Milliseconds 250
+    if ($Mode -eq 'Static') {
+        $matchingProcesses = Get-Cc4cStaticNginxProcesses -ExecutablePath $expectedExecutable -RunDirectory $runDirectory
+        $startedProcessIds = @($matchingProcesses | ForEach-Object { [int] $_.ProcessId })
+    } else {
+        $startedProcessIds = @([int] $started.Id)
+    }
     $processInfo = Get-Cc4cProcessInfo $started.Id
     if ($null -eq $processInfo -or
         [string]::IsNullOrWhiteSpace($processInfo.ExecutablePath) -or
         [System.IO.Path]::GetFullPath($processInfo.ExecutablePath) -cne [System.IO.Path]::GetFullPath($expectedExecutable) -or
         ([string] $processInfo.CommandLine) -notlike "*$expectedMarker*") {
-        if ($null -ne $processInfo) {
-            Stop-Process -Id $started.Id -ErrorAction SilentlyContinue
-        }
         throw 'The created frontend process did not match the requested mode.'
+    }
+    if ($Mode -eq 'Static' -and
+        ($startedProcessIds.Count -lt 1 -or
+        -not ($startedProcessIds -contains [int] $started.Id) -or
+        -not (@(Get-NetTCPConnection -LocalPort $FrontendPort -State Listen -ErrorAction SilentlyContinue | Where-Object { $startedProcessIds -contains [int] $_.OwningProcess }).Count -gt 0))) {
+        throw 'The created Nginx process set did not bind the requested frontend port.'
     }
     $record = [ordered]@{
         component = 'frontend'
         mode = $Mode
         pid = $started.Id
+        pids = $startedProcessIds
         executablePath = [System.IO.Path]::GetFullPath($expectedExecutable)
         startedAtUtc = [DateTime]::UtcNow.ToString('o')
         marker = $expectedMarker
@@ -139,7 +185,7 @@ http {
         commandLineSummary = if ($Mode -eq 'Dev') {
             "node vite.js --host 127.0.0.1 --port $FrontendPort"
         } else {
-            'nginx -c nginx.conf -g daemon off;'
+            'nginx -c nginx.conf -g "daemon off;"'
         }
         port = $FrontendPort
         status = 'running'
@@ -149,13 +195,21 @@ http {
     exit 0
 }
 catch {
-    if ($null -ne $started -and $null -ne $expectedExecutable) {
+    if ($null -ne $expectedExecutable) {
         try {
-            $current = Get-Cc4cProcessInfo $started.Id
-            if ($null -ne $current -and
-                -not [string]::IsNullOrWhiteSpace($current.ExecutablePath) -and
-                [System.IO.Path]::GetFullPath($current.ExecutablePath) -ceq [System.IO.Path]::GetFullPath($expectedExecutable)) {
-                Stop-Process -Id $started.Id -ErrorAction SilentlyContinue
+            $cleanupIds = @($startedProcessIds)
+            if ($null -ne $started) {
+                $cleanupIds += [int] $started.Id
+            }
+            $cleanupIds = @($cleanupIds | Sort-Object -Unique)
+            foreach ($cleanupId in $cleanupIds) {
+                $current = Get-Cc4cProcessInfo $cleanupId
+                if ($null -ne $current -and
+                    -not [string]::IsNullOrWhiteSpace($current.ExecutablePath) -and
+                    [System.IO.Path]::GetFullPath($current.ExecutablePath) -ceq [System.IO.Path]::GetFullPath($expectedExecutable) -and
+                    ([string] $current.CommandLine) -like "*$expectedMarker*") {
+                    Stop-Process -Id $cleanupId -ErrorAction SilentlyContinue
+                }
             }
         } catch { }
     }

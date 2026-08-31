@@ -54,6 +54,19 @@ test('comment and reply preserve caller-owned request construction', async () =>
   ]);
 });
 
+test('comment and reply accept the DTO returned by the created endpoints', async () => {
+  const thread = useCommentThread({
+    subjectId: 42,
+    fetchPage: async () => page([], 0),
+    createComment: async () => ({ data: { data: { commentId: '11' } } }),
+    createReply: async () => ({ data: { data: { commentId: '12' } } }),
+  });
+  thread.commentText.value = 'comment dto';
+  assert.equal(await thread.comment(), true);
+  thread.replyText.value = 'reply dto';
+  assert.equal(await thread.reply(11), true);
+});
+
 test('empty comment and reply are rejected locally', async () => {
   const thread = useCommentThread({
     subjectId: 1,
