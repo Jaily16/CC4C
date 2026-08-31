@@ -82,6 +82,7 @@ class BusinessCacheTest {
         AtomicInteger loads = new AtomicInteger();
         CountDownLatch loaderStarted = new CountDownLatch(1);
         CountDownLatch releaseLoader = new CountDownLatch(1);
+        store.coordinateDataReads(8);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<java.util.concurrent.Future<Optional<Value>>> futures = new ArrayList<>();
             for (int index = 0; index < 8; index++) {
@@ -220,11 +221,28 @@ class BusinessCacheTest {
         private final List<String> deletedKeys = new ArrayList<>();
         private final AtomicInteger increments = new AtomicInteger();
         private final AtomicInteger readFailures = new AtomicInteger();
+        private volatile CountDownLatch coordinatedDataReads;
         private volatile boolean failReads;
         private volatile Duration lastTtl = Duration.ZERO;
 
+        private void coordinateDataReads(int expectedReads) {
+            coordinatedDataReads = new CountDownLatch(expectedReads);
+        }
+
         @Override
         public String get(String key) {
+            CountDownLatch readGate = coordinatedDataReads;
+            if (readGate != null && !key.endsWith(":generation") && !key.endsWith(":lock")) {
+                readGate.countDown();
+                try {
+                    if (!readGate.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out waiting for concurrent cache reads");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(exception);
+                }
+            }
             if (failReads) {
                 readFailures.incrementAndGet();
                 throw new IllegalStateException("Redis unavailable");

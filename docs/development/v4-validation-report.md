@@ -17,9 +17,9 @@
 | 浏览器业务写入 | 隔离 `cc4c-browser` 业务 smoke 通过；一次性用户/管理员数据和非敏感上传仅写入隔离资源 |
 | SemVer 标签 | 未创建 |
 | GHCR 镜像 | 未发布 |
-| 远程 V4 质量工作流 | `quality #22` / `33355519788` 已通过；`dependency-review` 按既有条件跳过 |
+| 远程 V4 质量工作流 | `quality #22` / `33355519788` 通过；随后文档提交触发的 `quality #23` / `33355952829` 因并发测试竞态失败，已修复并等待重跑 |
 
-当前工程已通过本地质量、隔离运行、浏览器业务验收和远程 V4 quality workflow；`v4.0.0` 标签与 GHCR 发布仍待完成，不能将 V4 标记为最终发布完成。
+当前工程本地质量、隔离运行、浏览器业务验收和修复后的本地后端全量测试均通过；远程修复后 quality workflow、`v4.0.0` 标签与 GHCR 发布仍待完成，不能将 V4 标记为最终发布完成。
 
 ## 外部证据与安全边界
 
@@ -51,14 +51,16 @@
 | 2026-08-31 本次最终重跑 | `docker compose -p cc4c config --quiet`、`cc4c-ci` 配置和 `cc4c-perf --profile performance` 配置 | 全部退出码 0 |
 | 2026-08-31 本次最终重跑 | `node scripts/testing/openapi-snapshot.mjs check` | 退出码 0；快照未改写 |
 | 2026-08-31 03:58–04:04 | 推送 `ed1439ef6486fd79ef639723971628a0d1e388a1` 并运行 GitHub Actions `quality #22` | 运行 `33355519788` 通过；所有必需 job 成功，`dependency-review` 按条件跳过；[运行详情](https://github.com/Jaily16/CC4C/actions/runs/33355519788) |
+| 2026-08-31 04:08–04:10 | 文档提交 `7d1d526db0a23b1d947c771b8d85c6192650f01` 的 GitHub Actions `quality #23` | 运行 `33355952829` 失败；仅 backend 的 `BusinessCacheTest.concurrentMissesUseOneLocalLoader` 并发断言出现 1 次失败，其他已完成 job 通过；[运行详情](https://github.com/Jaily16/CC4C/actions/runs/33355952829) |
+| 2026-08-31 04:10–04:12 | 修复测试竞态后的并发测试和后端 `clean verify` | 并发测试连续 10/10 通过；后端 160/160，失败/错误/跳过均为 0，退出码 0 |
 | 2026-08-31 03:38–03:47 | 隔离 `cc4c-browser` 浏览器业务 smoke | 通过注册/验证码邮件、登录/退出、课程/博客读取、收藏、评论/回复、管理员登录、博客审核、头像/博客图片上传；消息管理页为空，无可安全执行的 retry/ignore 候选 |
 | 2026-08-31 03:49 | 前端评论成功判定回归修复及 `npm run test:api` | 退出码 0；11/11，通过真实 `CommentResponse` DTO 成功路径回归测试 |
 
-报告更新后已完成最终重跑和远程 quality workflow；标签和发布流程仍以之后的实际状态为准。
+修复后本地验证已完成；quality #23 的失败结果已保留为证据，包含测试修复的原因和回归结果；需在新提交上重新执行远程 quality workflow。
 
 ## 后端与前端质量
 
-后端最终使用 Java 21 和 Maven 3.9.16 完成 `clean verify`。Surefire 实际结果为 160 个测试运行、160 个通过，失败 0、错误 0、跳过 0；生成：
+后端最终使用 Java 21 和 Maven 3.9.16 完成 `clean verify`。Surefire 实际结果为 160 个测试运行、160 个通过，失败 0、错误 0、跳过 0；并对远程暴露的 `BusinessCacheTest` 并发测试连续执行 10 次均通过。生成：
 
 - `backend/target/cc4c-4.0.0-SNAPSHOT.jar`
 - `backend/target/cc4c-4.0.0-SNAPSHOT-admin-bootstrap.jar`
@@ -136,9 +138,10 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 - 消息 retry/ignore 未执行：隔离消息管理页无待发送、发布失败或消费死信候选项；仅完成页面、筛选和空状态验收。
 - 未执行源卷删除：本轮授权明确 `DELETE_LEGACY_VOLUMES=NO`，旧 `cc4c-v3_*` 源卷继续保留。
-- 尚未创建 SemVer 标签、尚未发布 GHCR 镜像；标签和发布工作流需在最终提交上继续执行。
+- 修复并发测试竞态后尚未重新推送远程 quality workflow；必须以包含修复的新提交通过后再创建 SemVer 标签。
+- 尚未创建 SemVer 标签、尚未发布 GHCR 镜像；标签和发布工作流需在最终通过提交上继续执行。
 
-本地收口提交和推送已完成，但报告仍如实保留标签、GHCR 和源卷删除边界；V4 最终完成状态要等发布链路和最终用户验收口径收口后再判断。
+本地收口提交和推送已完成；当前工作区含待提交的并发测试修复及对应报告更新，报告仍如实保留 quality #23 失败、标签、GHCR 和源卷删除边界；V4 最终完成状态要等修复后远程 quality 和发布链路完成后再判断。
 
 ## 提交前清单边界
 
@@ -146,4 +149,4 @@ powershell.exe -NoProfile -File .\scripts\performance\run-container-performance.
 
 ## 验收结论
 
-本报告不把未执行项当作通过项，不宣称 V4 已最终发布完成。浏览器业务、Nginx、最终本地门禁和远程 quality #22 已完成；下一步是在当前远程通过状态上创建 `v4.0.0` 标签并确认 GHCR 发布，源卷继续保留。
+本报告不把未执行项当作通过项，不宣称 V4 已最终发布完成。浏览器业务、Nginx、修复后本地门禁已完成；下一步是提交测试竞态修复、等待新的远程 quality workflow 通过，再创建 `v4.0.0` 标签并确认 GHCR 发布，源卷继续保留。
