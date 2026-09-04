@@ -36,7 +36,7 @@
 离线密码迁移命令要求数据库连接以进程变量提供，且必须与备份确认信息指向同一精确数据库：
 
 ```powershell
-cd D:\codex\CC4C_v2
+cd D:\codex\CC4C_v5
 .\scripts\deployment\migrate-passwords.ps1 `
   -BackupPath <verified-backup.sql> `
   -BackupSha256 <64-hex-sha256> `
@@ -61,57 +61,12 @@ V7 只向 `async_outbox` 增加可空的 `correlation_id VARCHAR(64)`，不修�
 
 该字段仅用于日志关联，不能用于身份、幂等或授权，也不得写入 Cookie、邮箱、验证码、SQL 或连接信息。回滚到 V6 代码时旧版本会忽略这个可空附加列；不得为回滚删除列或执行 Flyway `repair`。
 
-## Testcontainers 集成测试数据库
+## 宿主机数据安全与备份
 
-方面七起，标准测试不再依赖本机测试数据库或 `.env.test.local`。`run-tests.ps1` 只校验 Java 21 和 Docker Engine，然后由 Testcontainers 1.21.4 在本轮测试 JVM 内启动 MySQL 8.4.11、两个 Redis 7.4.10 和 RabbitMQ 4.3.5。
+宿主机模式由 [宿主机运行手册](../../docs/operations/host-runbook.md) 管理，要求用户预先创建并精确确认目标数据库；应用启动时由 Flyway V1–V7 完成迁移，不执行 `clean`、`repair`、降级、数据库创建或数据库删除。
 
-- MySQL 容器的主库从空状态应用 Flyway V1–V7，并承载业务功能回归。
-- 迁移测试在同一隔离容器中创建随机临时库，分别验证空库初始化、模拟 V1 已有库升级、第二次 migrate 零新增和 validate。
-- 容器数据库名和凭据由测试基础设施动态注入，不从系统环境、本机 `.env` 或开发配置回退。
-- Testcontainers reuse 明确禁用，Ryuk 只清理本轮容器与网络；测试不会接触本机 MySQL、Redis、RabbitMQ 或任何 Compose 持久卷。
-- 任何 schema 删除只允许发生在已校验的容器临时库中，仍禁止 Flyway `clean/repair` 和数据库级无范围破坏操作。
-
-执行方式：
-
-```powershell
-cd D:\codex\CC4C_v2
-.\scripts\testing\run-backend-tests.ps1 clean verify
-```
-
-历史本机测试库授权、备份和恢复脚本仅保留为迁移追溯资料，不再是标准测试入口。
-
-## Compose 数据卷与备份
-
-`compose.yml` 默认项目为 `cc4c`，并为 MySQL 使用项目级命名卷 `cc4c_mysql_data`。普通 `docker compose -p cc4c down` 只停止并移除容器与网络，不删除数据库卷；禁止随手添加 `-v`。显式重置只能通过 `scripts/deployment/reset-local.ps1 -ConfirmProjectName cc4c`，脚本还要求再次输入精确确认文本。旧 `cc4c-v3_*` 卷只可按 [Compose 身份迁移说明](../../docs/operations/compose-identity-migration.md) 的逐卷流程处理。
-
-宿主机模式由 [宿主机运行手册](../../docs/operations/host-runbook.md) 管理，要求用户预先提供并精确确认隔离数据库；应用启动时仍由 Flyway V1–V7 完成迁移，不执行 `clean`、`repair`、降级或数据库删除。
-
-升级镜像或进行破坏性维护前，必须从运行中的 MySQL 服务执行单事务备份并保存 SHA-256，同时备份博客和头像上传卷。回滚只允许切换到已记录的旧镜像 digest，并在新恢复库中验证备份；不得在原库执行 Flyway `clean/repair`、伪造 down migration 或手工删除 V1–V7 历史。
-
-## 独立性能数据库
-
-方面四基准只接受数据库名精确以 `_perf_test` 结尾的 JDBC URL，并要求 `CC4C_PERF_CONFIRM_DATABASE` 与 URL 中的实际数据库名完全一致。复制 `.env.performance.example` 为已忽略的 `.env.performance.local`，填写性能库账号、独立缓存 Redis 和确认值后运行 `scripts/performance/run-performance-benchmark.ps1`。
-
-性能准备工具使用固定种子 `20260827`，默认生成 2,000 用户、1,000 课程、20,000 博客以及合计 200,000 条收藏、评论与回复关系。它只删除工具保留的有限 ID 区间，禁止 Flyway `clean`/`repair`、`DROP DATABASE`、无范围删除以及对功能测试库执行。基准和 `EXPLAIN FORMAT=JSON` 结果只写入已忽略的 `temp/`；这些数字是同一提交、数据、Redis 和硬件上的本地对照，不代表生产容量。
-
-## 失败后的恢复库
-
-`infrastructure/database/test-database-recovery-setup.sql` 和 `scripts/testing/restore-flyway-test-backup.ps1` 只用于已经发生迁移失败、且用户明确授权的恢复流程。脚本将目标固定为 `cc4c_recovery_test`，并拒绝以下情况：
-
-- `.env.test.local` 的主 URL 不再指向原 `cc4c_test`；
-- 备份不位于已忽略的 `temp/` 或文件名不符合方面二备份格式；
-- 备份包含选库、数据库级破坏语句或 `flyway_schema_history`；
-- 恢复库授权、结构检查或导入失败。
-
-授权并建立恢复库后，命令格式为：
-
-```powershell
-cd backend
-./restore-flyway-test-backup.ps1 -BackupPath <verified-backup.sql> -MySqlBin <mysql-bin>
-```
-
-恢复成功后仍需将测试 URL 显式切换到恢复库，再执行迁移、重复迁移、`validate`、结构断言和完整功能测试；未经比对不得替换原库。
+升级或维护前，必须从运行中的 MySQL 服务执行单事务备份并保存 SHA-256，同时单独备份博客和头像上传目录。恢复时只能导入到用户预先创建的新数据库，核对结构和数据后再切换连接；不得在原库反复试错、伪造 down migration 或手工删除 V1–V7 历史。
 
 ## 产物与安全
 
-数据库备份、SHA-256、EXPLAIN 原始结果和日志只允许写入已忽略的 `temp/`。这些文件可能包含结构或数据线索，不得暂存、提交或上传。RabbitMQ definitions、消息密文和 DLQ 导出同样不得进入仓库。提交前必须确认本机 `application.yml`、`.env.runtime.local`、`.env.test.local`、`.env.performance.local`、`target/`、`temp/` 和日志均未进入 Git。
+数据库备份、SHA-256 和日志只允许写入用户明确指定的受保护位置或已忽略的 `temp/`。这些文件可能包含结构或数据线索，不得暂存、提交或上传。RabbitMQ definitions、消息密文和 DLQ 导出同样不得进入仓库。提交前必须确认本机 `application.yml`、`.env.runtime.local`、`target/`、`temp/` 和日志均未进入 Git。

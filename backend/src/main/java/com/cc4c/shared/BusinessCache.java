@@ -134,16 +134,6 @@ public final class BusinessCache {
         }
     }
 
-    public long clearNamespaceForTests() {
-        if (!properties.testCleanupEnabled()) {
-            throw new IllegalStateException("Business cache namespace cleanup is disabled");
-        }
-        if (store == null) {
-            return 0;
-        }
-        return store.deleteByPrefix(properties.namespace() + ":");
-    }
-
     private <T> Optional<T> singleFlight(
             ResolvedKey key,
             String region,

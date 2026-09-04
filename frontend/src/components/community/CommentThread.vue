@@ -37,6 +37,8 @@
     </el-alert>
     <div v-else-if="comments.length === 0" class="comments__state">{{ emptyText }}</div>
 
+    <el-alert v-if="deleteError" :title="deleteError" type="error" :closable="false" show-icon />
+
     <article v-for="commentItem in comments" :key="commentItem.commentId" class="comment-item">
       <el-avatar :size="36">{{ commentInitial(commentItem.userName) }}</el-avatar>
       <div class="comment-item__body">
@@ -48,6 +50,15 @@
         <el-button v-if="loggedIn" link type="primary" @click="emit('toggle-reply', commentItem.commentId)">
           {{ replyingTo === commentItem.commentId ? '取消回复' : '回复' }}
         </el-button>
+        <el-button
+          v-if="loggedIn && canDeleteComment(commentItem)"
+          link
+          type="danger"
+          :loading="deletingCommentId === String(commentItem.commentId)"
+          :disabled="deletingCommentId !== null"
+          @click="emit('delete-comment', commentItem)"
+          >删除评论</el-button
+        >
         <div v-if="replyingTo === commentItem.commentId" class="reply-compose">
           <label class="sr-only" :for="`${replyInputPrefix}${commentItem.commentId}`">回复评论</label>
           <el-input
@@ -81,6 +92,15 @@
               <span v-if="subcomment.time">{{ formatCommentTime(subcomment.time) }}</span>
             </div>
             <p>{{ subcomment.content }}</p>
+            <el-button
+              v-if="loggedIn && canDeleteComment(subcomment)"
+              link
+              type="danger"
+              :loading="deletingCommentId === String(subcomment.commentId)"
+              :disabled="deletingCommentId !== null"
+              @click="emit('delete-comment', subcomment)"
+              >删除回复</el-button
+            >
           </article>
         </div>
       </div>
@@ -119,6 +139,9 @@ const props = defineProps({
   commentPage: { type: Number, default: 1 },
   commentPageSize: { type: Number, default: 10 },
   commentTotal: { type: Number, default: 0 },
+  canDeleteComment: { type: Function, default: () => false },
+  deletingCommentId: { type: String, default: null },
+  deleteError: { type: String, default: '' },
   commentInputId: { type: String, default: 'comment-input' },
   replyInputPrefix: { type: String, default: 'reply-' },
   replyFocusPrefix: { type: String, default: 'replies-' },
@@ -132,6 +155,8 @@ const emit = defineEmits([
   'update:replyText',
   'submit-comment',
   'submit-reply',
+  // 将当前评论对象交给父页面处理；展示组件不直接发送删除请求或修改评论列表。
+  'delete-comment',
   'toggle-reply',
   'change-page',
   'retry',

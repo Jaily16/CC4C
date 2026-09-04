@@ -70,7 +70,7 @@
               :total="courseTotal"
               @current-change="changeCoursePage"
             />
-            <el-empty v-else description="还没有收藏课程">
+            <el-empty v-if="!favoriteCourses.length" description="还没有收藏课程">
               <el-button type="primary" @click="router.push('/allCourses')">浏览课程</el-button>
             </el-empty>
           </template>
@@ -103,7 +103,7 @@
               :total="blogTotal"
               @current-change="changeBlogPage"
             />
-            <el-empty v-else description="还没有收藏博客">
+            <el-empty v-if="!favoriteBlogs.length" description="还没有收藏博客">
               <el-button type="primary" @click="router.push('/allBlogs')">浏览博客</el-button>
             </el-empty>
           </template>

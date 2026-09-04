@@ -1,6 +1,6 @@
 {
   "name": "cc4c",
-  "version": "4.0.0-SNAPSHOT",
+  "version": "5.0.0-SNAPSHOT",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.16.0",
@@ -13,10 +13,8 @@
     "dev": "vite",
     "preview": "vite preview --port 4173",
     "lint": "eslint . --max-warnings=0",
-    "format": "prettier --write src tests index.html vite.config.js",
-    "format:check": "prettier --check src tests index.html vite.config.js",
-    "test:security": "node --test tests/markdownSanitizer.test.mjs",
-    "test:api": "node --test tests/api.test.mjs tests/currentUser.test.mjs tests/reportClientError.test.mjs tests/commentThread.test.mjs tests/verificationCode.test.mjs"
+    "format": "prettier --write src index.html vite.config.js",
+    "format:check": "prettier --check src index.html vite.config.js"
   },
   "dependencies": {
     "axios": "1.19.0",

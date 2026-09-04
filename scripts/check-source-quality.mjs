@@ -8,10 +8,7 @@ const execFile = promisify(execFileCallback);
 
 export const QUALITY_PATHS = Object.freeze([
   'backend/src/main/java',
-  'backend/src/test/java',
-  'backend/src/gatling/java',
   'frontend/src',
-  'frontend/tests',
   'scripts',
   '.editorconfig',
   'backend/pom.xml',

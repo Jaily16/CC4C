@@ -146,16 +146,12 @@ cc4c:
     enabled: "${CC4C_BUSINESS_CACHE_ENABLED}"
     redis-url: "${CC4C_CACHE_REDIS_URL:}"
     namespace: "${CC4C_CACHE_NAMESPACE:}"
-    test-cleanup-enabled: false
   security:
     pepper: "${CC4C_SECURITY_PEPPER}"
     cookie-secure: "${CC4C_SESSION_COOKIE_SECURE}"
     allowed-origins: "${CC4C_ALLOWED_ORIGINS}"
     bcrypt-strength: "${CC4C_BCRYPT_STRENGTH:12}"
-    password-readiness-enabled: true
-    redis-readiness-enabled: true
     key-prefix: "${CC4C_SESSION_NAMESPACE}:security"
-  test-controller-enabled: false
   #存储博客图片的路径
   save-img-path: "${CC4C_SAVE_IMG_PATH:../../frontend/public/blogImg/}"
   #返回的请求访问博客图片的路径

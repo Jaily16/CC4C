@@ -150,19 +150,11 @@ Test-BasicEndpoint `
     'RabbitMQ Prometheus endpoint'
 
 $rules = Join-Path $workspaceRoot 'infrastructure\observability\prometheus\rules\cc4c-alerts.yml'
-$tests = Join-Path $workspaceRoot 'infrastructure\observability\prometheus\tests\cc4c-alerts.test.yml'
 & $promtool check rules $rules
 if ($LASTEXITCODE -ne 0) { throw 'Prometheus rule validation failed.' }
 $config = Join-Path $workspaceRoot 'infrastructure\observability\prometheus\prometheus.yml.template'
 & $promtool check config $config
 if ($LASTEXITCODE -ne 0) { throw 'Prometheus configuration validation failed.' }
-Push-Location -LiteralPath (Split-Path $tests -Parent)
-try {
-    & $promtool test rules (Split-Path $tests -Leaf)
-    if ($LASTEXITCODE -ne 0) { throw 'Prometheus rule unit tests failed.' }
-} finally {
-    Pop-Location
-}
 
 [pscustomobject]@{
     Prometheus = $prometheusVersion

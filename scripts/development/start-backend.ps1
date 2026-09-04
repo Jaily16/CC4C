@@ -62,7 +62,7 @@ try {
     }
     $workspaceRoot = Get-Cc4cHostWorkspaceRoot
     $backendRoot = Join-Path $workspaceRoot 'backend'
-    $jarPath = Join-Path $backendRoot 'target\cc4c-4.0.0-SNAPSHOT.jar'
+    $jarPath = Join-Path $backendRoot 'target\cc4c-5.0.0-SNAPSHOT.jar'
     if (-not (Test-Path -LiteralPath $jarPath -PathType Leaf)) {
         throw "Missing backend JAR: $jarPath"
     }
@@ -72,9 +72,36 @@ try {
     New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
     $state = Read-Cc4cHostState 'backend'
     if ($null -ne $state) {
-        $existing = Get-Cc4cProcessInfo ([int] $state.pid)
+        # Windows 会复用已退出进程的 PID；不能仅凭编号存在就判定旧后端仍在运行。
+        # 查询失败、记录不完整或存活进程身份不可读时停止；确认属于其他程序后只忽略旧记录，绝不结束该进程。
+        $recordedPid = 0
+        $recordedExecutable = [string] $state.executablePath
+        $recordedJar = [string] $state.jarFileName
+        if (-not [int]::TryParse([string] $state.pid, [ref] $recordedPid) -or $recordedPid -le 0 -or
+            [string]::IsNullOrWhiteSpace($recordedExecutable) -or
+            -not [System.IO.Path]::IsPathRooted($recordedExecutable) -or
+            [string]::IsNullOrWhiteSpace($recordedJar)) {
+            throw 'The recorded backend process identity is incomplete; inspect the state before restarting.'
+        }
+        $recordedExecutable = [System.IO.Path]::GetFullPath($recordedExecutable)
+        $existing = Get-CimInstance Win32_Process -Filter "ProcessId = $recordedPid" -ErrorAction Stop
         if ($null -ne $existing) {
-            throw 'A recorded CC4C backend process is still present.'
+            if ([string]::IsNullOrWhiteSpace([string] $existing.ExecutablePath)) {
+                throw 'The recorded backend PID identity cannot be verified; no process was changed.'
+            }
+            $sameExecutable = [string]::Equals(
+                [System.IO.Path]::GetFullPath([string] $existing.ExecutablePath),
+                $recordedExecutable,
+                [System.StringComparison]::OrdinalIgnoreCase)
+            if ($sameExecutable) {
+                if ([string]::IsNullOrWhiteSpace([string] $existing.CommandLine)) {
+                    throw 'The recorded backend PID command line cannot be verified; no process was changed.'
+                }
+                if (([string] $existing.CommandLine).IndexOf($recordedJar, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    throw 'A recorded CC4C backend process is still present.'
+                }
+            }
+            Write-Output 'The previous backend PID belongs to a different process; leaving that process unchanged.'
         }
     }
     $extraArguments = if ($null -eq $ApplicationArguments) {
@@ -107,9 +134,9 @@ try {
     $processMatches = $null -ne $processInfo -and
         -not [string]::IsNullOrWhiteSpace($processInfo.ExecutablePath) -and
         [System.IO.Path]::GetFullPath($processInfo.ExecutablePath) -ceq [System.IO.Path]::GetFullPath($javaPath) -and
-        ([string] $processInfo.CommandLine) -like '*cc4c-4.0.0-SNAPSHOT.jar*'
+        ([string] $processInfo.CommandLine) -like '*cc4c-5.0.0-SNAPSHOT.jar*'
     if (-not $processMatches) {
-        Stop-Cc4cStartedProcess $started $javaPath 'cc4c-4.0.0-SNAPSHOT.jar'
+        Stop-Cc4cStartedProcess $started $javaPath 'cc4c-5.0.0-SNAPSHOT.jar'
         throw 'The created process did not match the CC4C JAR identity.'
     }
     $record = [ordered]@{
@@ -117,10 +144,10 @@ try {
         pid = $started.Id
         executablePath = [System.IO.Path]::GetFullPath($javaPath)
         startedAtUtc = [DateTime]::UtcNow.ToString('o')
-        jarFileName = 'cc4c-4.0.0-SNAPSHOT.jar'
+        jarFileName = 'cc4c-5.0.0-SNAPSHOT.jar'
         workingDirectory = $backendRoot
         argumentCount = $extraArguments.Count
-        commandLineSummary = 'java -jar cc4c-4.0.0-SNAPSHOT.jar'
+        commandLineSummary = 'java -jar cc4c-5.0.0-SNAPSHOT.jar'
         managementPort = $ManagementPort
         applicationPort = $ApplicationPort
         status = 'running'
@@ -136,7 +163,7 @@ catch {
             if ($null -ne $current -and
                 -not [string]::IsNullOrWhiteSpace($current.ExecutablePath) -and
                 [System.IO.Path]::GetFullPath($current.ExecutablePath) -ceq [System.IO.Path]::GetFullPath($javaPath) -and
-                ([string] $current.CommandLine) -like '*cc4c-4.0.0-SNAPSHOT.jar*') {
+                ([string] $current.CommandLine) -like '*cc4c-5.0.0-SNAPSHOT.jar*') {
                 Stop-Process -Id $started.Id -ErrorAction SilentlyContinue
             }
         } catch { }

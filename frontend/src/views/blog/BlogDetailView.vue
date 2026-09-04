@@ -111,6 +111,9 @@
         :comments="commentList"
         :comments-loading="commentsLoading"
         :comments-error="commentsError"
+        :can-delete-comment="canDeleteComment"
+        :deleting-comment-id="deletingCommentId"
+        :delete-error="deleteError"
         :comment-input-error="commentInputError"
         :comment-submitting="commentSubmitting"
         :replying-to="replyingTo"
@@ -126,6 +129,7 @@
         :format-time="formatDate"
         @submit-comment="comment"
         @submit-reply="reply"
+        @delete-comment="deleteOwnComment"
         @toggle-reply="toggleReply"
         @change-page="changeCommentPage"
         @retry="loadComments"
@@ -144,13 +148,14 @@ import {
   addBlogFavorite,
   createBlogComment,
   createReply,
+  deleteComment,
   getBlogComments,
   getBlogFavoriteState,
   removeBlogFavorite,
 } from '@/api/interactions';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
@@ -179,6 +184,14 @@ const userInitial = computed(() => commentInitial(store.state.user.name));
 const commentThread = useCommentThread({
   subjectId: () => blogData.value?.blogId,
   fetchPage: getBlogComments,
+  currentUserId: () => (loggedIn.value ? store.state.user.id : null),
+  deleteComment,
+  confirmDelete: () =>
+    ElMessageBox.confirm('确认删除这条本人评论？删除后该评论及其下的回复将不再展示。', '删除本人评论', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }),
   createComment: (content) =>
     createBlogComment({
       content,
@@ -204,6 +217,9 @@ const {
   commentPage,
   commentPageSize,
   commentTotal,
+  canDeleteComment,
+  deletingCommentId,
+  deleteError,
   loadComments,
   toggleReply,
   changeCommentPage,
@@ -324,6 +340,12 @@ async function reply(fatherId) {
 async function comment() {
   const succeeded = await commentThread.comment();
   if (succeeded) ElMessage.success('评论成功');
+}
+
+/** 由共享状态机确认并删除本人评论，仅在接口成功且列表刷新完成后提示成功。 */
+async function deleteOwnComment(commentItem) {
+  const succeeded = await commentThread.removeComment(commentItem);
+  if (succeeded) ElMessage.success('评论已删除');
 }
 
 watch(() => route.query.blogId, loadBlog, { immediate: true });

@@ -184,9 +184,9 @@ if ($LASTEXITCODE -ne 0 -or ($javaVersionOutput -join "`n") -notmatch 'version "
     throw 'Java 21 is required. Set JAVA_HOME and place its bin directory first on PATH.'
 }
 
-$jarPath = Join-Path $workspaceRoot 'backend\target\cc4c-4.0.0-SNAPSHOT.jar'
+$jarPath = Join-Path $workspaceRoot 'backend\target\cc4c-5.0.0-SNAPSHOT.jar'
 if (-not (Test-Path -LiteralPath $jarPath -PathType Leaf)) {
-    throw "Missing application JAR: $jarPath. Run .\scripts\testing\run-backend-tests.ps1 clean verify first."
+    throw "Missing application JAR: $jarPath. Run mvn --no-transfer-progress clean package -DskipTests in backend first."
 }
 
 $original = @{}

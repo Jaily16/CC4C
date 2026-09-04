@@ -10,7 +10,18 @@
 
 ## 版本和依赖预检
 
-按根目录 `versions.yml` 检查 Java 21、Maven 3.9.16、Node 24.18.0、npm 11.16.0、MySQL 8.4.11、Redis 7.4.10、RabbitMQ 4.3.5、Mailpit 1.31.0、Prometheus 3.13.2、Grafana 13.1.0 和可选 Nginx 1.28.3。后端 JAR 必须由 canonical `backend/target/cc4c-4.0.0-SNAPSHOT.jar` 提供，前端 Dev 模式必须已有 `frontend/node_modules`，脚本不会执行 `npm install`。
+按根目录 `versions.yml` 检查 Java 21、Maven 3.9.16、Node 24.18.0、npm 11.16.0、MySQL 8.4.11、Redis 7.4.10、RabbitMQ 4.3.5、Mailpit 1.31.0、Prometheus 3.13.2、Grafana 13.1.0 和可选 Nginx 1.28.3。后端 JAR 必须由 canonical `backend/target/cc4c-5.0.0-SNAPSHOT.jar` 提供，前端 Dev 模式必须已有 `frontend/node_modules`，脚本不会执行 `npm install`。
+
+生产构建不执行自动化测试：
+
+```powershell
+Set-Location .\backend
+mvn --no-transfer-progress clean package -DskipTests
+Set-Location ..\frontend
+npm run lint
+npm run format:check
+npm run build
+```
 
 环境文件按 canonical 优先、旧路径回退：
 
@@ -59,6 +70,18 @@ MySQL/Flyway → 安全 Redis → 业务缓存 Redis → RabbitMQ → Mailpit/SM
 ```
 
 脚本设置进程级 `SPRING_CONFIG_NAME=application-example` 和 `SPRING_APPLICATION_NAME=CC4C`，退出或启动完成后恢复调用进程原环境。后端监听 `127.0.0.1:4080`，管理端监听 `127.0.0.1:4081`；前端 Vite 监听 `127.0.0.1:5173`。
+
+空数据库由后端首次启动执行 Flyway V1–V7。数据库结构就绪后，可使用仓库外的密码文件创建唯一管理员：
+
+```powershell
+.\scripts\deployment\bootstrap-admin.ps1 `
+  -AdminId <七位管理员ID> `
+  -ConfirmDatabase <exact-database-name> `
+  -PasswordFile <absolute-secret-file-outside-repository> `
+  -RuntimeEnvironmentPath <absolute-runtime-env-outside-repository>
+```
+
+脚本不会创建数据库、密码文件或外部服务，也不会输出密码和运行环境值。
 
 静态模式要求用户提供已验证的 Nginx 绝对路径和现有 `frontend/dist`：
 

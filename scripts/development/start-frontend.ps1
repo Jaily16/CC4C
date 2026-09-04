@@ -1,4 +1,4 @@
-# 运行前提：已准备 frontend/.env.local（或旧路径回退文件）；Dev 模式已有 node_modules，Static 模式已有 dist 和已验证 Nginx。
+# 运行前提：已准备前端环境文件；Dev 模式还需运行环境文件与 node_modules，Static 模式需 dist 和已验证 Nginx。
 # 破坏性边界：只启动本脚本创建的一个前端进程；不执行 npm install、不修改 tracked Nginx 配置、不接管后端或 Compose。
 # 失败恢复：启动后状态记录失败时，只按本次返回的精确 PID 校验并停止；临时配置仅写入 temp/cc4c-host-frontend。
 # 退出码：启动并记录成功返回 0，前置检查、路径或进程身份校验失败返回非零码。
@@ -10,7 +10,8 @@ param(
 
     [string] $NginxPath,
     [ValidateRange(1, 65535)][int] $FrontendPort = 5173,
-    [string] $FrontendEnvironmentPath
+    [string] $FrontendEnvironmentPath,
+    [string] $RuntimeEnvironmentPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,6 +31,52 @@ function ConvertTo-Cc4cNginxPath {
     return ([System.IO.Path]::GetFullPath($Path)).Replace('\', '/')
 }
 
+# 将上传保存路径按后端进程的工作目录解析为绝对路径，使读写两端指向同一位置。
+# 这里只检查路径自身及已有父目录的元数据：拒绝盘符根目录、文件、网络路径和 reparse point，
+# 不创建上传目录、不枚举目录内容，也不读取上传文件；尚不存在的目录由后端首次上传时创建。
+function Resolve-Cc4cHostUploadRoot {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary] $Values,
+        [Parameter(Mandatory = $true)][string] $Name,
+        [Parameter(Mandatory = $true)][string] $BackendRoot
+    )
+    if (-not $Values.Contains($Name) -or [string]::IsNullOrWhiteSpace([string] $Values[$Name])) {
+        throw "Required upload path '$Name' is missing or empty."
+    }
+    try {
+        $configuredPath = [string] $Values[$Name]
+        if ([System.IO.Path]::IsPathRooted($configuredPath)) {
+            if ($configuredPath -notmatch '^[A-Za-z]:[\\/]') {
+                throw 'An upload root must use a local drive path.'
+            }
+            $absolutePath = [System.IO.Path]::GetFullPath($configuredPath)
+        } else {
+            $absolutePath = [System.IO.Path]::GetFullPath((Join-Path $BackendRoot $configuredPath))
+        }
+        if ($absolutePath -eq [System.IO.Path]::GetPathRoot($absolutePath)) {
+            throw 'A drive root cannot be an upload root.'
+        }
+        $absolutePath = $absolutePath.TrimEnd('\')
+        $currentPath = $absolutePath
+        while (-not [string]::IsNullOrEmpty($currentPath)) {
+            if (Test-Path -LiteralPath $currentPath) {
+                $item = Get-Item -LiteralPath $currentPath -Force
+                if (-not $item.PSIsContainer -or
+                    ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                    throw 'Upload paths must contain only ordinary directories.'
+                }
+            }
+            $parent = [System.IO.Directory]::GetParent($currentPath)
+            $currentPath = if ($null -eq $parent) { $null } else { $parent.FullName }
+        }
+        return $absolutePath
+    }
+    catch {
+        # 不在启动错误中回显用户配置的路径或运行环境内容。
+        throw "Upload path '$Name' must resolve to ordinary directories on a local drive."
+    }
+}
+
 function Get-Cc4cStaticNginxProcesses {
     param(
         [Parameter(Mandatory = $true)][string] $ExecutablePath,
@@ -45,7 +92,9 @@ function Get-Cc4cStaticNginxProcesses {
 }
 
 try {
-    $environmentPathSnapshot = Set-Cc4cHostEnvironmentPathOverrides -FrontendPath $FrontendEnvironmentPath
+    $environmentPathSnapshot = Set-Cc4cHostEnvironmentPathOverrides `
+        -RuntimePath $RuntimeEnvironmentPath `
+        -FrontendPath $FrontendEnvironmentPath
     $workspaceRoot = Get-Cc4cHostWorkspaceRoot
     $frontendRoot = Join-Path $workspaceRoot 'frontend'
     & (Join-Path $PSScriptRoot 'host-preflight.ps1') `
@@ -59,9 +108,61 @@ try {
     if (-not $frontendEnvironment.Values.Contains('VITE_API_BASE_URL')) {
         throw 'VITE_API_BASE_URL is required for host frontend mode.'
     }
+    $frontendProcessValues = [ordered]@{
+        VITE_API_BASE_URL = [string] $frontendEnvironment.Values.VITE_API_BASE_URL
+    }
+    if ($Mode -eq 'Dev') {
+        # 复用既有解析器；整栈启动时继承其外部环境文件入口，独立启动时也可显式传入。
+        # 只提取两个非秘密路径，不把数据库、邮件、管理凭据等运行变量交给 Vite。
+        $runtimeEnvironment = Read-Cc4cEnvironmentFile -Kind Runtime
+        $backendRoot = Join-Path $workspaceRoot 'backend'
+        $frontendProcessValues.CC4C_HOST_BLOG_IMG_ROOT = Resolve-Cc4cHostUploadRoot `
+            -Values $runtimeEnvironment.Values -Name 'CC4C_SAVE_IMG_PATH' -BackendRoot $backendRoot
+        $frontendProcessValues.CC4C_HOST_AVATAR_ROOT = Resolve-Cc4cHostUploadRoot `
+            -Values $runtimeEnvironment.Values -Name 'CC4C_SAVE_AVATAR_PATH' -BackendRoot $backendRoot
+        if ($frontendProcessValues.CC4C_HOST_BLOG_IMG_ROOT -eq $frontendProcessValues.CC4C_HOST_AVATAR_ROOT) {
+            throw 'Blog image and avatar upload roots must be distinct.'
+        }
+        $runtimeEnvironment = $null
+    }
     $state = Read-Cc4cHostState 'frontend'
-    if ($null -ne $state -and $null -ne (Get-Cc4cProcessInfo ([int] $state.pid))) {
-        throw 'A recorded CC4C frontend process is still present.'
+    if ($null -ne $state) {
+        # 已停止的 Node/Nginx PID 可能被其他应用复用；逐一核对主进程与已记录 worker 的身份。
+        # 只读查询失败或身份不可读时停止；不按 PID 编号直接认领、终止进程，也不删除旧状态文件。
+        $recordedExecutable = [string] $state.executablePath
+        $recordedMarker = [string] $state.marker
+        if ([string]::IsNullOrWhiteSpace($recordedExecutable) -or
+            -not [System.IO.Path]::IsPathRooted($recordedExecutable) -or
+            [string]::IsNullOrWhiteSpace($recordedMarker)) {
+            throw 'The recorded frontend process identity is incomplete; inspect the state before restarting.'
+        }
+        $recordedExecutable = [System.IO.Path]::GetFullPath($recordedExecutable)
+        $recordedIds = @($state.pid)
+        if ($null -ne $state.pids) { $recordedIds += @($state.pids) }
+        foreach ($recordedId in @($recordedIds | Sort-Object -Unique)) {
+            $recordedPid = 0
+            if (-not [int]::TryParse([string] $recordedId, [ref] $recordedPid) -or $recordedPid -le 0) {
+                throw 'A recorded frontend PID is invalid; inspect the state before restarting.'
+            }
+            $existing = Get-CimInstance Win32_Process -Filter "ProcessId = $recordedPid" -ErrorAction Stop
+            if ($null -eq $existing) { continue }
+            if ([string]::IsNullOrWhiteSpace([string] $existing.ExecutablePath)) {
+                throw 'A recorded frontend PID identity cannot be verified; no process was changed.'
+            }
+            $sameExecutable = [string]::Equals(
+                [System.IO.Path]::GetFullPath([string] $existing.ExecutablePath),
+                $recordedExecutable,
+                [System.StringComparison]::OrdinalIgnoreCase)
+            if ($sameExecutable) {
+                if ([string]::IsNullOrWhiteSpace([string] $existing.CommandLine)) {
+                    throw 'A recorded frontend PID command line cannot be verified; no process was changed.'
+                }
+                if (([string] $existing.CommandLine).IndexOf($recordedMarker, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    throw 'A recorded CC4C frontend process is still present.'
+                }
+            }
+            Write-Output 'A previous frontend PID belongs to a different process; leaving that process unchanged.'
+        }
     }
     $runDirectory = Join-Path $workspaceRoot 'temp\cc4c-host-frontend'
     New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
@@ -77,7 +178,7 @@ try {
         }
         $expectedMarker = 'vite.js'
         try {
-            $environmentSnapshot = Set-Cc4cProcessEnvironment $frontendEnvironment.Values
+            $environmentSnapshot = Set-Cc4cProcessEnvironment $frontendProcessValues
             $started = Start-Process -FilePath $expectedExecutable -WorkingDirectory $frontendRoot -ArgumentList @($viteEntry, '--host', '127.0.0.1', '--port', [string] $FrontendPort) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDirectory 'frontend.stdout.log') -RedirectStandardError (Join-Path $runDirectory 'frontend.stderr.log')
         }
         finally {

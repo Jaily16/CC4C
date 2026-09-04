@@ -139,9 +139,6 @@ public class OpenApiConfiguration {
                 && (path.equals("/users/password/forget") || path.startsWith("/blogs/click/"))) {
             return false;
         }
-        if (path.startsWith("/test/")) {
-            return false;
-        }
         if (method == io.swagger.v3.oas.models.PathItem.HttpMethod.GET
                 && path.startsWith("/courses/")
                 && !path.startsWith("/courses/star")) {

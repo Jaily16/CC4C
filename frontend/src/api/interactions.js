@@ -51,3 +51,8 @@ export function createBlogComment(payload, http = api) {
 export function createReply(payload, http = api) {
   return http.post('/comments/indirect', payload);
 }
+
+/** 复用现有评论删除接口；只传评论 ID，作者身份由后端会话校验，不由客户端指定。 */
+export function deleteComment(id, http = api) {
+  return http.delete(`/comments/${encodeURIComponent(id)}`);
+}
