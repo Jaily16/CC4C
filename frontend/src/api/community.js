@@ -24,6 +24,10 @@ export function listMyBlogs(params, http = api) {
   return http.get('/blogs/myBlogs', { params });
 }
 
+export function deleteBlog(id, http = api) {
+  return http.delete('/blogs/delete', { params: { blogId: id } });
+}
+
 export function getDraft(http = api) {
   return http.get('/blogs/draft');
 }

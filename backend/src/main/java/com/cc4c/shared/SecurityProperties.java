@@ -17,8 +17,6 @@ public record SecurityProperties(
         boolean cookieSecure,
         @NotBlank String allowedOrigins,
         @Min(4) @Max(16) int bcryptStrength,
-        boolean passwordReadinessEnabled,
-        boolean redisReadinessEnabled,
         @NotBlank String keyPrefix) {
     public List<String> allowedOriginList() {
         List<String> origins = Arrays.stream(allowedOrigins.split(","))

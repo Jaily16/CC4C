@@ -10,7 +10,8 @@
     "java": 21,
     "maven": "3.9.16",
     "node": "24.18.0",
-    "npm": "11.16.0"
+    "npm": "11.16.0",
+    "powershell": "7.6.5"
   },
   "backend": {
     "springBoot": "3.5.16",
@@ -29,7 +30,7 @@
   },
   "data": {
     "mysql": "8.4.11",
-    "redis": "7.4.10-alpine3.21",
+    "redis": "8.2.9",
     "rabbitmq": "4.3.5",
     "mailpit": "1.31.0"
   },

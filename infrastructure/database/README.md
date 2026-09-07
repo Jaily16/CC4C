@@ -14,11 +14,11 @@
 | `V6__add_async_outbox_and_inbox.sql` | 增加加密消息 Outbox/Inbox、租约、尝试次数、generation、受控错误码及发布/消费扫描索引 |
 | `V7__add_outbox_correlation_id.sql` | 为 Outbox 增加可空 ASCII 请求关联 ID，使 HTTP、发布、重试和消费者日志可关联，同时兼容 V6 历史积压 |
 
-`database/legacy/cc4c.sql` 仅供历史对照，已移除默认管理员，不得用于初始化新环境。应用配置中的 `baseline-on-migrate` 默认并持续保持 `false`。
+`infrastructure/database/legacy/cc4c.sql` 仅供历史对照，已移除默认管理员，不得用于初始化新环境。应用配置中的 `baseline-on-migrate` 默认并持续保持 `false`。
 
 ## 新建空数据库
 
-先由数据库管理员创建使用 `utf8mb4_0900_ai_ci` 的空库，并为应用账号授予业务读写及 Flyway 所需的 `CREATE`、`ALTER`、`INDEX`、`REFERENCES` 权限。随后复制 `.env.runtime.example` 为已忽略的 `.env.runtime.local`，由 `scripts/development/run-backend.ps1` 显式加载脱敏配置；Flyway 会按 V1–V7 初始化 18 张表并校验迁移。空库没有历史账号，不需要执行密码转换。
+先由数据库管理员创建使用 `utf8mb4_0900_ai_ci` 的空库，并为应用账号授予业务读写及 Flyway 所需的 `CREATE`、`ALTER`、`INDEX`、`REFERENCES` 权限。随后由用户根据 `backend/.env.example` 手工准备已忽略的 `backend/.env.local`，由 `backend/scripts/start-backend.ps1 -ConfirmDatabase <精确数据库名>` 通过共享加载器注入环境，使用已跟踪的脱敏 `application.yml`；Flyway 会按 V1–V7 初始化 18 张表并校验迁移。空库没有历史账号，不需要执行密码转换。
 
 不要将数据库密码、SMTP 授权码或本机路径写入仓库配置、本文档或日志。生产环境不应为方便迁移而使用数据库管理员账号运行应用。
 
@@ -33,12 +33,12 @@
 5. 再次执行密码迁移必须转换 0 行，并确认明文或未知 `{id}` 格式剩余数为 0。
 6. 第二次 Flyway `migrate` 必须为零新增迁移，随后执行 `validate` 和结构断言，最后才允许启动 Web 应用。
 
-离线密码迁移命令要求数据库连接以进程变量提供，且必须与备份确认信息指向同一精确数据库：
+离线密码迁移只从固定 `backend/.env.local` 读取运行配置，不接受外部配置路径或旧目录回退。数据库名必须与备份确认信息逐字符一致；进程变量在 `finally` 中恢复，脚本不输出配置值。只有用户明确要求迁移时才执行：
 
 ```powershell
 cd D:\codex\CC4C_v5
-.\scripts\deployment\migrate-passwords.ps1 `
-  -BackupPath <verified-backup.sql> `
+.\infrastructure\database\migrate-passwords.ps1 `
+  -BackupPath <已验证备份的绝对路径> `
   -BackupSha256 <64-hex-sha256> `
   -ConfirmDatabase <exact-database-name>
 ```
@@ -69,4 +69,4 @@ V7 只向 `async_outbox` 增加可空的 `correlation_id VARCHAR(64)`，不修�
 
 ## 产物与安全
 
-数据库备份、SHA-256 和日志只允许写入用户明确指定的受保护位置或已忽略的 `temp/`。这些文件可能包含结构或数据线索，不得暂存、提交或上传。RabbitMQ definitions、消息密文和 DLQ 导出同样不得进入仓库。提交前必须确认本机 `application.yml`、`.env.runtime.local`、`target/`、`temp/` 和日志均未进入 Git。
+数据库备份、SHA-256 和日志只允许写入用户明确指定的受保护位置或已忽略的 `temp/`。这些文件可能包含结构或数据线索，不得暂存、提交或上传。RabbitMQ definitions、消息密文和 DLQ 导出同样不得进入仓库。提交前必须确认三端 `.env.local`、其他本机配置、`target/`、`temp/` 和日志均未进入 Git。已跟踪的 `backend/src/main/resources/application.yml` 只能保留受控环境占位符，不允许用旧本机配置覆盖；历史 SQL 和 Flyway 文件保持原样，不参与 Maven 过滤。

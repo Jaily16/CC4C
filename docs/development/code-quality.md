@@ -13,22 +13,31 @@
 本地可以显式执行：
 
 ```powershell
-cd D:\codex\CC4C_v2\backend
+cd D:\codex\CC4C_v5\backend
 mvn spotless:apply
 
-cd D:\codex\CC4C_v2\frontend
+cd D:\codex\CC4C_v5\frontend
 npm run format
 npm run lint
 
-cd D:\codex\CC4C_v2
-.\scripts\check-code-quality.ps1
+cd D:\codex\CC4C_v5
+.\infrastructure\quality\check-code-quality.ps1
 ```
 
-CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无依赖源码质量检查，不自动改写文件、不安装额外工具、不读取本机秘密。
+本机质量入口执行 `spotless:check`、`npm run lint`、`npm run format:check`、源码质量和文档链接检查，不自动改写文件、不安装依赖、不运行自动化测试。当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
+
+两个 Node 检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、上传数据、历史 SQL 和锁文件不进入正文扫描。
+
+```powershell
+node .\infrastructure\quality\check-source-quality.mjs
+node .\infrastructure\quality\check-doc-links.mjs
+```
+
+受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用 `mvn --no-transfer-progress clean package -DskipTests` 和 `npm run build`；业务验证采用用户确认的隔离环境与浏览器 smoke。观测应用目前只有环境模板，不声称其 lint 或构建已通过。
 
 ## 中文 Javadoc 边界
 
-生产 Java 的公开类型必须使用准确的中文 Javadoc 说明用途、约束、事务边界、幂等、重试、故障旁路、安全脱敏或退出码。注释不改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键。测试代码可以使用测试意图注释，但不以注释代替行为断言。
+生产 Java 的公开类型必须使用准确的中文 Javadoc 说明用途、约束、事务边界、幂等、重试、故障旁路、安全脱敏或退出码。注释不改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键。注释必须与当前生产行为一致，不为已移除的测试资产保留伪入口。
 
 ## 日志脱敏
 
@@ -37,11 +46,11 @@ CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无�
 
 ## 生成物和兼容资产
 
-`target`、`node_modules`、`dist`、性能输出和临时扫描缓存属于可重建产物或历史证据，不进入源码格式化。Flyway V1–V7、OpenAPI 契约、RabbitMQ `*.v1` 事件、DTO、Cookie、CSRF 和 Compose `cc4c-v3` 数据身份属于兼容资产，不能因为格式或静态引用结果而删除或改写。
+`target`、`node_modules`、`dist`、性能输出和临时扫描缓存属于可重建产物或历史证据，不进入源码格式化。Flyway V1–V7、OpenAPI 契约、RabbitMQ `*.v1` 事件、DTO、Cookie、CSRF 和既有隔离环境数据身份属于兼容资产，不能因为格式或静态引用结果而删除或改写。
 
 ## 超长活动文件审查记录
 
-核心文件超过 300 行时，优先抽取纯转换、协议、表单、评论或错误处理职责；保留页面/服务作为协调入口。当前仍超过 300 行的文件均已完成相应审查：
+核心文件超过 300 行时，优先抽取纯转换、协议、表单、评论或错误处理职责；保留页面/服务作为协调入口。下面保留业务文件的既有职责审查记录；它不是对所有当前文件行数的自动断言。共享 `infrastructure/host/host-environment.ps1` 集中维护配置解析与精确进程身份规则，避免各入口出现安全行为分歧：
 
 | 文件 | 保留原因 |
 | --- | --- |
@@ -66,7 +75,5 @@ CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无�
 | `frontend/src/layout/components/Sidebar.vue` | 保留全局导航、权限菜单和响应式布局协调；作为布局组件需要同时处理路由、菜单和移动端展示，拆分会增加状态边界。 |
 | `frontend/src/views/UserInfoView.vue` | 保留用户资料路由容器和页面布局协调；实际资料编辑职责已由 `UserInfo.vue` 及共享对话框承担。 |
 | `backend/src/main/java/com/cc4c/shared/OutboxRepository.java` | 保留 Outbox SQL、租约和状态更新的一致性边界；仓储语句必须与 Flyway V6/V7 和消息重试语义一起维护，不适合按 SQL 方法拆成多个组件。 |
-| `backend/src/test/java/com/cc4c/performance/PerformanceBenchmarkApplication.java`、`PerformanceDataSeeder.java` | 性能测试工具的启动配置与数据语义必须保持完整，不属于生产业务组件。 |
-| `scripts/check-versions.mjs`、`scripts/check-structure.mjs` | 无依赖检查器集中定义受控路径、兼容例外和错误契约；拆分会削弱单一门禁入口。 |
 
-每次继续拆分都必须先保存行为基线，并以现有测试、API 快照、消息协议测试和前端页面回归证明等价性。
+每次继续拆分都必须先保存行为基线，并以编译、lint、格式检查、API/消息协议静态对照和浏览器人工 smoke 证明等价性，不恢复自动化测试或性能资产。
