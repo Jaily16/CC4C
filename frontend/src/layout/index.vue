@@ -19,6 +19,7 @@
 </template>
 
 <script setup>
+/** index 页面组件，协调当前路由的展示状态和用户事件。 */
 import Sidebar from './components/Sidebar.vue';
 import Header from './components/Header.vue';
 </script>

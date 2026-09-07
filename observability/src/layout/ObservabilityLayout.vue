@@ -1,4 +1,5 @@
 <script setup>
+/** 观测后台布局，维护中文导航、当前路径和安全退出入口。 */
 import { ElButton } from 'element-plus';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -17,8 +18,10 @@ const navigation = [
   { path: '/operations', label: '告警与依赖' },
 ];
 
+/** 从现有响应式状态派生 currentPath，不发起请求或写入外部数据。 */
 const currentPath = computed(() => route.path);
 
+/** 处理 signOut 清理操作，仅影响当前功能明确指向的状态或资源。 */
 async function signOut() {
   try {
     await auth.logout();

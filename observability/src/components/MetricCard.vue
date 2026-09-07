@@ -1,10 +1,12 @@
 <script setup>
+/** 观测指标卡片，格式化单项总览值并呈现数据可用状态。 */
 import { computed } from 'vue';
 
 import StatusBadge from './StatusBadge.vue';
 
 const props = defineProps({ metric: { type: Object, required: true } });
 
+/** 从现有响应式状态派生 formattedValue，不发起请求或写入外部数据。 */
 const formattedValue = computed(() => {
   const value = props.metric.value;
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';

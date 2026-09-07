@@ -21,9 +21,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** 提供带代际失效、负缓存和故障旁路的业务缓存协调入口。 */
+/**
+ * 提供带代际失效、负缓存和故障旁路的业务缓存协调入口。
+ */
 @Component
-/** BusinessCache 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public final class BusinessCache {
     private static final Logger logger = LoggerFactory.getLogger(BusinessCache.class);
     private static final Duration FAILURE_BYPASS = Duration.ofSeconds(30);
@@ -40,6 +41,14 @@ public final class BusinessCache {
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private volatile long bypassUntilNanos;
 
+    /**
+     * 创建 BusinessCache 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param properties 调用方提供的 {@code properties} 值
+     * @param storeProvider 调用方提供的 {@code storeProvider} 值
+     * @param micrometer 调用方提供的 {@code micrometer} 值
+     */
     @Autowired
     public BusinessCache(
             ObjectMapper objectMapper,
@@ -54,6 +63,13 @@ public final class BusinessCache {
         this.valueCodec = new BusinessCacheValueCodec(objectMapper);
     }
 
+    /**
+     * 创建 BusinessCache 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param properties 调用方提供的 {@code properties} 值
+     * @param storeProvider 调用方提供的 {@code storeProvider} 值
+     */
     public BusinessCache(
             ObjectMapper objectMapper,
             BusinessCacheProperties properties,
@@ -61,6 +77,18 @@ public final class BusinessCache {
         this(objectMapper, properties, storeProvider, Cc4cMetrics.disabled());
     }
 
+    /**
+     * 查询并返回 BusinessCache 中与 getOrLoad 对应的数据，不改变业务状态。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param region 调用方提供的 {@code region} 值
+     * @param logicalKey 调用方提供的 {@code logicalKey} 值
+     * @param type 调用方提供的 {@code type} 值
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
+     * @param loader 调用方提供的 {@code loader} 值
+     * @return 存在时包含目标值，否则为空
+     */
     public <T> Optional<T> getOrLoad(
             String region,
             String logicalKey,
@@ -92,6 +120,11 @@ public final class BusinessCache {
         return singleFlight(key, region, javaType, ttl, negativeTtl, loader);
     }
 
+    /**
+     * 执行 BusinessCache 中的 invalidateAfterCommit 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param regions 调用方提供的 {@code regions} 值
+     */
     public void invalidateAfterCommit(String... regions) {
         Runnable invalidation = () -> {
             for (String region : regions) {
@@ -101,6 +134,9 @@ public final class BusinessCache {
         if (TransactionSynchronizationManager.isSynchronizationActive()
                 && TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                /**
+                 * 执行 BusinessCache 中的 afterCommit 职责，并保持既有权限、事务与副作用边界。
+                 */
                 @Override
                 public void afterCommit() {
                     invalidation.run();
@@ -111,10 +147,20 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 metrics 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public BusinessCacheMetrics metrics() {
         return metrics;
     }
 
+    /**
+     * 执行 BusinessCache 中的 healthSnapshot 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public HealthSnapshot healthSnapshot() {
         if (!properties.enabled()) {
             return new HealthSnapshot(false, true, false);
@@ -134,6 +180,18 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 singleFlight 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param key 调用方提供的 {@code key} 值
+     * @param region 调用方提供的 {@code region} 值
+     * @param javaType 调用方提供的 {@code javaType} 值
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
+     * @param loader 调用方提供的 {@code loader} 值
+     * @return 存在时包含目标值，否则为空
+     */
     private <T> Optional<T> singleFlight(
             ResolvedKey key,
             String region,
@@ -162,6 +220,18 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 loadWithDistributedLock 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param key 调用方提供的 {@code key} 值
+     * @param region 调用方提供的 {@code region} 值
+     * @param javaType 调用方提供的 {@code javaType} 值
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
+     * @param loader 调用方提供的 {@code loader} 值
+     * @return 存在时包含目标值，否则为空
+     */
     private <T> Optional<T> loadWithDistributedLock(
             ResolvedKey key,
             String region,
@@ -231,6 +301,13 @@ public final class BusinessCache {
         return load(loader, region);
     }
 
+    /**
+     * 执行 BusinessCache 中的 resolveKey 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param region 调用方提供的 {@code region} 值
+     * @param logicalKey 调用方提供的 {@code logicalKey} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private ResolvedKey resolveKey(String region, String logicalKey) {
         String generationKey = keyFactory.generationKey(region);
         try {
@@ -246,6 +323,11 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 invalidateNow 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param region 调用方提供的 {@code region} 值
+     */
     private void invalidateNow(String region) {
         if (!properties.enabled() || store == null || circuitOpen()) {
             return;
@@ -259,6 +341,15 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 read 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param key 调用方提供的 {@code key} 值
+     * @param javaType 调用方提供的 {@code javaType} 值
+     * @param region 调用方提供的 {@code region} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private <T> ReadResult<T> read(String key, JavaType javaType, String region) {
         String json;
         try {
@@ -294,6 +385,15 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 write 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param key 调用方提供的 {@code key} 值
+     * @param value 调用方提供的 {@code value} 值
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @param region 调用方提供的 {@code region} 值
+     */
     private <T> void write(String key, Optional<T> value, Duration ttl, String region) {
         try {
             String json = valueCodec.encode(value);
@@ -314,6 +414,14 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 load 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param loader 调用方提供的 {@code loader} 值
+     * @param region 调用方提供的 {@code region} 值
+     * @return 存在时包含目标值，否则为空
+     */
     private <T> Optional<T> load(Supplier<Optional<T>> loader, String region) {
         long startedNanos = System.nanoTime();
         try {
@@ -329,15 +437,29 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 jitter 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private Duration jitter(Duration ttl) {
         double factor = ThreadLocalRandom.current().nextDouble(0.85, 1.1500001);
         return Duration.ofMillis(Math.max(1, Math.round(ttl.toMillis() * factor)));
     }
 
+    /**
+     * 执行 BusinessCache 中的 circuitOpen 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 当前条件是否成立
+     */
     private boolean circuitOpen() {
         return System.nanoTime() < bypassUntilNanos;
     }
 
+    /**
+     * 执行 BusinessCache 中的 markSuccess 职责，并保持既有权限、事务与副作用边界。
+     */
     private void markSuccess() {
         consecutiveFailures.set(0);
         if (System.nanoTime() >= bypassUntilNanos) {
@@ -345,6 +467,13 @@ public final class BusinessCache {
         }
     }
 
+    /**
+     * 执行 BusinessCache 中的 markFailure 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param operation 调用方提供的 {@code operation} 值
+     * @param region 调用方提供的 {@code region} 值
+     * @param exception 调用方提供的 {@code exception} 值
+     */
     private void markFailure(String operation, String region, RuntimeException exception) {
         metrics.error(region);
         if (consecutiveFailures.incrementAndGet() >= 3) {
@@ -358,8 +487,16 @@ public final class BusinessCache {
                 .log("Business cache operation failed");
     }
 
+    /**
+     * ResolvedKey 以不可变字段承载共享基础设施数据并保持既有协议语义。
+     *
+     * @param dataKey 调用方提供的 {@code dataKey} 值
+     */
     private record ResolvedKey(String dataKey) {}
 
+    /**
+     * ReadState 枚举共享基础设施允许出现的有限状态或协议取值。
+     */
     private enum ReadState {
         VALUE,
         NEGATIVE,
@@ -367,25 +504,62 @@ public final class BusinessCache {
         ERROR
     }
 
+    /**
+     * ReadResult 以不可变字段承载共享基础设施数据并保持既有协议语义。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param state 调用方提供的 {@code state} 值
+     * @param value 调用方提供的 {@code value} 值
+     */
     private record ReadResult<T>(ReadState state, T value) {
+        /**
+         * 执行 ReadResult 中的 value 职责，并保持既有权限、事务与副作用边界。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @param value 调用方提供的 {@code value} 值
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         static <T> ReadResult<T> value(T value) {
             return new ReadResult<>(ReadState.VALUE, value);
         }
 
+        /**
+         * 执行 ReadResult 中的 negative 职责，并保持既有权限、事务与副作用边界。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         static <T> ReadResult<T> negative() {
             return new ReadResult<>(ReadState.NEGATIVE, null);
         }
 
+        /**
+         * 执行 ReadResult 中的 miss 职责，并保持既有权限、事务与副作用边界。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         static <T> ReadResult<T> miss() {
             return new ReadResult<>(ReadState.MISS, null);
         }
 
+        /**
+         * 执行 ReadResult 中的 error 职责，并保持既有权限、事务与副作用边界。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         static <T> ReadResult<T> error() {
             return new ReadResult<>(ReadState.ERROR, null);
         }
     }
 
-    /** 描述缓存开关、后端连通性和故障旁路状态。 */
-    /** HealthSnapshot 是不可变的数据载体，保持现有字段语义和序列化契约。 */
+    /**
+     * 描述缓存开关、后端连通性和故障旁路状态。
+     *
+     * @param enabled 是否启用对应受控能力
+     * @param reachable 调用方提供的 {@code reachable} 值
+     * @param bypassing 调用方提供的 {@code bypassing} 值
+     */
     public record HealthSnapshot(boolean enabled, boolean reachable, boolean bypassing) {}
 }

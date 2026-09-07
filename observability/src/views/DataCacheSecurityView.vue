@@ -1,4 +1,5 @@
 <script setup>
+/** 数据库、缓存与安全页面，固定展示对应观测仪表板。 */
 import DashboardPage from '@/components/DashboardPage.vue';
 </script>
 

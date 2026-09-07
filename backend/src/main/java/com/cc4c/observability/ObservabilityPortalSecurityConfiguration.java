@@ -21,10 +21,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/** ObservabilityPortalSecurityConfiguration 隔离门户权限、CORS 和无状态安全上下文。 */
+/**
+ * 装配独立观测门户运行组件，并集中声明安全或基础设施策略。
+ */
 @Configuration(proxyBeanMethods = false)
 class ObservabilityPortalSecurityConfiguration {
 
+    /**
+     * 创建并配置 ObservabilityPortalSecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param portal 由容器注入的 ObservabilityPortalProperties 协作组件
+     * @param security 由容器注入的 SecurityProperties 协作组件
+     * @param cache 由容器注入的 BusinessCacheProperties 协作组件
+     * @return 当前操作产生的 InitializingBean 结果
+     */
     @Bean
     InitializingBean observabilityNamespaceValidator(
             ObservabilityPortalProperties portal, SecurityProperties security, BusinessCacheProperties cache) {
@@ -40,6 +50,16 @@ class ObservabilityPortalSecurityConfiguration {
         };
     }
 
+    /**
+     * 创建并配置 ObservabilityPortalSecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param http 调用方提供的 {@code http} 值
+     * @param properties 由容器注入的 ObservabilityPortalProperties 协作组件
+     * @param sessions 由容器注入的 ObservabilitySessionService 协作组件
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @return 当前操作产生的 SecurityFilterChain 结果
+     * @throws Exception 当输入、数据或依赖状态不满足当前方法约束时抛出
+     */
     @Bean
     @Order(1)
     SecurityFilterChain observabilityPortalSecurityFilterChain(
@@ -89,6 +109,16 @@ class ObservabilityPortalSecurityConfiguration {
         return http.build();
     }
 
+    /**
+     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     *
+     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param status 当前对象或流程的有限状态
+     * @param code 调用方提供的 {@code code} 值
+     * @param message 当前处理的消息或用户提示
+     * @throws java.io.IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     */
     private static void writeError(
             jakarta.servlet.http.HttpServletResponse response,
             ObjectMapper objectMapper,

@@ -95,6 +95,7 @@
 </template>
 
 <script setup>
+/** CoursesAndBlogsView 管理页面，协调管理员只可访问的查询与操作状态。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { listHomeCourses } from '@/api/catalog';
@@ -121,10 +122,12 @@ const levelMap = {
   66: '重点展示',
 };
 
+/** levelLabel 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function levelLabel(level) {
   return levelMap[String(level)] || '未设置';
 }
 
+/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
 function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
@@ -132,6 +135,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
+/** 读取 loadOverview 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadOverview() {
   loading.value = true;
   errorMessage.value = '';

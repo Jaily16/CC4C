@@ -1,4 +1,5 @@
 <script setup>
+/** 告警与依赖页面，组合告警、依赖、存活、就绪和请求关联状态。 */
 import { ElTable, ElTableColumn } from 'element-plus';
 
 import StatusBadge from '@/components/StatusBadge.vue';
@@ -9,6 +10,7 @@ import { useOperationsStore } from '@/stores/operations.js';
 const store = useOperationsStore();
 const polling = usePolling((signal) => store.load(signal));
 
+/** 把现有数据转换为 formatTime 所需展示结构，不产生外部副作用。 */
 function formatTime(value) {
   return value ? new Date(value).toLocaleString('zh-CN') : '未提供';
 }

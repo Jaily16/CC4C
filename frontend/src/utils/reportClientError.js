@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 
+/** safeText 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function safeText(value, fallback = '') {
   if (typeof value !== 'string') return fallback;
   return value.replace(/[\r\n\t]/g, ' ').slice(0, 160);

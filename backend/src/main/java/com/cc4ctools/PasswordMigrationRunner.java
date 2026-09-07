@@ -23,6 +23,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * PasswordMigrationRunner 负责离线维护工具的一项明确运行职责，并保持现有外部行为不变。
+ */
 @Component
 final class PasswordMigrationRunner implements ApplicationRunner {
     private static final Pattern DATABASE_NAME =
@@ -34,6 +37,14 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     private final Environment environment;
     private final ConfigurableApplicationContext context;
 
+    /**
+     * 创建 PasswordMigrationRunner 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param jdbc 调用方提供的 {@code jdbc} 值
+     * @param transactionTemplate 调用方提供的 {@code transactionTemplate} 值
+     * @param environment 调用方提供的 {@code environment} 值
+     * @param context 调用方提供的 {@code context} 值
+     */
     PasswordMigrationRunner(
             JdbcTemplate jdbc,
             TransactionTemplate transactionTemplate,
@@ -45,6 +56,11 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         this.context = context;
     }
 
+    /**
+     * 执行当前组件约定的单次任务，并按既有失败语义向调用方报告结果。
+     *
+     * @param args 调用方提供的 {@code args} 值
+     */
     @Override
     public void run(ApplicationArguments args) {
         validateBackupAndDatabase();
@@ -61,6 +77,12 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         context.close();
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param encoder 调用方提供的 {@code encoder} 值
+     * @return 按当前规则计算或读取的数值
+     */
     private long migrateNumericTable(PasswordEncoder encoder) {
         long migrated = 0;
         long lastId = Long.MIN_VALUE;
@@ -88,6 +110,12 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param encoder 调用方提供的 {@code encoder} 值
+     * @return 按当前规则计算或读取的数值
+     */
     private long migrateAdministratorTable(PasswordEncoder encoder) {
         long migrated = 0;
         String lastId = "";
@@ -119,6 +147,9 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
+    /**
+     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     */
     private void verifyAllPasswordsMigrated() {
         Long userPlaintext = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM user WHERE password IS NULL OR password NOT LIKE '{bcrypt}%'", Long.class);
@@ -134,6 +165,9 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
+    /**
+     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     */
     private void validateBackupAndDatabase() {
         String jdbcUrl = required("spring.datasource.url");
         Matcher matcher = DATABASE_NAME.matcher(jdbcUrl);
@@ -160,6 +194,13 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
+    /**
+     * 编码或保护当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param encoder 调用方提供的 {@code encoder} 值
+     * @param password 仅用于当前安全校验的密码或密码摘要
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String encode(PasswordEncoder encoder, String password) {
         if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new IllegalStateException("A legacy password exceeds the BCrypt byte limit");
@@ -167,12 +208,23 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         return encoder.encode(password);
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param password 仅用于当前安全校验的密码或密码摘要
+     */
     private void rejectUnknownEncoding(String password) {
         if (password.startsWith("{")) {
             throw new IllegalStateException("An unsupported password encoding identifier was found");
         }
     }
 
+    /**
+     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param value 待处理或存储的值
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String requiredPassword(Object value) {
         if (value == null || value.toString().isEmpty()) {
             throw new IllegalStateException("An empty password was found");
@@ -180,6 +232,12 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         return value.toString();
     }
 
+    /**
+     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param name 调用方提供的 {@code name} 值
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String required(String name) {
         String value = environment.getProperty(name);
         if (value == null || value.isBlank()) {
@@ -188,11 +246,23 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         return value;
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param strength 调用方提供的 {@code strength} 值
+     * @return 当前操作产生的 PasswordEncoder 结果
+     */
     private PasswordEncoder passwordEncoder(int strength) {
         Map<String, PasswordEncoder> encoders = Map.of("bcrypt", new BCryptPasswordEncoder(strength));
         return new DelegatingPasswordEncoder("bcrypt", encoders);
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param file 待校验或保存的上传文件
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String sha256(Path file) {
         try (InputStream input = Files.newInputStream(file)) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

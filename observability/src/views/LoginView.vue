@@ -1,4 +1,5 @@
 <script setup>
+/** 观测登录页面，只收集门户凭据并通过独立 CSRF 与 Session 边界认证。 */
 import { ElButton, ElForm, ElFormItem, ElInput } from 'element-plus';
 import { reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -15,6 +16,7 @@ const rules = {
   password: [{ required: true, message: '请输入观测密码', trigger: 'blur' }],
 };
 
+/** 处理 submit 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function submit() {
   const valid = await formRef.value.validate().catch(() => false);
   if (!valid) return;

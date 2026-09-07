@@ -3,10 +3,12 @@ import { nextTick, onScopeDispose, ref, unref } from 'vue';
 import { apiErrorMessage } from '../utils/apiError.js';
 import { reportClientError } from '../utils/reportClientError.js';
 
+/** 把现有数据转换为 resolve 所需展示结构，不产生外部副作用。 */
 function resolve(value) {
   return typeof value === 'function' ? value() : unref(value);
 }
 
+/** 校验 isSuccessfulMutation 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function isSuccessfulMutation(response) {
   const result = response?.data?.data;
   return result === true || (result !== null && typeof result === 'object');
@@ -134,6 +136,7 @@ export function useCommentThread({
     }
   }
 
+  /** 读取 loadComments 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
   async function loadComments() {
     const currentSubjectId = resolve(subjectId);
     if (!currentSubjectId) {
@@ -164,6 +167,7 @@ export function useCommentThread({
     }
   }
 
+  /** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
   async function comment() {
     commentInputError.value = '';
     const content = commentText.value.trim();
@@ -192,12 +196,14 @@ export function useCommentThread({
     }
   }
 
+  /** 响应 toggleReply 导航或界面事件，更新当前组件的受控展示状态。 */
   function toggleReply(commentId) {
     replyingTo.value = replyingTo.value === commentId ? null : commentId;
     replyText.value = '';
     replyInputError.value = '';
   }
 
+  /** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
   async function reply(fatherId) {
     replyInputError.value = '';
     const content = replyText.value.trim();
@@ -230,12 +236,14 @@ export function useCommentThread({
     }
   }
 
+  /** 处理 changeCommentPage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
   function changeCommentPage(page) {
     commentPage.value = page;
     replyingTo.value = null;
     return loadComments();
   }
 
+  /** 处理 resetComments 清理操作，仅影响当前功能明确指向的状态或资源。 */
   function resetComments() {
     scopeVersion += 1;
     deletingCommentId.value = null;

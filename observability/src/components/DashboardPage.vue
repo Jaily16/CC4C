@@ -1,4 +1,5 @@
 <script setup>
+/** 观测仪表板容器，协调时间范围、轮询和面板状态展示。 */
 import { watch } from 'vue';
 
 import ChartPanel from '@/components/ChartPanel.vue';
@@ -17,6 +18,7 @@ const store = useDashboardStore();
 const range = defineModel('range', { type: String, default: '1h' });
 const polling = usePolling((signal) => store.load(props.dashboardId, range.value, signal));
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(range, () => void polling.refresh(true));
 </script>
 

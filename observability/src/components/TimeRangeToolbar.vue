@@ -1,4 +1,5 @@
 <script setup>
+/** 观测时间工具栏，提供固定范围、刷新及暂停控制。 */
 import { ElButton, ElRadioButton, ElRadioGroup } from 'element-plus';
 
 defineProps({

@@ -5,10 +5,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 装配共享基础设施运行组件，并集中声明安全或基础设施策略。
+ */
 @Configuration(proxyBeanMethods = false)
 class BusinessCacheConfiguration {
 
     // 即使禁用缓存也校验隔离身份，避免下一次启用时复用 Session 命名空间。
+    /**
+     * 创建 BusinessCacheConfiguration 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param properties 由容器注入的 BusinessCacheProperties 协作组件
+     * @param sessionNamespace 调用方提供的 {@code sessionNamespace} 值
+     */
     BusinessCacheConfiguration(
             BusinessCacheProperties properties, @Value("${spring.session.redis.namespace:}") String sessionNamespace) {
         if (sessionNamespace == null || sessionNamespace.isBlank()) {
@@ -26,6 +35,13 @@ class BusinessCacheConfiguration {
         }
     }
 
+    /**
+     * 创建并配置 BusinessCacheConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param redisUrl 调用方提供的 {@code redisUrl} 值
+     * @return 当前操作产生的 BusinessCacheStore 结果
+     */
     @Bean
     @ConditionalOnProperty(prefix = "cc4c.cache", name = "enabled", havingValue = "true")
     BusinessCacheStore businessCacheStore(Cc4cMetrics metrics, @Value("${spring.data.redis.url:}") String redisUrl) {

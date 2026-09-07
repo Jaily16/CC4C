@@ -104,6 +104,7 @@
 </template>
 
 <script setup>
+/** BlogWriteView 博客页面，协调社区数据、会话状态和用户交互。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref, watch } from 'vue';
 import { Loading } from '@element-plus/icons-vue';
@@ -136,16 +137,19 @@ const languages = [
   { value: 4, label: 'C' },
 ];
 
+/** 从现有响应式状态派生 editorStatus，不发起请求或写入外部数据。 */
 const editorStatus = computed(() => {
   if (uploading.value) return '正在上传图片…';
   if (!text.value.trim()) return '正文尚未开始';
   return `已输入约 ${text.value.trim().length} 个字符`;
 });
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(text, (value) => {
   if (value.trim()) contentError.value = '';
 });
 
+/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 async function verifyUser() {
   try {
     const resp = await getSession();
@@ -162,6 +166,7 @@ async function verifyUser() {
   }
 }
 
+/** 读取 loadDraft 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadDraft() {
   try {
     const resp = await getDraft();
@@ -178,6 +183,7 @@ async function loadDraft() {
   }
 }
 
+/** 读取 initializePage 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function initializePage() {
   pageLoading.value = true;
   pageError.value = '';
@@ -186,10 +192,12 @@ async function initializePage() {
   pageLoading.value = false;
 }
 
+/** codeSave 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function codeSave() {
   ElMessage.info('当前内容仍保留在编辑器中，如需持久保存请点击“保存草稿”');
 }
 
+/** 校验 validatePublish 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function validatePublish() {
   titleError.value = title.value.trim() ? '' : '请输入文章标题。';
   languageError.value = langList.value.length > 0 ? '' : '请至少选择一种文章语言。';
@@ -197,6 +205,7 @@ function validatePublish() {
   return !titleError.value && !languageError.value && !contentError.value;
 }
 
+/** 处理 publish 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function publish() {
   if (!validatePublish() || publishSubmitting.value || uploading.value) return;
   publishSubmitting.value = true;
@@ -223,6 +232,7 @@ async function publish() {
   }
 }
 
+/** draft 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function draft() {
   contentError.value = '';
   if (!text.value.trim()) {
@@ -249,6 +259,7 @@ async function draft() {
   }
 }
 
+/** 处理 deleteDraft 清理操作，仅影响当前功能明确指向的状态或资源。 */
 async function deleteDraft() {
   if (!hasDraft.value || draftSaving.value || publishSubmitting.value || uploading.value) return;
   draftSaving.value = true;
@@ -268,6 +279,7 @@ async function deleteDraft() {
   }
 }
 
+/** onUploadImg 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function onUploadImg(files, callback) {
   if (!files?.length) return;
   uploading.value = true;

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { safeMessage } from '@/api/client.js';
 import { fetchDashboard } from '@/api/observability.js';
 
+/** useDashboardStore 集中维护本领域的加载、成功、失败和会话状态，供页面共享。 */
 export const useDashboardStore = defineStore('observability-dashboard', {
   state: () => ({ data: null, loading: false, error: null }),
   actions: {

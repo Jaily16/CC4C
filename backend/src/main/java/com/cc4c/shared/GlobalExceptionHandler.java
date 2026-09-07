@@ -30,11 +30,19 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * GlobalExceptionHandler 表示可被统一错误处理器识别的业务故障。
+ */
 @RestControllerAdvice
-/** GlobalExceptionHandler 表示可被统一错误处理器识别的业务故障。 */
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException exception) {
         markHandled(exception);
@@ -42,6 +50,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(exception.code(), exception.data(), exception.getMessage()));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(RateLimitException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleRateLimit(RateLimitException exception) {
         markHandled(exception);
@@ -50,6 +64,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.RATE_LIMITED.code(), false, exception.getMessage()));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler({RedisConnectionFailureException.class, RedisSystemException.class})
     public ResponseEntity<ApiResponse<Boolean>> handleRedisUnavailable(Exception exception) {
         markHandled(exception);
@@ -57,6 +77,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.SERVICE_UNAVAILABLE.code(), false, "安全服务暂时不可用"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleBodyValidation(
             MethodArgumentNotValidException exception) {
@@ -70,6 +96,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.VALIDATION_ERROR.code(), errors, "Request validation failed"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler({
         ConstraintViolationException.class,
         BindException.class,
@@ -83,6 +115,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.VALIDATION_ERROR.code(), false, "Request validation failed"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(MissingRequestCookieException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleMissingCookie(MissingRequestCookieException exception) {
         markHandled(exception);
@@ -90,6 +128,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.UNAUTHORIZED.code(), false, "请先登录"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleMissingResource(NoResourceFoundException exception) {
         markHandled(exception);
@@ -97,6 +141,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.NOT_FOUND.code(), false, "Resource does not exist"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleUnsupportedMethod(
             HttpRequestMethodNotSupportedException exception) {
@@ -105,6 +155,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.VALIDATION_ERROR.code(), false, "HTTP method is not allowed"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleDuplicateKey(DuplicateKeyException exception) {
         markHandled(exception);
@@ -112,6 +168,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.CONFLICT.code(), false, "Resource already exists"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleDataIntegrity(DataIntegrityViolationException exception) {
         markHandled(exception);
@@ -120,6 +182,12 @@ public class GlobalExceptionHandler {
                         BusinessCode.FOREIGN_KEY_CONSTRAINT_VIOLATION.code(), false, "Referenced resource is invalid"));
     }
 
+    /**
+     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Boolean>> handleUnexpectedException(Exception exception) {
         if (RedisInfrastructureFailure.isUnavailable(exception)) {
@@ -138,6 +206,11 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(BusinessCode.INTERNAL_ERROR.code(), false, "Request processing failed"));
     }
 
+    /**
+     * 执行 GlobalExceptionHandler 中的 markHandled 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     */
     private static void markHandled(Exception exception) {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
             ServerHttpObservationFilter.findObservationContext(attributes.getRequest())
@@ -145,6 +218,12 @@ public class GlobalExceptionHandler {
         }
     }
 
+    /**
+     * 执行 GlobalExceptionHandler 中的 fingerprint 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param exception 调用方提供的 {@code exception} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private static String fingerprint(Exception exception) {
         StringBuilder source = new StringBuilder(exception.getClass().getName());
         StackTraceElement[] frames = exception.getStackTrace();

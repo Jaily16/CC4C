@@ -7,6 +7,7 @@ const client = axios.create({
   headers: { Accept: 'application/json' },
 });
 
+/** 解包统一 API 响应，并把业务失败转换为前端可处理的受控错误。 */
 export function unwrap(response) {
   if (!response?.data || response.data.code !== 200) {
     throw new Error('INVALID_API_RESPONSE');
@@ -14,6 +15,7 @@ export function unwrap(response) {
   return response.data.data;
 }
 
+/** 从受控错误中选择可展示中文消息，不暴露响应正文、凭据或内部异常。 */
 export function safeMessage(error, fallback = '请求暂时无法完成，请稍后重试') {
   const status = error?.response?.status;
   if (status === 401) return '观测会话已失效，请重新登录';

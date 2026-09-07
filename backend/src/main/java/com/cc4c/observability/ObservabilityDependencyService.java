@@ -18,7 +18,9 @@ import org.springframework.boot.availability.LivenessState;
 import org.springframework.boot.availability.ReadinessState;
 import org.springframework.stereotype.Service;
 
-/** ObservabilityDependencyService 直接汇总健康贡献者及应用可用性，只返回归一化状态。 */
+/**
+ * 协调独立观测门户用例及其持久化、安全和外部协作边界。
+ */
 @Service
 public final class ObservabilityDependencyService {
     private static final Set<String> SAFE_STATUSES = Set.of("UP", "DOWN", "OUT_OF_SERVICE", "DEGRADED", "UNKNOWN");
@@ -27,6 +29,13 @@ public final class ObservabilityDependencyService {
     private final ApplicationAvailability availability;
     private final PrometheusClient prometheus;
 
+    /**
+     * 创建 ObservabilityDependencyService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param healthRegistry 调用方提供的 {@code healthRegistry} 值
+     * @param availability 调用方提供的 {@code availability} 值
+     * @param prometheus 由容器注入的 PrometheusClient 协作组件
+     */
     ObservabilityDependencyService(
             HealthContributorRegistry healthRegistry,
             ApplicationAvailability availability,
@@ -36,6 +45,12 @@ public final class ObservabilityDependencyService {
         this.prometheus = prometheus;
     }
 
+    /**
+     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     *
+     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
+     * @return 当前操作产生的 DependenciesResponse 结果
+     */
     public DependenciesResponse snapshot(HttpServletRequest request) {
         String liveness = availability.getLivenessState() == LivenessState.CORRECT ? "UP" : "DOWN";
         String readiness = availability.getReadinessState() == ReadinessState.ACCEPTING_TRAFFIC ? "UP" : "DOWN";
@@ -64,6 +79,14 @@ public final class ObservabilityDependencyService {
                 List.copyOf(items));
     }
 
+    /**
+     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param status 当前对象或流程的有限状态
+     * @return 当前操作产生的 DependencyItemResponse 结果
+     */
     private DependencyItemResponse item(String id, String title, String status) {
         String message =
                 switch (status) {
@@ -75,6 +98,12 @@ public final class ObservabilityDependencyService {
         return new DependencyItemResponse(id, title, status, message);
     }
 
+    /**
+     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     *
+     * @param name 调用方提供的 {@code name} 值
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String contributorStatus(String name) {
         HealthContributor contributor = healthRegistry.getContributor(name);
         if (contributor == null) {
@@ -102,6 +131,12 @@ public final class ObservabilityDependencyService {
         return "UNKNOWN";
     }
 
+    /**
+     * 规范化观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     *
+     * @param candidate 调用方提供的 {@code candidate} 值
+     * @return 按当前协议生成或读取的字符串值
+     */
     private String normalize(String candidate) {
         String upper = candidate == null ? "UNKNOWN" : candidate.toUpperCase(Locale.ROOT);
         return SAFE_STATUSES.contains(upper) ? upper : "UNKNOWN";

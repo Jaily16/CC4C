@@ -28,21 +28,57 @@ cd D:\codex\CC4C_v5
 .\infrastructure\quality\check-code-quality.ps1
 ```
 
-本机质量入口执行 `spotless:check`、两端前端的 `npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查，不自动改写文件、不安装依赖、不运行自动化测试。当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
+本机质量入口先执行 PowerShell AST 与 Java 中文 Javadoc 覆盖检查，再执行 `spotless:check`、两端前端的
+`npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查。入口不自动改写文件、
+不安装依赖、不运行自动化测试；当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
 
-三个 Node 检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、上传数据、历史 SQL 和锁文件不进入正文扫描。观测契约检查固定验证 8 项总览、3 个 Dashboard、20 个面板、39 条查询和 20 条告警。
+质量检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；
+Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、
+上传数据、历史 SQL 和锁文件不进入正文扫描。观测契约检查固定验证 8 项总览、3 个 Dashboard、
+20 个面板、39 条查询和 20 条告警。
 
 ```powershell
 node .\infrastructure\quality\check-source-quality.mjs
 node .\infrastructure\quality\check-doc-links.mjs
 node .\infrastructure\quality\check-observability-contract.mjs
+java --source 21 .\infrastructure\quality\JavaCommentCoverage.java --repository-root .
+.\infrastructure\quality\check-powershell-quality.ps1
 ```
 
-受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用 `mvn --no-transfer-progress clean package -DskipTests` 和两端前端各自的 `npm run build`；业务与观测验证采用用户确认的隔离环境和浏览器 smoke。
+受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用
+`mvn --no-transfer-progress clean package -DskipTests` 和两端前端各自的 `npm run build`；
+业务与观测验证采用用户确认的隔离环境和浏览器 smoke。
 
 ## 中文 Javadoc 边界
 
-生产 Java 的公开类型必须使用准确的中文 Javadoc 说明用途、约束、事务边界、幂等、重试、故障旁路、安全脱敏或退出码。注释不改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键。注释必须与当前生产行为一致，不为已移除的测试资产保留伪入口。
+`JavaCommentCoverage.java` 使用 JDK 21 Compiler Tree API 检查生产 Java，不依赖正则推测声明。当前基线包含
+10 个包说明、226 个具名类型、106 个显式构造器和 584 个显式方法，共 926 个文档单元。具名类型、
+匿名类中的显式覆盖方法和全部显式构造器/方法都必须具有中文 Javadoc；匿名类类型本身、隐式 record
+访问器和隐式构造器不计入覆盖。
+
+- 类型说明职责、边界和主要协作对象；record 还要为每个组件提供 `@param`。
+- 方法和构造器为全部值参数及类型参数提供 `@param`；非 `void` 方法提供 `@return`，显式异常提供
+  `@throws` 或 `@exception`。
+- 涉及事务、权限、脱敏、幂等、缓存失效、重试、故障旁路或外部副作用时，说明必须与当前实现一致，
+  不得虚构额外保证。
+- 注释不得改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键，也不为已移除的测试资产
+  保留伪入口。
+
+## Vue 与 JavaScript 功能边界
+
+两个 ESLint 配置共同加载本地 `eslint-functional-comments.mjs`。每个 `.vue` 组件需要中文职责说明；
+具名/导出函数、API wrapper、composable、Pinia/Vuex action、事件处理器、业务派生函数以及生命周期、
+`watch`、路由守卫、定时器、事件监听和 Axios 拦截器边界需要紧邻中文说明。
+
+API 注释应区分只读请求和写入副作用，并写清 Session/CSRF 与错误处理责任。局部
+`map`/`filter`/`reduce`/`find`/`forEach` 回调、Promise 链回调和懒加载组件由所属语义函数统一说明，
+不要求逐行翻译式注释。规则只检查职责说明是否存在，评审仍需核对文字与实现一致。
+
+## PowerShell 功能边界
+
+`check-powershell-quality.ps1` 使用 PowerShell AST 校验语法，不执行被检查脚本。当前 17 个受控脚本必须
+同时具有 `运行前提`、`外部依赖`、`破坏性边界`、`失败恢复` 和 `退出码` 五项头部；每个具名函数必须
+有紧邻中文说明。检查范围来自 Git 清单，身份不明的路径或 Git 查询失败都会直接阻断。
 
 ## 日志脱敏
 

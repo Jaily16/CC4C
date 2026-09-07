@@ -19,16 +19,28 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * OpenApiConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
+ */
 @Configuration
-/** OpenApiConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。 */
 public class OpenApiConfiguration {
 
+    /**
+     * 执行 OpenApiConfiguration 中的 cc4cOpenApi 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Bean
     OpenAPI cc4cOpenApi() {
         return new OpenAPI()
                 .info(new Info().title("CC4C API").version("3").description("CC4C modular monolith HTTP API"));
     }
 
+    /**
+     * 执行 OpenApiConfiguration 中的 cc4cResponseDocumentation 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Bean
     OpenApiCustomizer cc4cResponseDocumentation() {
         Set<String> createdPaths = Set.of(
@@ -139,6 +151,12 @@ public class OpenApiConfiguration {
         };
     }
 
+    /**
+     * 校验 OpenApiConfiguration 中与 requiresCsrf 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param method 调用方提供的 {@code method} 值
+     * @return 当前条件是否成立
+     */
     private boolean requiresCsrf(io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         return method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST
                 || method == io.swagger.v3.oas.models.PathItem.HttpMethod.PUT
@@ -146,17 +164,37 @@ public class OpenApiConfiguration {
                 || method == io.swagger.v3.oas.models.PathItem.HttpMethod.PATCH;
     }
 
+    /**
+     * 校验 OpenApiConfiguration 中与 requiresObservabilitySession 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param path 调用方提供的 {@code path} 值
+     * @return 当前条件是否成立
+     */
     private boolean requiresObservabilitySession(String path) {
         return !Set.of("/observability/auth/csrf", "/observability/auth/login", "/observability/auth/session")
                 .contains(path);
     }
 
+    /**
+     * 校验 OpenApiConfiguration 中与 requiresObservabilityCsrf 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param path 调用方提供的 {@code path} 值
+     * @param method 调用方提供的 {@code method} 值
+     * @return 当前条件是否成立
+     */
     private boolean requiresObservabilityCsrf(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         return method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST
                 && Set.of("/observability/auth/login", "/observability/auth/logout")
                         .contains(path);
     }
 
+    /**
+     * 校验 OpenApiConfiguration 中与 requiresSession 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param path 调用方提供的 {@code path} 值
+     * @param method 调用方提供的 {@code method} 值
+     * @return 当前条件是否成立
+     */
     private boolean requiresSession(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         if (method == io.swagger.v3.oas.models.PathItem.HttpMethod.GET
                 && (path.equals("/csrf") || path.equals("/auth/session"))) {
@@ -187,6 +225,11 @@ public class OpenApiConfiguration {
         return method != io.swagger.v3.oas.models.PathItem.HttpMethod.GET || !path.startsWith("/comments/");
     }
 
+    /**
+     * 执行 OpenApiConfiguration 中的 errorResponseSchema 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private Schema<?> errorResponseSchema() {
         return new ObjectSchema()
                 .addProperty("code", new IntegerSchema())

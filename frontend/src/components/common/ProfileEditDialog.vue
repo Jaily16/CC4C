@@ -72,6 +72,7 @@
 </template>
 
 <script setup>
+/** 资料编辑对话框，维护表单草稿并向父组件提交用户确认的数据。 */
 import { Loading, Plus } from '@element-plus/icons-vue';
 
 defineProps({
@@ -87,6 +88,7 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue', 'closed', 'upload-avatar', 'clear-error', 'update-field', 'save']);
 
+/** 处理 updateField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateField(field, value) {
   emit('update-field', field, value);
   if (field === 'name') emit('clear-error', field);

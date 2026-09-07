@@ -1,4 +1,5 @@
 <script setup>
+/** 观测图表面板，将受控时序数据渲染为 ECharts，并提供文本替代状态。 */
 import { LineChart } from 'echarts/charts';
 import { AriaComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { init, use } from 'echarts/core';
@@ -14,6 +15,7 @@ const chartRoot = ref(null);
 let chart = null;
 let observer = null;
 
+/** 从现有响应式状态派生 latestValues，不发起请求或写入外部数据。 */
 const latestValues = computed(() =>
   props.panel.series.map((series) => ({
     name: series.name,
@@ -21,6 +23,7 @@ const latestValues = computed(() =>
   })),
 );
 
+/** renderChart 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function renderChart() {
   if (!chart || props.panel.status !== 'OK') {
     chart?.clear();
@@ -53,6 +56,7 @@ function renderChart() {
   );
 }
 
+/** 组件挂载后执行首次只读加载并登记当前页面需要的运行资源。 */
 onMounted(() => {
   chart = init(chartRoot.value, null, { renderer: 'canvas' });
   observer = new ResizeObserver(() => chart?.resize());
@@ -60,8 +64,10 @@ onMounted(() => {
   renderChart();
 });
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(() => props.panel, renderChart, { deep: true });
 
+/** 组件卸载前取消计时器、监听或未完成请求，避免资源泄漏和过期写回。 */
 onBeforeUnmount(() => {
   observer?.disconnect();
   chart?.dispose();

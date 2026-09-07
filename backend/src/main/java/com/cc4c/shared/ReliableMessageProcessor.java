@@ -12,9 +12,10 @@ import org.springframework.amqp.core.Message;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * 协调可靠消息的解密、幂等、业务处理、重试和死信确认流程。
+ */
 @Component
-/** 协调可靠消息的解密、幂等、业务处理、重试和死信确认流程。 */
-/** ReliableMessageProcessor 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public final class ReliableMessageProcessor {
     private static final Logger log = LoggerFactory.getLogger(ReliableMessageProcessor.class);
 
@@ -28,6 +29,17 @@ public final class ReliableMessageProcessor {
     private final ReliableMessageProtocolSupport protocolSupport;
     private final String workerId = "consumer-" + UUID.randomUUID();
 
+    /**
+     * 创建 ReliableMessageProcessor 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param inbox 由容器注入的 InboxRepository 协作组件
+     * @param outbox 由容器注入的 OutboxRepository 协作组件
+     * @param cipher 调用方提供的 {@code cipher} 值
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param publisher 调用方提供的 {@code publisher} 值
+     * @param topology 调用方提供的 {@code topology} 值
+     * @param metrics 调用方提供的 {@code metrics} 值
+     */
     @Autowired
     public ReliableMessageProcessor(
             InboxRepository inbox,
@@ -47,6 +59,16 @@ public final class ReliableMessageProcessor {
         this.protocolSupport = new ReliableMessageProtocolSupport();
     }
 
+    /**
+     * 创建 ReliableMessageProcessor 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param inbox 由容器注入的 InboxRepository 协作组件
+     * @param outbox 由容器注入的 OutboxRepository 协作组件
+     * @param cipher 调用方提供的 {@code cipher} 值
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param publisher 调用方提供的 {@code publisher} 值
+     * @param topology 调用方提供的 {@code topology} 值
+     */
     public ReliableMessageProcessor(
             InboxRepository inbox,
             OutboxRepository outbox,
@@ -57,6 +79,17 @@ public final class ReliableMessageProcessor {
         this(inbox, outbox, cipher, objectMapper, publisher, topology, Cc4cMetrics.disabled());
     }
 
+    /**
+     * 处理 ReliableMessageProcessor 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param expectedEventType 调用方提供的 {@code expectedEventType} 值
+     * @param message 待处理的消息及其属性
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag RabbitMQ 当前投递的确认标识
+     * @param handler 调用方提供的 {@code handler} 值
+     * @throws IOException I/O 操作失败或消息确认无法完成时抛出
+     */
     public void process(
             String consumerName,
             String expectedEventType,
@@ -90,6 +123,12 @@ public final class ReliableMessageProcessor {
         }
     }
 
+    /**
+     * 执行 ReliableMessageProcessor 中的 correlationFallback 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param message 待处理的消息及其属性
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String correlationFallback(Message message) {
         Optional<String> reference =
                 protocolSupport.messageReference(message).map(ReliableMessageProtocolSupport.MessageReference::eventId);
@@ -108,6 +147,17 @@ public final class ReliableMessageProcessor {
         }
     }
 
+    /**
+     * 处理 ReliableMessageProcessor 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param expectedEventType 调用方提供的 {@code expectedEventType} 值
+     * @param message 待处理的消息及其属性
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag RabbitMQ 当前投递的确认标识
+     * @param handler 调用方提供的 {@code handler} 值
+     * @throws IOException I/O 操作失败或消息确认无法完成时抛出
+     */
     private void processCorrelated(
             String consumerName,
             String expectedEventType,
@@ -239,6 +289,20 @@ public final class ReliableMessageProcessor {
         }
     }
 
+    /**
+     * 处理 ReliableMessageProcessor 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @param original 调用方提供的 {@code original} 值
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag RabbitMQ 当前投递的确认标识
+     * @param handler 调用方提供的 {@code handler} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param permanent 调用方提供的 {@code permanent} 值
+     * @throws IOException I/O 操作失败或消息确认无法完成时抛出
+     */
     private void handleFailure(
             String consumerName,
             MessageEnvelope envelope,
@@ -302,6 +366,17 @@ public final class ReliableMessageProcessor {
         }
     }
 
+    /**
+     * 执行 ReliableMessageProcessor 中的 deadWithoutHandler 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @param original 调用方提供的 {@code original} 值
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag RabbitMQ 当前投递的确认标识
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @throws IOException I/O 操作失败或消息确认无法完成时抛出
+     */
     private void deadWithoutHandler(
             String consumerName,
             MessageEnvelope envelope,
@@ -335,6 +410,17 @@ public final class ReliableMessageProcessor {
         }
     }
 
+    /**
+     * 执行 ReliableMessageProcessor 中的 rejectMalformedEnvelope 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param expectedEventType 调用方提供的 {@code expectedEventType} 值
+     * @param original 调用方提供的 {@code original} 值
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag RabbitMQ 当前投递的确认标识
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @throws IOException I/O 操作失败或消息确认无法完成时抛出
+     */
     private void rejectMalformedEnvelope(
             String consumerName,
             String expectedEventType,

@@ -110,6 +110,7 @@
 </template>
 
 <script setup>
+/** Login 身份页面，维护输入校验、认证请求和安全错误提示。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { reactive, ref } from 'vue';
 import { resetCsrfToken } from '@/api/client';
@@ -143,10 +144,12 @@ const {
   buildRequest: () => ({ email: findForm.email, purpose: 'PASSWORD_RESET' }),
 });
 
+/** 校验 isEmail 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+/** 校验 validateLoginField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function validateLoginField(field) {
   if (field === 'email') {
     fieldErrors.email = !form.email ? '请输入邮箱' : !isEmail(form.email) ? '请输入正确的邮箱地址' : '';
@@ -156,12 +159,14 @@ function validateLoginField(field) {
   }
 }
 
+/** 校验 validateLoginForm 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function validateLoginForm() {
   validateLoginField('email');
   validateLoginField('password');
   return !fieldErrors.email && !fieldErrors.password;
 }
 
+/** login 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function login() {
   formError.value = '';
   if (!validateLoginForm()) {
@@ -194,11 +199,13 @@ async function login() {
   }
 }
 
+/** 响应 openFindPassword 导航或界面事件，更新当前组件的受控展示状态。 */
 function openFindPassword() {
   recoveryError.value = '';
   findPwdDialog.value = true;
 }
 
+/** 校验 validateRecoveryField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function validateRecoveryField(field) {
   if (field === 'email') {
     recoveryErrors.email = !findForm.email ? '请输入邮箱' : !isEmail(findForm.email) ? '请输入正确的邮箱地址' : '';
@@ -213,6 +220,7 @@ function validateRecoveryField(field) {
   }
 }
 
+/** 读取 getVCode 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function getVCode() {
   recoveryError.value = '';
   validateRecoveryField('email');
@@ -234,6 +242,7 @@ async function getVCode() {
   }
 }
 
+/** findPassword 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function findPassword() {
   recoveryError.value = '';
   validateRecoveryField('email');

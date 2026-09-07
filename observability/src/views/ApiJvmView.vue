@@ -1,4 +1,5 @@
 <script setup>
+/** API 与 JVM 页面，固定展示对应观测仪表板。 */
 import DashboardPage from '@/components/DashboardPage.vue';
 </script>
 

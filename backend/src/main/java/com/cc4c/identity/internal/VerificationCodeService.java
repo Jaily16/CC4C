@@ -19,8 +19,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * VerificationCodeService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
+ */
 @Service
-/** VerificationCodeService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public class VerificationCodeService {
     private static final Duration VALIDITY = Duration.ofMinutes(10);
     private static final DefaultRedisScript<Long> CONSUME_SCRIPT = new DefaultRedisScript<>(
@@ -69,6 +71,17 @@ public class VerificationCodeService {
     private final TransactionalOutbox outbox;
     private final String keyPrefix;
 
+    /**
+     * 创建 VerificationCodeService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param generator 调用方提供的 {@code generator} 值
+     * @param userMapper 调用方提供的 {@code userMapper} 值
+     * @param redis 调用方提供的 {@code redis} 值
+     * @param hasher 调用方提供的 {@code hasher} 值
+     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
+     * @param outbox 调用方提供的 {@code outbox} 值
+     * @param properties 调用方提供的 {@code properties} 值
+     */
     VerificationCodeService(
             VerificationCodeGenerator generator,
             UserMapper userMapper,
@@ -86,6 +99,13 @@ public class VerificationCodeService {
         this.keyPrefix = properties.keyPrefix();
     }
 
+    /**
+     * 按既有可靠消息或邮件协议发送数据，并保留调用方可观察的失败语义。
+     *
+     * @param recipient 调用方提供的 {@code recipient} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean send(String recipient, VerificationPurpose purpose) {
         String normalizedEmail = normalize(recipient);
@@ -108,6 +128,13 @@ public class VerificationCodeService {
         return true;
     }
 
+    /**
+     * 处理 VerificationCodeService 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @param code 调用方提供的 {@code code} 值
+     */
     public void consume(String email, VerificationPurpose purpose, String code) {
         String normalizedEmail = normalize(email);
         Long result = redis.execute(
@@ -118,6 +145,17 @@ public class VerificationCodeService {
         }
     }
 
+    /**
+     * 执行 VerificationCodeService 中的 activateForDelivery 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @param code 调用方提供的 {@code code} 值
+     * @param eventId 目标对象的稳定标识
+     * @param issuedAt 调用方提供的 {@code issuedAt} 值
+     * @param expiresAt 调用方提供的 {@code expiresAt} 值
+     * @return 当前条件是否成立
+     */
     public boolean activateForDelivery(
             String email,
             VerificationPurpose purpose,
@@ -140,18 +178,46 @@ public class VerificationCodeService {
         return result != null && result == 1;
     }
 
+    /**
+     * 执行 VerificationCodeService 中的 discardIfCurrent 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @param eventId 目标对象的稳定标识
+     */
     public void discardIfCurrent(String email, VerificationPurpose purpose, String eventId) {
         redis.execute(DISCARD_SCRIPT, List.of(key(normalize(email), purpose)), eventId);
     }
 
+    /**
+     * 执行 VerificationCodeService 中的 key 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String key(String email, VerificationPurpose purpose) {
         return keyPrefix + ":verification:" + purpose.name().toLowerCase(Locale.ROOT) + ":" + hasher.hash(email);
     }
 
+    /**
+     * 执行 VerificationCodeService 中的 digest 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @param purpose 调用方提供的 {@code purpose} 值
+     * @param code 调用方提供的 {@code code} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String digest(String email, VerificationPurpose purpose, String code) {
         return hasher.hash(email + ":" + purpose.name() + ":" + code);
     }
 
+    /**
+     * 按 VerificationCodeService 的既定规则转换输入，不记录凭据或敏感原文。
+     *
+     * @param email 调用方提供的 {@code email} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }

@@ -63,6 +63,7 @@
 </template>
 
 <script setup>
+/** UserInfoView 页面组件，协调当前路由的展示状态和用户事件。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { getCurrentUser } from '@/api/profile';
@@ -86,9 +87,12 @@ const languages = {
   3: 'Python',
   4: 'C',
 };
+/** 从现有响应式状态派生 majorLabel，不发起请求或写入外部数据。 */
 const majorLabel = computed(() => majors[String(user.value.major)] || '未设置');
+/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
 const languageLabel = computed(() => languages[Number(user.value.language)] || '未设置');
 
+/** syncStore 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function syncStore(currentUser) {
   store.commit('SET_ID', currentUser.id);
   store.commit('SET_NAME', currentUser.name);
@@ -98,6 +102,7 @@ function syncStore(currentUser) {
   store.commit('SET_AVATAR', currentUser.avatar);
 }
 
+/** 读取 loadProfile 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadProfile() {
   loading.value = true;
   errorMessage.value = '';

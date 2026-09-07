@@ -20,10 +20,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * ObservabilitySecurityConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
+ */
 @ManagementContextConfiguration(proxyBeanMethods = false)
-/** ObservabilitySecurityConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。 */
 public class ObservabilitySecurityConfiguration {
 
+    /**
+     * 执行 ObservabilitySecurityConfiguration 中的 observabilityAuthenticationManager 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param properties 调用方提供的 {@code properties} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Bean("observabilityAuthenticationManager")
     AuthenticationManager observabilityAuthenticationManager(ObservabilityProperties properties) {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
@@ -37,6 +45,15 @@ public class ObservabilitySecurityConfiguration {
         return new ProviderManager(provider);
     }
 
+    /**
+     * 执行 ObservabilitySecurityConfiguration 中的 observabilitySecurityFilterChain 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param http 调用方提供的 {@code http} 值
+     * @param observabilityAuthenticationManager 调用方提供的 {@code observabilityAuthenticationManager} 值
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @return 按当前声明计算、查询或转换得到的结果
+     * @throws Exception 既有声明所描述的失败条件发生时抛出
+     */
     @Bean
     @Order(1)
     SecurityFilterChain observabilitySecurityFilterChain(

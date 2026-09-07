@@ -9,9 +9,18 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+/**
+ * 定义课程目录的 MyBatis 持久化及结果映射边界。
+ */
 @Mapper
 interface CatalogMapper extends BaseMapper<CourseEntity> {
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param page 从零或接口约定起算的页码
+     * @return 当前操作产生的 IPage<CourseEntity> 结果
+     */
     @Select(
             """
             SELECT c.course_id, c.course_name, c.language_name, c.description, c.level, c.state, c.deleted,
@@ -24,9 +33,21 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             """)
     IPage<CourseEntity> selectHome(Page<CourseEntity> page);
 
+    /**
+     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 按当前协议生成或读取的字符串值
+     */
     @Select("SELECT language_name FROM programming_language WHERE language_id = #{languageId} AND deleted = 0")
     String findLanguageName(int languageId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 按当前方法约定返回结果集合
+     */
     @Select(
             """
             SELECT language_id, priority, module_name, level
@@ -36,6 +57,14 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             """)
     List<CourseModuleRow> selectModules(int languageId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param minimum 调用方提供的 {@code minimum} 值
+     * @param maximum 调用方提供的 {@code maximum} 值
+     * @return 按当前方法约定返回结果集合
+     */
     @Select(
             """
             SELECT language_id, priority, module_name, level
@@ -46,6 +75,12 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
     List<CourseModuleRow> selectModulesForRecommendation(
             @Param("languageId") int languageId, @Param("minimum") int minimum, @Param("maximum") int maximum);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 按当前方法约定返回结果集合
+     */
     @Select(
             """
             SELECT mc.priority, c.course_name
@@ -56,6 +91,14 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             """)
     List<ModuleCourseNameRow> selectCourseNamesByLanguage(int languageId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param minimum 调用方提供的 {@code minimum} 值
+     * @param maximum 调用方提供的 {@code maximum} 值
+     * @return 按当前方法约定返回结果集合
+     */
     @Select(
             """
             SELECT mc.priority, c.course_name
@@ -69,6 +112,13 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
     List<ModuleCourseNameRow> selectRecommendedCourseNamesByLanguage(
             @Param("languageId") int languageId, @Param("minimum") int minimum, @Param("maximum") int maximum);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param priority 调用方提供的 {@code priority} 值
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Select(
             """
             SELECT COUNT(*)
@@ -77,6 +127,15 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             """)
     boolean moduleExists(@Param("languageId") int languageId, @Param("priority") int priority);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param priority 调用方提供的 {@code priority} 值
+     * @param moduleName 调用方提供的 {@code moduleName} 值
+     * @param level 调用方提供的 {@code level} 值
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert(
             """
             INSERT INTO course_module(language_id, priority, module_name, level)
@@ -88,6 +147,14 @@ interface CatalogMapper extends BaseMapper<CourseEntity> {
             @Param("moduleName") String moduleName,
             @Param("level") int level);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param priority 调用方提供的 {@code priority} 值
+     * @param courseId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert(
             """
             INSERT INTO module_course(language_id, priority, course_id)

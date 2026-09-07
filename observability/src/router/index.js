@@ -34,6 +34,7 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 });
 
+/** 在路由进入前恢复观测 Session，并按认证状态限制登录页与受保护页面。 */
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
   await auth.hydrate();

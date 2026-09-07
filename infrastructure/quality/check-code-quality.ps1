@@ -1,5 +1,6 @@
 #requires -Version 7.0
 # 运行前提：Java、Maven、Node 和前端开发依赖已由调用方准备好；本脚本不安装依赖。
+# 外部依赖：调用本机 Java 21、Maven、Node、npm、Git 与 PowerShell 7，不连接业务外部服务。
 # 破坏性边界：本脚本只执行检查命令，不读取本机秘密、不启动服务、不修改源文件。
 # 失败恢复：任一步返回非零码即停止，保留检查输出；调用方应保留现场并先解决失败原因。
 # 退出码：所有检查成功返回 0，任一步失败返回该检查的非零码。
@@ -31,6 +32,8 @@ function Invoke-QualityStep {
 }
 
 try {
+    Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'pwsh' -Arguments @('-NoProfile', '-File', 'infrastructure/quality/check-powershell-quality.ps1')
+    Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'java' -Arguments @('--source', '21', 'infrastructure/quality/JavaCommentCoverage.java', '--repository-root', '.')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'backend') -Command 'mvn' -Arguments @('-B', '-ntp', 'spotless:check')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'frontend') -Command 'npm' -Arguments @('run', 'lint')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'frontend') -Command 'npm' -Arguments @('run', 'format:check')

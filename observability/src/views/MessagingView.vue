@@ -1,4 +1,5 @@
 <script setup>
+/** 异步消息页面，固定展示消息链路观测仪表板。 */
 import DashboardPage from '@/components/DashboardPage.vue';
 </script>
 

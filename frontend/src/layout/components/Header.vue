@@ -26,6 +26,7 @@
 </template>
 
 <script setup>
+/** 业务顶栏组件，展示会话身份并提供登录、退出与导航入口。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { resetCsrfToken } from '@/api/client';
 import { logoutUser } from '@/api/auth';
@@ -45,6 +46,7 @@ const navItems = [
   { label: '所有博客', to: '/allBlogs' },
 ];
 
+/** 处理 logout 清理操作，仅影响当前功能明确指向的状态或资源。 */
 async function logout() {
   try {
     const resp = await logoutUser();
@@ -64,6 +66,7 @@ async function logout() {
   }
 }
 
+/** 响应 flyToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
 function flyToLogin() {
   router.push('/login');
 }

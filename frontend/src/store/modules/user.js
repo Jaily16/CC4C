@@ -98,6 +98,7 @@
 import { getSession } from '../../api/auth.js';
 import { getCurrentUser } from '../../api/profile.js';
 
+/** 读取 getDefaultState 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 const getDefaultState = () => {
   return {
     authenticated: false,

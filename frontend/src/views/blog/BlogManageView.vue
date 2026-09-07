@@ -122,6 +122,7 @@ const pageSize = 10;
 const total = ref(0);
 const deletingBlogId = ref(null);
 
+/** 从现有响应式状态派生 stateCounts，不发起请求或写入外部数据。 */
 const stateCounts = computed(() =>
   blogList.value.reduce(
     (counts, blog) => {
@@ -134,6 +135,7 @@ const stateCounts = computed(() =>
   ),
 );
 
+/** statusInfo 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function statusInfo(state) {
   return (
     {
@@ -154,6 +156,7 @@ function statusInfo(state) {
   );
 }
 
+/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -167,10 +170,12 @@ function formatDate(value) {
   }).format(date);
 }
 
+/** blogIdentity 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function blogIdentity(value) {
   return value == null ? '' : String(value);
 }
 
+/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 async function verifyUser() {
   try {
     const resp = await getSession();
@@ -187,6 +192,7 @@ async function verifyUser() {
   }
 }
 
+/** 读取 loadBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
@@ -206,15 +212,18 @@ async function loadBlogs() {
   }
 }
 
+/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function changePage(page) {
   currentPage.value = page;
   return loadBlogs();
 }
 
+/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
 function openBlog(blogId) {
   router.push({ path: '/blogDetail', query: { blogId } });
 }
 
+/** writeBlog 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function writeBlog() {
   router.push('/blogWrite');
 }

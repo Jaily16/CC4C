@@ -1,4 +1,5 @@
 <script setup>
+/** 运行总览页面，轮询并呈现八项固定关键指标。 */
 import MetricCard from '@/components/MetricCard.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import TimeRangeToolbar from '@/components/TimeRangeToolbar.vue';

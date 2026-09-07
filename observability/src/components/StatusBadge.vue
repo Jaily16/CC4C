@@ -1,11 +1,14 @@
 <script setup>
+/** 观测状态徽标，把有限状态映射为统一中文标签和视觉语义。 */
 import { computed } from 'vue';
 
 const props = defineProps({
   status: { type: String, default: 'UNKNOWN' },
 });
 
+/** 从现有响应式状态派生 normalized，不发起请求或写入外部数据。 */
 const normalized = computed(() => props.status.toUpperCase());
+/** 从现有响应式状态派生 label，不发起请求或写入外部数据。 */
 const label = computed(() => {
   const labels = {
     AVAILABLE: '可用',
@@ -27,6 +30,7 @@ const label = computed(() => {
   return labels[normalized.value] ?? '未知';
 });
 
+/** 从现有响应式状态派生 tone，不发起请求或写入外部数据。 */
 const tone = computed(() => {
   if (['AVAILABLE', 'UP', 'INACTIVE', 'OK'].includes(normalized.value)) return 'success';
   if (['PARTIAL', 'EMPTY', 'DEGRADED', 'PENDING', 'UNKNOWN', 'MISSING'].includes(normalized.value)) return 'warning';

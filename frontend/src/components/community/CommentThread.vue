@@ -121,6 +121,7 @@
 </template>
 
 <script setup>
+/** 评论线程组件，呈现分页评论与回复入口并转发互动事件。 */
 const props = defineProps({
   label: { type: String, default: '评论' },
   loggedIn: { type: Boolean, default: false },
@@ -163,10 +164,12 @@ const emit = defineEmits([
   'login',
 ]);
 
+/** commentInitial 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function commentInitial(name) {
   return (name || '用户').trim().slice(0, 1).toUpperCase();
 }
 
+/** 把现有数据转换为 formatCommentTime 所需展示结构，不产生外部副作用。 */
 function formatCommentTime(value) {
   return props.formatTime(value);
 }

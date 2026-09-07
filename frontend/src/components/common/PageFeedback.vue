@@ -33,6 +33,7 @@
 </template>
 
 <script setup>
+/** 页面反馈组件，统一呈现加载、空数据和失败重试状态。 */
 defineProps({
   loading: {
     type: Boolean,

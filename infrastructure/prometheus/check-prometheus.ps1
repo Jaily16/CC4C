@@ -1,5 +1,6 @@
 #requires -Version 7.0
 # 运行前提：用户已提供 promtool 绝对路径，外部 Prometheus 已启动；脚本不加载任何 .env.local。
+# 外部依赖：依赖用户指定的 promtool 和外部 Prometheus 公开 HTTP API，不读取其私有配置或数据目录。
 # 破坏性边界：仅校验仓库公开模板和规则，并只读查询就绪、版本及可选的 backend up 指标。
 # 失败恢复：失败即停止，不读取外部私有配置，不启动、停止、重载 Prometheus 或访问其数据目录。
 # 退出码：所选静态与只读检查全部通过为 0，否则为 1。

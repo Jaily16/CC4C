@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.util.Date;
 import lombok.Data;
 
+/**
+ * 映射博客社区数据库记录，字段语义与现有表结构保持一致。
+ */
 @Data
 @TableName("blog")
 class BlogEntity {

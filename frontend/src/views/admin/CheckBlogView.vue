@@ -118,6 +118,7 @@
 </template>
 
 <script setup>
+/** CheckBlogView 管理页面，协调管理员只可访问的查询与操作状态。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { getBlog, listPendingBlogs, reviewBlog } from '@/api/community';
@@ -142,6 +143,7 @@ const currentPage = ref(1);
 const pageSize = 10;
 const total = ref(0);
 
+/** 把现有数据转换为 formatDateTime 所需展示结构，不产生外部副作用。 */
 function formatDateTime(value) {
   if (!value) return '时间未知';
   const date = new Date(value);
@@ -155,6 +157,7 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+/** 读取 loadPendingBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadPendingBlogs() {
   loading.value = true;
   errorMessage.value = '';
@@ -172,6 +175,7 @@ async function loadPendingBlogs() {
   }
 }
 
+/** 响应 selectBlog 导航或界面事件，更新当前组件的受控展示状态。 */
 async function selectBlog(blog) {
   if (operationAction.value) return;
   selectedBlog.value = blog;
@@ -194,12 +198,14 @@ async function selectBlog(blog) {
   }
 }
 
+/** 处理 resetSelection 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function resetSelection() {
   selectedBlog.value = null;
   text.value = '';
   detailError.value = '';
 }
 
+/** confirmDecision 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function confirmDecision(action) {
   if (!selectedBlog.value || operationAction.value) return;
   const approve = action === 'approve';
@@ -222,6 +228,7 @@ async function confirmDecision(action) {
   await submitDecision(action);
 }
 
+/** 处理 submitDecision 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function submitDecision(action) {
   operationAction.value = action;
   try {
@@ -243,6 +250,7 @@ async function submitDecision(action) {
   }
 }
 
+/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function changePage(page) {
   currentPage.value = page;
   resetSelection();

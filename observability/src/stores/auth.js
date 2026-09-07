@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import * as authApi from '@/api/auth.js';
 import { safeMessage } from '@/api/client.js';
 
+/** useAuthStore 集中维护本领域的加载、成功、失败和会话状态，供页面共享。 */
 export const useAuthStore = defineStore('observability-auth', {
   state: () => ({
     hydrated: false,

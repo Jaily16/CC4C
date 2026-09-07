@@ -9,10 +9,23 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.web.multipart.MultipartFile;
 
-/** FileStorage 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
+/**
+ * FileStorage 负责共享基础设施的一项明确运行职责，并保持现有外部行为不变。
+ */
 public final class FileStorage {
+    /**
+     * 创建 FileStorage 实例，不触发外部 I/O。
+     */
     private FileStorage() {}
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param file 待校验或保存的上传文件
+     * @param storageBase 调用方提供的 {@code storageBase} 值
+     * @param requestBase 调用方提供的 {@code requestBase} 值
+     * @return 当前操作产生的 StoredFile 结果
+     */
     public static StoredFile storeImage(MultipartFile file, String storageBase, String requestBase) {
         String originalName = file.getOriginalFilename();
         if (file.isEmpty() || originalName == null || originalName.isBlank()) {
@@ -55,6 +68,11 @@ public final class FileStorage {
         return new StoredFile(target, url);
     }
 
-    /** StoredFile 是不可变的数据载体，保持现有字段语义和序列化契约。 */
+    /**
+     * StoredFile 以不可变结构承载共享基础设施数据，并保持现有字段语义。
+     *
+     * @param path 已验证边界内的文件或请求路径
+     * @param requestUrl 调用方提供的 {@code requestUrl} 值
+     */
     public record StoredFile(Path path, String requestUrl) {}
 }

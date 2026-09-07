@@ -116,6 +116,7 @@
 </template>
 
 <script setup>
+/** HomeView 页面组件，协调当前路由的展示状态和用户事件。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -134,6 +135,7 @@ const blogsLoading = ref(false);
 const coursesError = ref('');
 const blogsError = ref('');
 
+/** blogSummary 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
 }
@@ -147,6 +149,7 @@ const courseLevelLabels = {
   66: '难度：必须展示',
 };
 
+/** courseDifficulty 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function courseDifficulty(course) {
   const level = course.level ?? course.difficulty;
   if (level === null || level === undefined || level === '') {
@@ -155,6 +158,7 @@ function courseDifficulty(course) {
   return courseLevelLabels[String(level)] || '系统化学习路径';
 }
 
+/** 读取 loadCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadCourses() {
   coursesLoading.value = true;
   coursesError.value = '';
@@ -170,6 +174,7 @@ async function loadCourses() {
   }
 }
 
+/** 读取 loadBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadBlogs() {
   blogsLoading.value = true;
   blogsError.value = '';
@@ -185,10 +190,12 @@ async function loadBlogs() {
   }
 }
 
+/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
+/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
 async function openBlog(blogId) {
   try {
     await incrementBlogClick(blogId);

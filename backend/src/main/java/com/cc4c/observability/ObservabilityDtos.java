@@ -7,11 +7,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/** ObservabilityDtos 定义独立观测接口的脱敏、只读传输契约。 */
+/**
+ * 集中声明独立观测门户接口请求与响应的数据结构，不承载业务流程。
+ */
 public final class ObservabilityDtos {
+    /**
+     * 创建 ObservabilityDtos 实例，不触发外部 I/O。
+     */
     private ObservabilityDtos() {}
 
-    /** SourceStatus 表示固定数据源整体可用性，不携带内部异常。 */
+    /**
+     * SourceStatus 枚举独立观测门户的有限状态或协议取值。
+     */
     public enum SourceStatus {
         AVAILABLE,
         PARTIAL,
@@ -19,42 +26,105 @@ public final class ObservabilityDtos {
         UNAVAILABLE
     }
 
-    /** PanelStatus 表示单个固定面板的查询结果。 */
+    /**
+     * PanelStatus 枚举独立观测门户的有限状态或协议取值。
+     */
     public enum PanelStatus {
         OK,
         EMPTY,
         ERROR
     }
 
-    /** LoginRequest 仅接收配置账户凭据，密码不会进入响应或日志。 */
+    /**
+     * 承载独立观测门户接口的输入字段与声明式校验约束。
+     *
+     * @param username 待认证或查询的账户名
+     * @param password 仅用于当前安全校验的密码或密码摘要
+     */
     public record LoginRequest(
             @NotBlank @Size(max = 64) String username,
             @NotBlank @Size(min = 1, max = 64) @Schema(accessMode = Schema.AccessMode.WRITE_ONLY) String password) {}
 
-    /** ObservabilityCsrfResponse 向内存中的前端客户端交付专用请求头名称和一次 CSRF Token。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param headerName 调用方提供的 {@code headerName} 值
+     * @param token 当前协议使用且不得记录的安全令牌
+     */
     public record ObservabilityCsrfResponse(String headerName, String token) {}
 
-    /** SessionResponse 描述独立观测 Session，不暴露 Cookie 或 Redis 标识。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param authenticated 调用方提供的 {@code authenticated} 值
+     * @param role 当前身份的固定角色
+     * @param username 待认证或查询的账户名
+     * @param idleExpiresAt 当前操作使用的时间点
+     * @param absoluteExpiresAt 当前操作使用的时间点
+     */
     public record SessionResponse(
             boolean authenticated, String role, String username, Instant idleExpiresAt, Instant absoluteExpiresAt) {}
 
-    /** LoginResponse 确认登录结果及当前 Session 期限。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param role 当前身份的固定角色
+     * @param username 待认证或查询的账户名
+     * @param idleExpiresAt 当前操作使用的时间点
+     * @param absoluteExpiresAt 当前操作使用的时间点
+     */
     public record LoginResponse(String role, String username, Instant idleExpiresAt, Instant absoluteExpiresAt) {}
 
-    /** MetricCardResponse 表示总览中的一个固定指标。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param unit 调用方提供的 {@code unit} 值
+     * @param status 当前对象或流程的有限状态
+     * @param value 待处理或存储的值
+     * @param message 当前处理的消息或用户提示
+     */
     public record MetricCardResponse(
             String id, String title, String unit, PanelStatus status, Double value, String message) {}
 
-    /** OverviewResponse 汇总八个固定运行指标。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param generatedAt 当前操作使用的时间点
+     * @param sourceStatus 调用方提供的 {@code sourceStatus} 值
+     * @param metrics 调用方提供的 {@code metrics} 值
+     */
     public record OverviewResponse(Instant generatedAt, SourceStatus sourceStatus, List<MetricCardResponse> metrics) {}
 
-    /** PointResponse 表示毫秒时间戳和可空数值；非有限值统一转换为空。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param timestamp 调用方提供的 {@code timestamp} 值
+     * @param value 待处理或存储的值
+     */
     public record PointResponse(long timestamp, Double value) {}
 
-    /** SeriesResponse 只包含 catalog 允许的标签和有界点集。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param name 调用方提供的 {@code name} 值
+     * @param labels 调用方提供的 {@code labels} 值
+     * @param points 调用方提供的 {@code points} 值
+     */
     public record SeriesResponse(String name, Map<String, String> labels, List<PointResponse> points) {}
 
-    /** PanelResponse 表示固定面板、脱敏状态和最多四组查询结果。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param unit 调用方提供的 {@code unit} 值
+     * @param status 当前对象或流程的有限状态
+     * @param series 调用方提供的 {@code series} 值
+     * @param truncated 调用方提供的 {@code truncated} 值
+     * @param message 当前处理的消息或用户提示
+     */
     public record PanelResponse(
             String id,
             String title,
@@ -64,7 +134,17 @@ public final class ObservabilityDtos {
             boolean truncated,
             String message) {}
 
-    /** DashboardResponse 表示一个固定 Dashboard 在受限时间范围内的结果。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param range 调用方提供的 {@code range} 值
+     * @param stepSeconds 调用方提供的 {@code stepSeconds} 值
+     * @param generatedAt 当前操作使用的时间点
+     * @param sourceStatus 调用方提供的 {@code sourceStatus} 值
+     * @param panels 调用方提供的 {@code panels} 值
+     */
     public record DashboardResponse(
             String id,
             String title,
@@ -74,7 +154,18 @@ public final class ObservabilityDtos {
             SourceStatus sourceStatus,
             List<PanelResponse> panels) {}
 
-    /** AlertRuleResponse 将规则状态映射为固定中文元数据，不返回 PromQL 或 lastError。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param description 面向用户展示的说明文本
+     * @param severity 调用方提供的 {@code severity} 值
+     * @param state 调用方提供的 {@code state} 值
+     * @param health 调用方提供的 {@code health} 值
+     * @param lastEvaluationAt 当前操作使用的时间点
+     * @param message 当前处理的消息或用户提示
+     */
     public record AlertRuleResponse(
             String id,
             String title,
@@ -85,7 +176,17 @@ public final class ObservabilityDtos {
             Instant lastEvaluationAt,
             String message) {}
 
-    /** AlertsResponse 汇总 catalog 中精确二十条告警。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param generatedAt 当前操作使用的时间点
+     * @param sourceStatus 调用方提供的 {@code sourceStatus} 值
+     * @param expected 调用方提供的 {@code expected} 值
+     * @param loaded 调用方提供的 {@code loaded} 值
+     * @param firing 调用方提供的 {@code firing} 值
+     * @param pending 调用方提供的 {@code pending} 值
+     * @param rules 调用方提供的 {@code rules} 值
+     */
     public record AlertsResponse(
             Instant generatedAt,
             SourceStatus sourceStatus,
@@ -95,10 +196,26 @@ public final class ObservabilityDtos {
             int pending,
             List<AlertRuleResponse> rules) {}
 
-    /** DependencyItemResponse 只公开依赖名称和归一化状态。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param id 调用方提供的 {@code id} 值
+     * @param title 当前博客或课程的标题
+     * @param status 当前对象或流程的有限状态
+     * @param message 当前处理的消息或用户提示
+     */
     public record DependencyItemResponse(String id, String title, String status, String message) {}
 
-    /** DependenciesResponse 汇总应用可用性、依赖与请求关联标识。 */
+    /**
+     * 承载独立观测门户接口的脱敏响应字段，不暴露内部凭据或异常。
+     *
+     * @param overall 调用方提供的 {@code overall} 值
+     * @param checkedAt 当前操作使用的时间点
+     * @param requestId 目标对象的稳定标识
+     * @param liveness 调用方提供的 {@code liveness} 值
+     * @param readiness 调用方提供的 {@code readiness} 值
+     * @param dependencies 调用方提供的 {@code dependencies} 值
+     */
     public record DependenciesResponse(
             String overall,
             Instant checkedAt,

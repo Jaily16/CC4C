@@ -24,8 +24,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * InteractionService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
+ */
 @Service
-/** InteractionService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public class InteractionService {
     private final InteractionMapper mapper;
     private final IdentityLookup identityLookup;
@@ -35,6 +37,16 @@ public class InteractionService {
     private final RedisRateLimiter rateLimiter;
     private final InteractionCommentAssembler commentAssembler;
 
+    /**
+     * 创建 InteractionService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param mapper 调用方提供的 {@code mapper} 值
+     * @param identityLookup 调用方提供的 {@code identityLookup} 值
+     * @param catalogLookup 调用方提供的 {@code catalogLookup} 值
+     * @param communityLookup 调用方提供的 {@code communityLookup} 值
+     * @param currentActor 调用方提供的 {@code currentActor} 值
+     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
+     */
     InteractionService(
             InteractionMapper mapper,
             IdentityLookup identityLookup,
@@ -51,6 +63,12 @@ public class InteractionService {
         this.commentAssembler = new InteractionCommentAssembler(mapper);
     }
 
+    /**
+     * 执行 InteractionService 中的 favoriteCourse 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param courseId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean favoriteCourse(int courseId) {
         long userId = currentActor.requiredUserId();
@@ -66,6 +84,12 @@ public class InteractionService {
         return true;
     }
 
+    /**
+     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     *
+     * @param courseId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean removeCourseFavorite(int courseId) {
         long userId = currentActor.requiredUserId();
@@ -76,10 +100,22 @@ public class InteractionService {
         return true;
     }
 
+    /**
+     * 判断 InteractionService 中与 isCourseFavorite 对应的条件是否成立。
+     *
+     * @param courseId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     public boolean isCourseFavorite(int courseId) {
         return mapper.courseFavoriteExists(currentActor.requiredUserId(), courseId);
     }
 
+    /**
+     * 执行 InteractionService 中的 courseFavorites 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CourseFavoriteSummary> courseFavorites(PageQuery query) {
         long userId = currentActor.requiredUserId();
         requireUser(userId);
@@ -94,6 +130,12 @@ public class InteractionService {
                 page.getTotal());
     }
 
+    /**
+     * 执行 InteractionService 中的 favoriteBlog 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean favoriteBlog(long blogId) {
         long userId = currentActor.requiredUserId();
@@ -113,6 +155,12 @@ public class InteractionService {
         return true;
     }
 
+    /**
+     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean removeBlogFavorite(long blogId) {
         long userId = currentActor.requiredUserId();
@@ -122,10 +170,22 @@ public class InteractionService {
         return true;
     }
 
+    /**
+     * 判断 InteractionService 中与 isBlogFavorite 对应的条件是否成立。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     public boolean isBlogFavorite(long blogId) {
         return mapper.blogFavoriteExists(currentActor.requiredUserId(), blogId);
     }
 
+    /**
+     * 执行 InteractionService 中的 blogFavorites 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogSummary> blogFavorites(PageQuery query) {
         long userId = currentActor.requiredUserId();
         requireUser(userId);
@@ -145,6 +205,12 @@ public class InteractionService {
                 page.getTotal());
     }
 
+    /**
+     * 执行 InteractionService 中的 commentCourse 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public CommentResponse commentCourse(CourseCommentRequest request) {
         long userId = currentActor.requiredUserId();
@@ -158,6 +224,12 @@ public class InteractionService {
         return commentAssembler.toCreatedResponse(comment, user, null, 0, null);
     }
 
+    /**
+     * 执行 InteractionService 中的 commentBlog 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public CommentResponse commentBlog(BlogCommentRequest request) {
         long userId = currentActor.requiredUserId();
@@ -173,6 +245,12 @@ public class InteractionService {
         return commentAssembler.toCreatedResponse(comment, user, null, 0, null);
     }
 
+    /**
+     * 执行 InteractionService 中的 reply 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public CommentResponse reply(ReplyCommentRequest request) {
         long userId = currentActor.requiredUserId();
@@ -196,6 +274,12 @@ public class InteractionService {
         return commentAssembler.toCreatedResponse(comment, user, request.fatherId(), layer, fatherName);
     }
 
+    /**
+     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     *
+     * @param commentId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean deleteComment(long commentId) {
         long userId = currentActor.requiredUserId();
@@ -210,6 +294,13 @@ public class InteractionService {
         return true;
     }
 
+    /**
+     * 执行 InteractionService 中的 courseComments 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param courseId 目标对象的稳定标识
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CommentResponse> courseComments(int courseId, PageQuery query) {
         if (!catalogLookup.courseExists(courseId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Course does not exist");
@@ -217,6 +308,13 @@ public class InteractionService {
         return commentAssembler.assemble(mapper.selectCourseComments(new Page<>(query.page(), query.size()), courseId));
     }
 
+    /**
+     * 执行 InteractionService 中的 blogComments 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CommentResponse> blogComments(long blogId, PageQuery query) {
         if (communityLookup.findBlog(blogId).isEmpty()) {
             throw new BusinessException(HttpStatus.NOT_FOUND, BusinessCode.NOT_FOUND, "Blog does not exist");
@@ -224,6 +322,13 @@ public class InteractionService {
         return commentAssembler.assemble(mapper.selectBlogComments(new Page<>(query.page(), query.size()), blogId));
     }
 
+    /**
+     * 执行 InteractionService 中的 insertComment 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param content 调用方提供的 {@code content} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private CommentEntity insertComment(long userId, String content) {
         CommentEntity comment = new CommentEntity();
         comment.setUserId(userId);
@@ -234,10 +339,22 @@ public class InteractionService {
         return comment;
     }
 
+    /**
+     * 校验 InteractionService 中与 requireUser 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private UserSnapshot requireUser(long userId) {
         return identityLookup.findUser(userId).orElseThrow(() -> unprocessable("User does not exist"));
     }
 
+    /**
+     * 执行 InteractionService 中的 unprocessable 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param message 待处理的消息及其属性
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private BusinessException unprocessable(String message) {
         return new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, BusinessCode.UNPROCESSABLE_ENTITY, message);
     }

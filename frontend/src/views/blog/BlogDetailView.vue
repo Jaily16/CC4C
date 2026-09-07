@@ -180,6 +180,7 @@ const isCommentOpen = ref(false);
 const catalogOpen = ref(false);
 
 const { isUser: loggedIn } = useCurrentUser();
+/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
 const userInitial = computed(() => commentInitial(store.state.user.name));
 const commentThread = useCommentThread({
   subjectId: () => blogData.value?.blogId,
@@ -225,7 +226,9 @@ const {
   changeCommentPage,
   resetComments,
 } = commentThread;
+/** 从现有响应式状态派生 authorLabel，不发起请求或写入外部数据。 */
 const authorLabel = computed(() => blogData.value?.poster || blogData.value?.author || '社区作者');
+/** 从现有响应式状态派生 statusInfo，不发起请求或写入外部数据。 */
 const statusInfo = computed(
   () =>
     ({
@@ -234,6 +237,7 @@ const statusInfo = computed(
       1: { label: '已发布', type: 'success' },
     })[String(blogData.value?.state)] || { label: '状态未知', type: 'info' },
 );
+/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
 const languageLabel = computed(() => {
   const names = { 1: 'Java', 2: 'C++', 3: 'Python', 4: 'C' };
   const values = blogData.value?.languageList;
@@ -241,6 +245,7 @@ const languageLabel = computed(() => {
   return values.map((value) => names[value] || value).join(' · ');
 });
 
+/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -254,25 +259,31 @@ function formatDate(value) {
   }).format(date);
 }
 
+/** commentInitial 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function commentInitial(name) {
   return (name || '用户').trim().slice(0, 1).toUpperCase();
 }
 
+/** 响应 backToBlogs 导航或界面事件，更新当前组件的受控展示状态。 */
 function backToBlogs() {
   router.push('/allBlogs');
 }
 
+/** 响应 goToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
 function goToLogin() {
   ElMessage.warning('登录后即可收藏博客和参与评论');
   router.push('/login');
 }
 
+/** 响应 closeCatalogAfterNavigation 导航或界面事件，更新当前组件的受控展示状态。 */
 function closeCatalogAfterNavigation() {
+  /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
   window.setTimeout(() => {
     catalogOpen.value = false;
   }, 0);
 }
 
+/** 读取 loadBlog 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadBlog() {
   const blogId = String(route.query.blogId || '');
   blogData.value = null;
@@ -314,6 +325,7 @@ async function loadBlog() {
   }
 }
 
+/** 响应 toggleCollect 导航或界面事件，更新当前组件的受控展示状态。 */
 async function toggleCollect() {
   if (!blogData.value?.blogId || !loggedIn.value) return;
   try {
@@ -332,11 +344,13 @@ async function toggleCollect() {
   }
 }
 
+/** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function reply(fatherId) {
   const succeeded = await commentThread.reply(fatherId);
   if (succeeded) ElMessage.success('回复成功');
 }
 
+/** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function comment() {
   const succeeded = await commentThread.comment();
   if (succeeded) ElMessage.success('评论成功');
@@ -348,6 +362,7 @@ async function deleteOwnComment(commentItem) {
   if (succeeded) ElMessage.success('评论已删除');
 }
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(() => route.query.blogId, loadBlog, { immediate: true });
 </script>
 
