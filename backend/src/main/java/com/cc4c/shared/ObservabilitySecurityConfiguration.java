@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,17 +20,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
-@Configuration(proxyBeanMethods = false)
 @ManagementContextConfiguration(proxyBeanMethods = false)
 /** ObservabilitySecurityConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。 */
 public class ObservabilitySecurityConfiguration {
 
     @Bean("observabilityAuthenticationManager")
     AuthenticationManager observabilityAuthenticationManager(ObservabilityProperties properties) {
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
         InMemoryUserDetailsManager users =
                 new InMemoryUserDetailsManager(User.withUsername(properties.managementUsername())
-                        .password(encoder.encode(properties.managementPassword()))
+                        .password(properties.managementPasswordHash())
                         .roles("OBSERVABILITY")
                         .build());
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(users);

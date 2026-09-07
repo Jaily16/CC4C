@@ -1,6 +1,6 @@
 #requires -Version 7.0
-# 运行前提：固定配置已由用户整理，生产 JAR 与前端依赖存在，外部中间件及 Prometheus 已就绪。
-# 破坏性边界：只按后端、前端顺序启动当前工作区应用，不管理观测服务或其他中间件。
+# 运行前提：固定配置已由用户整理，生产 JAR 与两端前端依赖存在，外部中间件及 Prometheus 已就绪。
+# 破坏性边界：只按后端、业务前端、观测前端顺序启动当前工作区应用，不管理外部服务。
 # 失败恢复：只按本次保存的完整身份逆序停止；不读取其他运行日志，不清理数据。
 # 退出码：两端启动、健康和栈记录完成为 0，任何失败为 1。
 
@@ -10,6 +10,7 @@ param(
     [ValidateRange(1, 65535)][int] $ApplicationPort = 4080,
     [ValidateRange(1, 65535)][int] $ManagementPort = 4081,
     [ValidateRange(1, 65535)][int] $FrontendPort = 5173,
+    [ValidateRange(1, 65535)][int] $ObservabilityPort = 5174,
     [string] $PrometheusUrl = 'http://127.0.0.1:9090'
 )
 
@@ -17,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'host-environment.ps1')
 $backendState = $null
 $frontendState = $null
+$observabilityState = $null
 
 # 仅在本次精确进程仍存活时等待后端就绪，超时即交由启动失败分支停止该进程。
 function Wait-Cc4cBackendReady {
@@ -31,11 +33,11 @@ function Wait-Cc4cBackendReady {
 }
 
 # 前端使用 strictPort；只有本次 PID 已监听且页面返回 200 才认为启动成功。
-function Wait-Cc4cFrontendReady {
-    param($State, [int] $Port)
+function Wait-Cc4cViteReady {
+    param($State, [int] $Port, [string] $Description)
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
-        if ($null -eq (Get-Cc4cRecordedProcess $State)) { throw 'The newly started frontend exited.' }
+        if ($null -eq (Get-Cc4cRecordedProcess $State)) { throw "The newly started $Description exited." }
         try {
             $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction Stop)
             if ($listeners.Count -eq 0 -or @($listeners | Where-Object OwningProcess -ne $State.pid).Count -gt 0) {
@@ -46,7 +48,7 @@ function Wait-Cc4cFrontendReady {
         } catch { }
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw 'The newly started frontend did not become healthy within thirty seconds.'
+    throw "The newly started $Description did not become healthy within thirty seconds."
 }
 
 try {
@@ -57,10 +59,11 @@ try {
     }
     Assert-Cc4cCanStart backend
     Assert-Cc4cCanStart frontend
+    Assert-Cc4cCanStart observability
     $preflight = @{
         Component = 'All'; ConfirmDatabase = $ConfirmDatabase
         ApplicationPort = $ApplicationPort; ManagementPort = $ManagementPort
-        FrontendPort = $FrontendPort; PrometheusUrl = $PrometheusUrl
+        FrontendPort = $FrontendPort; ObservabilityPort = $ObservabilityPort; PrometheusUrl = $PrometheusUrl
     }
     & (Join-Path $PSScriptRoot 'host-preflight.ps1') @preflight
     if ($LASTEXITCODE -ne 0) { throw 'Host stack preflight failed.' }
@@ -74,23 +77,29 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Frontend startup failed.' }
     $frontendState = Read-Cc4cHostState frontend
     if ($null -eq $frontendState) { throw 'The new frontend record is missing; do not guess its PID.' }
-    Wait-Cc4cFrontendReady $frontendState $FrontendPort
+    Wait-Cc4cViteReady $frontendState $FrontendPort 'business frontend'
+    & (Join-Path $workspaceRoot 'observability\scripts\start-observability.ps1') -ObservabilityPort $ObservabilityPort
+    if ($LASTEXITCODE -ne 0) { throw 'Observability frontend startup failed.' }
+    $observabilityState = Read-Cc4cHostState observability
+    if ($null -eq $observabilityState) { throw 'The new observability record is missing; do not guess its PID.' }
+    Wait-Cc4cViteReady $observabilityState $ObservabilityPort 'observability frontend'
     $stack = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         component = 'stack'
         runId = [Guid]::NewGuid().ToString('N')
         startedAtUtc = [DateTime]::UtcNow.ToString('o')
         backend = $backendState
         frontend = $frontendState
+        observability = $observabilityState
         status = 'running'
     }
     Write-Cc4cHostState stack $stack
-    Write-Output 'CC4C host stack is healthy; startup order was backend then frontend. External services were unchanged.'
+    Write-Output 'CC4C host stack is healthy; startup order was backend, business frontend, then observability. External services were unchanged.'
     exit 0
 }
 catch {
     $failure = $_.Exception.Message
-    foreach ($entry in @($frontendState, $backendState)) {
+    foreach ($entry in @($observabilityState, $frontendState, $backendState)) {
         if ($null -ne $entry) {
             try { Stop-Cc4cOwnedComponent $entry }
             catch { Write-Warning "Exact rollback failed for $($entry.component) PID $($entry.pid); preserve its record and logs." }

@@ -15,7 +15,11 @@ $script:Cc4cRuntimeRequiredNames = @(
     'CC4C_MESSAGING_CONFIRM_TIMEOUT', 'CC4C_MESSAGING_CONSUMER_RETRY_DELAYS',
     'CC4C_OUTBOX_DISPATCHER_ENABLED', 'CC4C_MESSAGE_CONSUMERS_ENABLED', 'CC4C_API_DOCS_ENABLED',
     'CC4C_OBSERVABILITY_ENABLED', 'CC4C_MANAGEMENT_ADDRESS', 'CC4C_MANAGEMENT_PORT',
-    'CC4C_MANAGEMENT_USERNAME', 'CC4C_MANAGEMENT_PASSWORD', 'CC4C_OBSERVABILITY_ENVIRONMENT',
+    'CC4C_MANAGEMENT_USERNAME', 'CC4C_MANAGEMENT_PASSWORD_HASH',
+    'CC4C_OBSERVABILITY_USERNAME', 'CC4C_OBSERVABILITY_PASSWORD_HASH',
+    'CC4C_OBSERVABILITY_SESSION_NAMESPACE', 'CC4C_OBSERVABILITY_COOKIE_SECURE',
+    'CC4C_OBSERVABILITY_ALLOWED_ORIGIN', 'CC4C_PROMETHEUS_URL',
+    'CC4C_PROMETHEUS_USERNAME', 'CC4C_PROMETHEUS_PASSWORD', 'CC4C_OBSERVABILITY_ENVIRONMENT',
     'CC4C_LOG_FORMAT', 'CC4C_SAVE_IMG_PATH', 'CC4C_REQUEST_IMG_PATH',
     'CC4C_SAVE_AVATAR_PATH', 'CC4C_REQUEST_AVATAR_PATH'
 )
@@ -153,25 +157,34 @@ function Assert-Cc4cRuntimeEnvironment {
     $values = $Environment.Values
     foreach ($name in $script:Cc4cRuntimeRequiredNames) {
         if (-not $values.Contains($name)) { throw "Required runtime variable '$name' is missing." }
-        if ($name -notin @('CC4C_MAIL_USERNAME', 'CC4C_MAIL_PASSWORD') -and
+        if ($name -notin @('CC4C_MAIL_USERNAME', 'CC4C_MAIL_PASSWORD', 'CC4C_PROMETHEUS_USERNAME', 'CC4C_PROMETHEUS_PASSWORD') -and
             [string]::IsNullOrWhiteSpace([string] $values[$name])) { throw "Required runtime variable '$name' is empty." }
     }
     foreach ($name in @('CC4C_SESSION_COOKIE_SECURE', 'CC4C_BUSINESS_CACHE_ENABLED', 'CC4C_API_DOCS_ENABLED',
-            'CC4C_OBSERVABILITY_ENABLED', 'CC4C_OUTBOX_DISPATCHER_ENABLED', 'CC4C_MESSAGE_CONSUMERS_ENABLED',
+            'CC4C_OBSERVABILITY_ENABLED', 'CC4C_OBSERVABILITY_COOKIE_SECURE',
+            'CC4C_OUTBOX_DISPATCHER_ENABLED', 'CC4C_MESSAGE_CONSUMERS_ENABLED',
             'CC4C_MAIL_AUTH', 'CC4C_MAIL_SSL_ENABLED', 'CC4C_MAIL_STARTTLS_ENABLED')) {
         Assert-Cc4cBooleanValue $values $name
     }
     $null = Get-Cc4cDatabaseName $values
     $null = Get-Cc4cEndpointUri $values.CC4C_REDIS_URL @('redis', 'rediss') 'Redis'
     $null = Get-Cc4cEndpointUri $values.CC4C_RABBITMQ_URL @('amqp', 'amqps') 'RabbitMQ'
-    foreach ($name in @('CC4C_SESSION_NAMESPACE', 'CC4C_CACHE_NAMESPACE')) {
+    foreach ($name in @('CC4C_SESSION_NAMESPACE', 'CC4C_CACHE_NAMESPACE', 'CC4C_OBSERVABILITY_SESSION_NAMESPACE')) {
         if ([string] $values[$name] -notmatch '^[A-Za-z0-9:_-]{3,120}$') { throw "$name contains unsupported characters." }
     }
-    if ($values.CC4C_SESSION_NAMESPACE -ceq $values.CC4C_CACHE_NAMESPACE) {
-        throw 'Session and business cache namespaces must differ.'
+    $namespaces = @($values.CC4C_SESSION_NAMESPACE, $values.CC4C_CACHE_NAMESPACE, $values.CC4C_OBSERVABILITY_SESSION_NAMESPACE)
+    if (@($namespaces | Sort-Object -Unique).Count -ne 3) {
+        throw 'Business Session, business cache and observability namespaces must differ.'
     }
     if (([string] $values.CC4C_SECURITY_PEPPER).Length -lt 32) { throw 'CC4C_SECURITY_PEPPER must contain at least 32 characters.' }
-    if (([string] $values.CC4C_MANAGEMENT_PASSWORD).Length -lt 24) { throw 'CC4C_MANAGEMENT_PASSWORD must contain at least 24 characters.' }
+    foreach ($name in @('CC4C_MANAGEMENT_PASSWORD_HASH', 'CC4C_OBSERVABILITY_PASSWORD_HASH')) {
+        if ([string] $values[$name] -cnotmatch '^\$2[aby]\$12\$[./A-Za-z0-9]{53}$') {
+            throw "$name must contain one BCrypt cost-12 hash."
+        }
+    }
+    if ([string] $values.CC4C_OBSERVABILITY_USERNAME -cnotmatch '^[A-Za-z0-9._-]{3,64}$') {
+        throw 'CC4C_OBSERVABILITY_USERNAME is invalid.'
+    }
     if ([string] $values.CC4C_MANAGEMENT_ADDRESS -cne '127.0.0.1' -or
         [string] $values.CC4C_MANAGEMENT_PORT -cne [string] $ManagementPort) { throw 'The management endpoint must use the confirmed loopback port.' }
     foreach ($origin in ([string] $values.CC4C_ALLOWED_ORIGINS).Split(',')) {
@@ -180,6 +193,18 @@ function Assert-Cc4cRuntimeEnvironment {
             throw 'CORS requires exact origins without wildcards, paths, or credentials.'
         }
     }
+    $observabilityOrigin = Get-Cc4cEndpointUri $values.CC4C_OBSERVABILITY_ALLOWED_ORIGIN @('http', 'https') 'Observability origin'
+    if ($observabilityOrigin.AbsolutePath -ne '/' -or $observabilityOrigin.Query -or
+        $observabilityOrigin.Fragment -or $observabilityOrigin.UserInfo) {
+        throw 'Observability CORS requires one exact origin without path or credentials.'
+    }
+    $prometheus = Get-Cc4cEndpointUri $values.CC4C_PROMETHEUS_URL @('http', 'https') 'Prometheus'
+    if ($prometheus.UserInfo -or $prometheus.Query -or $prometheus.Fragment) {
+        throw 'Prometheus URL must not contain credentials, query, or fragment.'
+    }
+    $prometheusUsername = -not [string]::IsNullOrWhiteSpace([string] $values.CC4C_PROMETHEUS_USERNAME)
+    $prometheusPassword = -not [string]::IsNullOrWhiteSpace([string] $values.CC4C_PROMETHEUS_PASSWORD)
+    if ($prometheusUsername -ne $prometheusPassword) { throw 'Prometheus credentials must be configured as a pair.' }
     $mailPort = 0
     if (-not [int]::TryParse([string] $values.CC4C_MAIL_PORT, [ref] $mailPort) -or $mailPort -lt 1 -or $mailPort -gt 65535) {
         throw 'CC4C_MAIL_PORT must be between 1 and 65535.'
@@ -209,17 +234,18 @@ function Assert-Cc4cRuntimeEnvironment {
 
 # 注入本次启动所需变量；前端清除已知后端运行变量，只注入公开地址和两个上传根变量。
 function Set-Cc4cProcessEnvironment {
-    param([System.Collections.IDictionary] $Values, [switch] $Backend, [switch] $Frontend)
-    if ($Backend -and $Frontend) { throw 'Choose one application environment.' }
+    param([System.Collections.IDictionary] $Values, [switch] $Backend, [switch] $Frontend, [switch] $Observability)
+    $selectedApplications = @($Backend, $Frontend, $Observability)
+    if (@($selectedApplications | Where-Object { $_ }).Count -ne 1) { throw 'Choose one application environment.' }
     $names = @($Values.Keys)
-    if ($Backend -or $Frontend) { $names += @('SPRING_CONFIG_NAME', 'SPRING_APPLICATION_NAME', 'SPRING_CONFIG_LOCATION', 'SPRING_CONFIG_ADDITIONAL_LOCATION', 'SPRING_CONFIG_IMPORT') }
-    if ($Frontend) { $names += $script:Cc4cRuntimeAllowedNames }
+    if ($Backend -or $Frontend -or $Observability) { $names += @('SPRING_CONFIG_NAME', 'SPRING_APPLICATION_NAME', 'SPRING_CONFIG_LOCATION', 'SPRING_CONFIG_ADDITIONAL_LOCATION', 'SPRING_CONFIG_IMPORT') }
+    if ($Frontend -or $Observability) { $names += $script:Cc4cRuntimeAllowedNames }
     $names = @($names | Sort-Object -Unique)
     $original = [ordered]@{}
     foreach ($name in $names) { $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
     $snapshot = [pscustomobject]@{ Names = $names; Values = $original }
     try {
-        if ($Frontend) { foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $null, 'Process') } }
+        if ($Frontend -or $Observability) { foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $null, 'Process') } }
         foreach ($name in $Values.Keys) { [Environment]::SetEnvironmentVariable($name, [string] $Values[$name], 'Process') }
         if ($Backend) {
             [Environment]::SetEnvironmentVariable('SPRING_CONFIG_NAME', 'application', 'Process')
@@ -250,7 +276,7 @@ function Get-Cc4cHostStateRoot {
 
 # 只读当前应用状态文件，不读取日志、其他 temp 内容或旧备份。
 function Read-Cc4cHostState {
-    param([ValidateSet('backend', 'frontend', 'stack')][string] $Name)
+    param([ValidateSet('backend', 'frontend', 'observability', 'stack')][string] $Name)
     $path = Join-Path (Get-Cc4cHostStateRoot) "$Name.json"
     if (-not (Test-Path -LiteralPath $path)) { return $null }
     $null = Assert-Cc4cOrdinaryPath $path
@@ -260,7 +286,7 @@ function Read-Cc4cHostState {
 
 # 仅更新受控应用状态；拒绝链接，并保留其他运行日志和所有外部服务状态。
 function Write-Cc4cHostState {
-    param([ValidateSet('backend', 'frontend', 'stack')][string] $Name, [Parameter(Mandatory = $true)] $State)
+    param([ValidateSet('backend', 'frontend', 'observability', 'stack')][string] $Name, [Parameter(Mandatory = $true)] $State)
     $root = Get-Cc4cHostStateRoot
     if (-not (Test-Path -LiteralPath $root)) { New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null }
     $path = Assert-Cc4cOrdinaryPath (Join-Path $root "$Name.json") -AllowMissing
@@ -269,7 +295,7 @@ function Write-Cc4cHostState {
 
 # 每次启动分配全新日志名；不读取、移动或覆盖过去运行的日志。
 function New-Cc4cRunLogs {
-    param([ValidateSet('backend', 'frontend')][string] $Name)
+    param([ValidateSet('backend', 'frontend', 'observability')][string] $Name)
     $root = Assert-Cc4cOrdinaryPath (Join-Path $script:Cc4cHostWorkspaceRoot "temp\cc4c-host-$Name") -Kind Directory -AllowMissing
     if (-not (Test-Path -LiteralPath $root)) { New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null }
     $runId = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffffffZ') + '-' + [Guid]::NewGuid().ToString('N')
@@ -302,7 +328,7 @@ function Get-Cc4cStartedIdentity {
         throw 'The created application process identity cannot be verified.'
     }
     return [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         component = $Component
         pid = [int] $current.ProcessId
         executablePath = [IO.Path]::GetFullPath($Executable)
@@ -317,17 +343,20 @@ function Get-Cc4cRecordedProcess {
     param([Parameter(Mandatory = $true)] $State)
     $recordedPid = 0
     if (-not [int]::TryParse([string] $State.pid, [ref] $recordedPid) -or $recordedPid -le 0 -or
-        $State.component -notin @('backend', 'frontend') -or
+        $State.component -notin @('backend', 'frontend', 'observability') -or
         [string]::IsNullOrWhiteSpace([string] $State.executablePath) -or
         -not [IO.Path]::IsPathFullyQualified([string] $State.executablePath) -or
         [string]::IsNullOrWhiteSpace([string] $State.marker) -or
         -not [IO.Path]::IsPathFullyQualified([string] $State.marker) -or
         $null -eq $State.processCreatedAtUtc) { throw 'Incomplete process identity; preserve the record for inspection.' }
-    $relativeMarker = if ($State.component -eq 'backend') { 'backend\target\cc4c-5.0.0-SNAPSHOT.jar' }
-    else { 'frontend\node_modules\vite\bin\vite.js' }
+    $relativeMarker = switch ($State.component) {
+        'backend' { 'backend\target\cc4c-5.0.0-SNAPSHOT.jar' }
+        'frontend' { 'frontend\node_modules\vite\bin\vite.js' }
+        'observability' { 'observability\node_modules\vite\bin\vite.js' }
+    }
     $expectedMarker = Join-Path $script:Cc4cHostWorkspaceRoot $relativeMarker
     $expectedExecutableName = if ($State.component -eq 'backend') { 'java.exe' } else { 'node.exe' }
-    if ($State.schemaVersion -ne 2 -or
+    if ($State.schemaVersion -ne 3 -or
         -not [IO.Path]::GetFullPath([string] $State.marker).Equals($expectedMarker, [StringComparison]::OrdinalIgnoreCase) -or
         [IO.Path]::GetFileName([string] $State.executablePath) -ine $expectedExecutableName) {
         throw 'The record does not identify this workspace application; nothing was changed.'
@@ -347,7 +376,7 @@ function Get-Cc4cRecordedProcess {
 
 # 已停止的旧记录可正常替换；存活、未知或不完整的运行记录不允许被新启动覆盖。
 function Assert-Cc4cCanStart {
-    param([ValidateSet('backend', 'frontend')][string] $Name)
+    param([ValidateSet('backend', 'frontend', 'observability')][string] $Name)
     $state = Read-Cc4cHostState $Name
     if ($null -eq $state -or $state.status -eq 'stopped') { return }
     if ($state.status -ne 'running') { throw 'Unknown process state; inspect it before starting.' }
@@ -418,16 +447,17 @@ function Assert-Cc4cPrometheusEndpoint {
     if ($RequireBackendScrape) { Write-Output 'up{job="cc4c-backend"} = 1.' }
 }
 
-# 栈记录必须包含两端完整身份快照；旧的已停止记录不走此函数，旧运行记录不可猜测补全。
+# 栈记录必须包含三端完整身份快照；旧的已停止记录不走此函数，旧运行记录不可猜测补全。
 function Assert-Cc4cRunningStack {
     param([Parameter(Mandatory = $true)] $State)
-    if ($State.status -ne 'running' -or $State.schemaVersion -ne 2 -or
+    if ($State.status -ne 'running' -or $State.schemaVersion -ne 3 -or
         $State.component -ne 'stack' -or [string]::IsNullOrWhiteSpace([string] $State.runId) -or
-        $null -eq $State.backend -or $null -eq $State.frontend -or
-        $State.backend.component -ne 'backend' -or $State.frontend.component -ne 'frontend') {
+        $null -eq $State.backend -or $null -eq $State.frontend -or $null -eq $State.observability -or
+        $State.backend.component -ne 'backend' -or $State.frontend.component -ne 'frontend' -or
+        $State.observability.component -ne 'observability') {
         throw 'Incomplete running stack record; preserve it for inspection.'
     }
-    foreach ($entry in @($State.backend, $State.frontend)) {
+    foreach ($entry in @($State.backend, $State.frontend, $State.observability)) {
         $null = Get-Cc4cRecordedProcess $entry
         $current = Read-Cc4cHostState $entry.component
         if ($null -eq $current -or $current.pid -ne $entry.pid -or

@@ -1,0 +1,38 @@
+{
+  "name": "cc4c-observability",
+  "version": "5.0.0-SNAPSHOT",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview --port 4174",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write src index.html vite.config.js",
+    "format:check": "prettier --check src index.html vite.config.js"
+  },
+  "dependencies": {
+    "@vue/devtools-api": "8.2.1",
+    "axios": "1.19.0",
+    "echarts": "6.1.0",
+    "element-plus": "2.14.5",
+    "pinia": "4.0.3",
+    "vue": "3.5.42",
+    "vue-router": "4.1.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "eslint": "10.9.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-vue": "10.10.0",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "vite": "8.2.2"
+  }
+}

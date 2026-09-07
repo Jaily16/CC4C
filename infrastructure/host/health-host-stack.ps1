@@ -27,20 +27,26 @@ try {
     $stack = Read-Cc4cHostState stack
     if ($null -eq $stack) { throw 'No running stack is recorded.' }
     Assert-Cc4cRunningStack $stack
-    foreach ($state in @($stack.backend, $stack.frontend)) {
+    foreach ($state in @($stack.backend, $stack.frontend, $stack.observability)) {
         if ($null -eq (Get-Cc4cRecordedProcess $state)) { throw 'A recorded application has exited.' }
     }
     Assert-Cc4cOwnedPort $stack.backend.applicationPort $stack.backend.pid
     Assert-Cc4cOwnedPort $stack.backend.managementPort $stack.backend.pid
     Assert-Cc4cOwnedPort $stack.frontend.port $stack.frontend.pid
+    Assert-Cc4cOwnedPort $stack.observability.port $stack.observability.pid
     Assert-Cc4cBackendHealth $stack.backend.managementPort
     try {
         $response = Invoke-WebRequest -Uri "http://127.0.0.1:$($stack.frontend.port)/" -TimeoutSec 5 -MaximumRedirection 0
         if ([int] $response.StatusCode -ne 200) { throw 'not OK' }
     }
     catch { throw 'The frontend did not return HTTP 200.' }
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$($stack.observability.port)/" -TimeoutSec 5 -MaximumRedirection 0
+        if ([int] $response.StatusCode -ne 200) { throw 'not OK' }
+    }
+    catch { throw 'The observability frontend did not return HTTP 200.' }
     if ($IncludePrometheus) { Assert-Cc4cPrometheusEndpoint -BaseUrl $PrometheusUrl -RequireBackendScrape }
-    Write-Output 'Frontend HTTP 200; backend health, liveness and readiness UP; all three ports belong to the exact recorded PIDs.'
+    Write-Output 'Both frontends return HTTP 200; backend health, liveness and readiness are UP; all four ports belong to the exact recorded PIDs.'
     exit 0
 }
 catch {

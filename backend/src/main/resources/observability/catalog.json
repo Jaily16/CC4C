@@ -1,0 +1,584 @@
+{
+  "overview": [
+    {
+      "id": "backend-up",
+      "title": "后端抓取状态",
+      "unit": "状态",
+      "expression": "up{job=\"cc4c-backend\"}",
+      "legend": "后端",
+      "allowedLabels": []
+    },
+    {
+      "id": "http-p95",
+      "title": "HTTP P95",
+      "unit": "s",
+      "expression": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))",
+      "legend": "P95",
+      "allowedLabels": []
+    },
+    {
+      "id": "http-5xx-ratio",
+      "title": "HTTP 5xx 比例",
+      "unit": "ratio",
+      "expression": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.000001)",
+      "legend": "5xx",
+      "allowedLabels": []
+    },
+    {
+      "id": "jvm-heap-ratio",
+      "title": "JVM 堆使用率",
+      "unit": "ratio",
+      "expression": "sum(jvm_memory_used_bytes{area=\"heap\"}) / clamp_min(sum(jvm_memory_max_bytes{area=\"heap\"}), 1)",
+      "legend": "堆",
+      "allowedLabels": []
+    },
+    {
+      "id": "hikari-pending",
+      "title": "数据库连接等待",
+      "unit": "count",
+      "expression": "sum(hikaricp_connections_pending)",
+      "legend": "等待",
+      "allowedLabels": []
+    },
+    {
+      "id": "cache-hit-ratio",
+      "title": "缓存命中率",
+      "unit": "ratio",
+      "expression": "sum(rate(cc4c_cache_requests_total{outcome=\"hit\"}[5m])) / clamp_min(sum(rate(cc4c_cache_requests_total{outcome=~\"hit|miss\"}[5m])), 0.000001)",
+      "legend": "命中率",
+      "allowedLabels": []
+    },
+    {
+      "id": "outbox-oldest-pending",
+      "title": "最老待发消息",
+      "unit": "s",
+      "expression": "cc4c_messaging_outbox_oldest_pending_seconds",
+      "legend": "Outbox",
+      "allowedLabels": []
+    },
+    {
+      "id": "firing-alerts",
+      "title": "正在触发的告警",
+      "unit": "count",
+      "expression": "sum(ALERTS{alertstate=\"firing\"})",
+      "legend": "告警",
+      "allowedLabels": []
+    }
+  ],
+  "dashboards": [
+    {
+      "id": "api-jvm",
+      "title": "API 与 JVM",
+      "panels": [
+        {
+          "id": "http-requests",
+          "title": "HTTP 请求速率",
+          "unit": "req/s",
+          "queries": [
+            {
+              "id": "api-http-rate",
+              "expression": "sum(rate(http_server_requests_seconds_count[5m]))",
+              "legend": "请求速率",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "http-latency",
+          "title": "HTTP P50 / P95 / P99",
+          "unit": "s",
+          "queries": [
+            {
+              "id": "api-http-p50",
+              "expression": "histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))",
+              "legend": "P50",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-http-p95",
+              "expression": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))",
+              "legend": "P95",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-http-p99",
+              "expression": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket[5m])))",
+              "legend": "P99",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "jvm-heap",
+          "title": "JVM 堆内存",
+          "unit": "bytes",
+          "queries": [
+            {
+              "id": "api-heap-used",
+              "expression": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+              "legend": "已用",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-heap-max",
+              "expression": "sum(jvm_memory_max_bytes{area=\"heap\"})",
+              "legend": "最大",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "cpu-gc",
+          "title": "CPU 与 GC",
+          "unit": "ratio",
+          "queries": [
+            {
+              "id": "api-process-cpu",
+              "expression": "process_cpu_usage",
+              "legend": "进程 CPU",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-gc-pause",
+              "expression": "rate(jvm_gc_pause_seconds_sum[5m])",
+              "legend": "GC 暂停/秒",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "http-status",
+          "title": "HTTP 错误状态速率",
+          "unit": "req/s",
+          "queries": [
+            {
+              "id": "api-http-status",
+              "expression": "sum by (status) (rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[5m]))",
+              "legend": "HTTP {{status}}",
+              "allowedLabels": ["status"]
+            }
+          ]
+        },
+        {
+          "id": "threads",
+          "title": "JVM 与 Tomcat 线程",
+          "unit": "count",
+          "queries": [
+            {
+              "id": "api-jvm-threads",
+              "expression": "jvm_threads_live_threads",
+              "legend": "JVM 活跃线程",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-tomcat-busy",
+              "expression": "tomcat_threads_busy_threads",
+              "legend": "Tomcat 忙线程",
+              "allowedLabels": []
+            },
+            {
+              "id": "api-tomcat-current",
+              "expression": "tomcat_threads_current_threads",
+              "legend": "Tomcat 当前线程",
+              "allowedLabels": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data-cache-security",
+      "title": "数据库、缓存与安全",
+      "panels": [
+        {
+          "id": "mybatis-p95",
+          "title": "MyBatis 各模块 P95",
+          "unit": "s",
+          "queries": [
+            {
+              "id": "data-mybatis-p95",
+              "expression": "histogram_quantile(0.95, sum by (le,module) (rate(cc4c_mybatis_operations_seconds_bucket[5m])))",
+              "legend": "{{module}}",
+              "allowedLabels": ["module"]
+            }
+          ]
+        },
+        {
+          "id": "hikari-pool",
+          "title": "Hikari 连接池",
+          "unit": "count",
+          "queries": [
+            {
+              "id": "data-hikari-active",
+              "expression": "hikaricp_connections_active",
+              "legend": "活跃",
+              "allowedLabels": []
+            },
+            {
+              "id": "data-hikari-idle",
+              "expression": "hikaricp_connections_idle",
+              "legend": "空闲",
+              "allowedLabels": []
+            },
+            {
+              "id": "data-hikari-pending",
+              "expression": "hikaricp_connections_pending",
+              "legend": "等待",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "cache-outcomes",
+          "title": "缓存结果速率",
+          "unit": "ops/s",
+          "queries": [
+            {
+              "id": "data-cache-outcomes",
+              "expression": "sum by (region,outcome) (rate(cc4c_cache_requests_total[5m]))",
+              "legend": "{{region}} {{outcome}}",
+              "allowedLabels": ["region", "outcome"]
+            }
+          ]
+        },
+        {
+          "id": "security-events",
+          "title": "认证与限流事件",
+          "unit": "events/s",
+          "queries": [
+            {
+              "id": "data-auth-events",
+              "expression": "sum by (role,outcome) (rate(cc4c_security_authentication_attempts_total[5m]))",
+              "legend": "认证 {{role}} {{outcome}}",
+              "allowedLabels": ["role", "outcome"]
+            },
+            {
+              "id": "data-rate-limits",
+              "expression": "sum by (scope) (rate(cc4c_security_rate_limit_rejections_total[5m]))",
+              "legend": "限流 {{scope}}",
+              "allowedLabels": ["scope"]
+            }
+          ]
+        },
+        {
+          "id": "mybatis-operations",
+          "title": "MyBatis 操作与错误",
+          "unit": "ops/s",
+          "queries": [
+            {
+              "id": "data-mybatis-operations",
+              "expression": "sum by (module,command,outcome) (rate(cc4c_mybatis_operations_seconds_count[5m]))",
+              "legend": "{{module}} {{command}} {{outcome}}",
+              "allowedLabels": ["module", "command", "outcome"]
+            }
+          ]
+        },
+        {
+          "id": "cache-health",
+          "title": "缓存命中率与 Redis 错误",
+          "unit": "ratio",
+          "queries": [
+            {
+              "id": "data-cache-hit-ratio",
+              "expression": "sum(rate(cc4c_cache_requests_total{outcome=\"hit\"}[5m])) / clamp_min(sum(rate(cc4c_cache_requests_total{outcome=~\"hit|miss\"}[5m])), 0.000001)",
+              "legend": "命中率",
+              "allowedLabels": []
+            },
+            {
+              "id": "data-cache-errors",
+              "expression": "sum by (operation) (rate(cc4c_cache_redis_operations_seconds_count{outcome=\"error\"}[5m]))",
+              "legend": "Redis 错误 {{operation}}",
+              "allowedLabels": ["operation"]
+            }
+          ]
+        },
+        {
+          "id": "authorization-denials",
+          "title": "授权拒绝",
+          "unit": "events/s",
+          "queries": [
+            {
+              "id": "data-authorization-denials",
+              "expression": "sum by (role,reason) (rate(cc4c_security_authorization_denials_total[5m]))",
+              "legend": "{{role}} {{reason}}",
+              "allowedLabels": ["role", "reason"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "messaging",
+      "title": "异步消息",
+      "panels": [
+        {
+          "id": "outbox-inbox-status",
+          "title": "Outbox 与 Inbox 状态",
+          "unit": "count",
+          "queries": [
+            {
+              "id": "msg-outbox-status",
+              "expression": "cc4c_messaging_outbox_messages",
+              "legend": "Outbox {{status}}",
+              "allowedLabels": ["status"]
+            },
+            {
+              "id": "msg-inbox-status",
+              "expression": "cc4c_messaging_inbox_messages",
+              "legend": "Inbox {{status}}",
+              "allowedLabels": ["status"]
+            }
+          ]
+        },
+        {
+          "id": "pending-sampler-age",
+          "title": "最老待发与采样器年龄",
+          "unit": "s",
+          "queries": [
+            {
+              "id": "msg-oldest-pending",
+              "expression": "cc4c_messaging_outbox_oldest_pending_seconds",
+              "legend": "最老待发",
+              "allowedLabels": []
+            },
+            {
+              "id": "msg-sampler-age",
+              "expression": "cc4c_messaging_sampler_age_seconds",
+              "legend": "采样器年龄",
+              "allowedLabels": []
+            }
+          ]
+        },
+        {
+          "id": "message-latency",
+          "title": "发布与消费 P95",
+          "unit": "s",
+          "queries": [
+            {
+              "id": "msg-publish-p95",
+              "expression": "histogram_quantile(0.95, sum by (le,event_type) (rate(cc4c_messaging_publish_duration_seconds_bucket[5m])))",
+              "legend": "发布 {{event_type}}",
+              "allowedLabels": ["event_type"]
+            },
+            {
+              "id": "msg-consume-p95",
+              "expression": "histogram_quantile(0.95, sum by (le,event_type) (rate(cc4c_messaging_consume_duration_seconds_bucket[5m])))",
+              "legend": "消费 {{event_type}}",
+              "allowedLabels": ["event_type"]
+            }
+          ]
+        },
+        {
+          "id": "rabbit-queues",
+          "title": "RabbitMQ 队列",
+          "unit": "count",
+          "queries": [
+            {
+              "id": "msg-rabbit-ready",
+              "expression": "sum by (queue) (rabbitmq_queue_messages_ready)",
+              "legend": "就绪 {{queue}}",
+              "allowedLabels": ["queue"]
+            },
+            {
+              "id": "msg-rabbit-unacked",
+              "expression": "sum by (queue) (rabbitmq_queue_messages_unacked)",
+              "legend": "未确认 {{queue}}",
+              "allowedLabels": ["queue"]
+            },
+            {
+              "id": "msg-rabbit-consumers",
+              "expression": "sum by (queue) (rabbitmq_queue_consumers)",
+              "legend": "消费者 {{queue}}",
+              "allowedLabels": ["queue"]
+            }
+          ]
+        },
+        {
+          "id": "message-exceptions",
+          "title": "重试、死亡、重复与过期",
+          "unit": "events/s",
+          "queries": [
+            {
+              "id": "msg-retries",
+              "expression": "sum by (event_type,stage) (rate(cc4c_messaging_retries_total[5m]))",
+              "legend": "重试 {{event_type}} {{stage}}",
+              "allowedLabels": ["event_type", "stage"]
+            },
+            {
+              "id": "msg-dead",
+              "expression": "sum by (event_type,error_code) (rate(cc4c_messaging_dead_total[5m]))",
+              "legend": "死亡 {{event_type}} {{error_code}}",
+              "allowedLabels": ["event_type", "error_code"]
+            },
+            {
+              "id": "msg-duplicates",
+              "expression": "sum by (event_type) (rate(cc4c_messaging_duplicates_total[5m]))",
+              "legend": "重复 {{event_type}}",
+              "allowedLabels": ["event_type"]
+            },
+            {
+              "id": "msg-expired",
+              "expression": "sum by (event_type) (rate(cc4c_messaging_expired_total[5m]))",
+              "legend": "过期 {{event_type}}",
+              "allowedLabels": ["event_type"]
+            }
+          ]
+        },
+        {
+          "id": "message-outcomes",
+          "title": "发布与消费结果",
+          "unit": "ops/s",
+          "queries": [
+            {
+              "id": "msg-publish-outcomes",
+              "expression": "sum by (event_type,outcome) (rate(cc4c_messaging_publish_duration_seconds_count[5m]))",
+              "legend": "发布 {{event_type}} {{outcome}}",
+              "allowedLabels": ["event_type", "outcome"]
+            },
+            {
+              "id": "msg-consume-outcomes",
+              "expression": "sum by (event_type,outcome) (rate(cc4c_messaging_consume_duration_seconds_count[5m]))",
+              "legend": "消费 {{event_type}} {{outcome}}",
+              "allowedLabels": ["event_type", "outcome"]
+            }
+          ]
+        },
+        {
+          "id": "rabbit-dead-letter",
+          "title": "RabbitMQ 死信队列",
+          "unit": "count",
+          "queries": [
+            {
+              "id": "msg-rabbit-dead-letter",
+              "expression": "sum by (queue) (rabbitmq_queue_messages{queue=~\".*dead.*\"})",
+              "legend": "DLQ {{queue}}",
+              "allowedLabels": ["queue"]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "id": "Cc4cBackendUnreachable",
+      "title": "后端不可抓取",
+      "description": "Prometheus 连续无法抓取后端指标。",
+      "severity": "critical"
+    },
+    {
+      "id": "Cc4cHttp5xxRateHigh",
+      "title": "HTTP 5xx 比例过高",
+      "description": "有足够请求样本时，5xx 比例持续超过百分之一。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cApiP95High",
+      "title": "API P95 过高",
+      "description": "HTTP 请求 P95 持续超过 500 毫秒。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cHikariPending",
+      "title": "数据库连接等待",
+      "description": "请求正在等待 Hikari 数据库连接。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cHikariUtilizationHigh",
+      "title": "连接池使用率过高",
+      "description": "Hikari 活跃连接持续超过容量的百分之九十。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cMybatisP95High",
+      "title": "MyBatis P95 过高",
+      "description": "MyBatis 操作 P95 持续超过 200 毫秒。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cMybatisErrorRateHigh",
+      "title": "MyBatis 错误率过高",
+      "description": "有足够样本时，MyBatis 错误率持续超过百分之一。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cCacheHitRatioLow",
+      "title": "缓存命中率偏低",
+      "description": "有足够样本时，正向缓存命中率低于百分之八十五。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cCacheFallbackIncreasing",
+      "title": "缓存旁路增加",
+      "description": "业务缓存因 Redis 故障发生错误或旁路。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cAuthenticationFailuresHigh",
+      "title": "认证失败升高",
+      "description": "认证失败事件在短时间内明显升高。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cRateLimitRejectionsHigh",
+      "title": "限流拒绝升高",
+      "description": "安全限流拒绝事件在短时间内明显升高。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cOutboxBacklogOld",
+      "title": "Outbox 积压过久",
+      "description": "最老待发布消息已等待超过 60 秒。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cOutboxFailed",
+      "title": "Outbox 存在失败消息",
+      "description": "Outbox 中存在发布失败或死亡状态消息。",
+      "severity": "critical"
+    },
+    {
+      "id": "Cc4cMessagingSamplerStale",
+      "title": "消息采样器陈旧",
+      "description": "异步消息状态采样器已超过新鲜度门限。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cRabbitBacklog",
+      "title": "RabbitMQ 队列积压",
+      "description": "RabbitMQ 就绪消息持续超过 100。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cRabbitNoConsumers",
+      "title": "RabbitMQ 无消费者",
+      "description": "存在待处理消息，但没有消费者。",
+      "severity": "critical"
+    },
+    {
+      "id": "Cc4cRabbitDeadLetters",
+      "title": "RabbitMQ 存在死信",
+      "description": "死信队列当前不为空。",
+      "severity": "critical"
+    },
+    {
+      "id": "Cc4cJvmHeapHigh",
+      "title": "JVM 堆使用率过高",
+      "description": "JVM 堆使用率持续超过百分之八十五。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cProcessCpuHigh",
+      "title": "进程 CPU 过高",
+      "description": "后端进程 CPU 使用率持续超过百分之九十。",
+      "severity": "warning"
+    },
+    {
+      "id": "Cc4cGcPauseP99High",
+      "title": "GC 暂停 P99 过高",
+      "description": "JVM GC 暂停 P99 持续超过 500 毫秒。",
+      "severity": "warning"
+    }
+  ]
+}

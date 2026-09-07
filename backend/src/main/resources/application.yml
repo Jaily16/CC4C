@@ -129,9 +129,21 @@ cc4c:
     enabled: "${CC4C_OBSERVABILITY_ENABLED:true}"
     environment: "${CC4C_OBSERVABILITY_ENVIRONMENT:local}"
     management-username: "${CC4C_MANAGEMENT_USERNAME}"
-    management-password: "${CC4C_MANAGEMENT_PASSWORD}"
+    management-password-hash: "${CC4C_MANAGEMENT_PASSWORD_HASH}"
     messaging-sample-interval: "${CC4C_MESSAGING_SAMPLE_INTERVAL:15s}"
     max-http-uri-tags: "${CC4C_MAX_HTTP_URI_TAGS:100}"
+    portal:
+      username: "${CC4C_OBSERVABILITY_USERNAME}"
+      password-hash: "${CC4C_OBSERVABILITY_PASSWORD_HASH}"
+      session-namespace: "${CC4C_OBSERVABILITY_SESSION_NAMESPACE}"
+      cookie-secure: "${CC4C_OBSERVABILITY_COOKIE_SECURE:false}"
+      allowed-origin: "${CC4C_OBSERVABILITY_ALLOWED_ORIGIN:http://localhost:5174}"
+      idle-timeout: 30m
+      absolute-timeout: 8h
+    prometheus:
+      url: "${CC4C_PROMETHEUS_URL:http://127.0.0.1:9090}"
+      username: "${CC4C_PROMETHEUS_USERNAME:}"
+      password: "${CC4C_PROMETHEUS_PASSWORD:}"
   messaging:
     namespace: "${CC4C_RABBITMQ_NAMESPACE}"
     active-key-id: "${CC4C_MESSAGING_ACTIVE_KEY_ID}"

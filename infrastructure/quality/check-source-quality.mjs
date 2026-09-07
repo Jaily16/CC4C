@@ -9,17 +9,24 @@ const execFile = promisify(execFileCallback);
 export const QUALITY_PATHS = Object.freeze([
   'backend/src/main/java',
   'frontend/src',
+  'observability/src',
   'backend/scripts',
   'frontend/scripts',
+  'observability/scripts',
   'infrastructure/host',
   'infrastructure/quality',
   'infrastructure/database/migrate-passwords.ps1',
   'infrastructure/prometheus/check-prometheus.ps1',
   '.editorconfig',
   'backend/pom.xml',
+  'backend/src/main/resources/observability',
   'frontend/eslint.config.js',
   'frontend/prettier.config.mjs',
   'frontend/package.json',
+  'observability/eslint.config.js',
+  'observability/prettier.config.mjs',
+  'observability/package.json',
+  'observability/vite.config.js',
 ]);
 
 const TEXT_EXTENSIONS = new Set([
@@ -161,7 +168,7 @@ function validateTextShape(errors, relativePath, source) {
 }
 
 function validateBrowserConsole(errors, relativePath, source) {
-  if (!isUnder(relativePath, 'frontend/src')) return;
+  if (!isUnder(relativePath, 'frontend/src') && !isUnder(relativePath, 'observability/src')) return;
   const consoleMatch = source.match(/\bconsole\.(?:log|debug|error|warn|info|trace)\s*\(/);
   const debuggerMatch = source.match(/\bdebugger\b/);
   if (debuggerMatch) addError(errors, relativePath, 'debugger', 'absent', 'present');

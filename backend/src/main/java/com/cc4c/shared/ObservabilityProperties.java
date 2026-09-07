@@ -14,7 +14,7 @@ public record ObservabilityProperties(
         boolean enabled,
         @NotBlank String environment,
         @NotBlank String managementUsername,
-        @NotBlank String managementPassword,
+        @NotBlank String managementPasswordHash,
         @NotNull Duration messagingSampleInterval,
         int maxHttpUriTags) {
     private static final Pattern ENVIRONMENT = Pattern.compile("[a-z0-9-]{2,32}");
@@ -27,8 +27,8 @@ public record ObservabilityProperties(
         if (managementUsername != null && !USERNAME.matcher(managementUsername).matches()) {
             throw new IllegalStateException("CC4C management username is invalid");
         }
-        if (enabled && managementPassword != null && managementPassword.length() < 24) {
-            throw new IllegalStateException("CC4C management password must contain at least 24 characters");
+        if (managementPasswordHash != null && !managementPasswordHash.matches("^\\$2[aby]\\$12\\$[./A-Za-z0-9]{53}$")) {
+            throw new IllegalStateException("CC4C management password must be a BCrypt cost-12 hash");
         }
         if (messagingSampleInterval != null
                 && (messagingSampleInterval.isNegative() || messagingSampleInterval.isZero())) {

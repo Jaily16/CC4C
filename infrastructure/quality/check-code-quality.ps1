@@ -34,8 +34,11 @@ try {
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'backend') -Command 'mvn' -Arguments @('-B', '-ntp', 'spotless:check')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'frontend') -Command 'npm' -Arguments @('run', 'lint')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'frontend') -Command 'npm' -Arguments @('run', 'format:check')
+    Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'observability') -Command 'npm' -Arguments @('run', 'lint')
+    Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'observability') -Command 'npm' -Arguments @('run', 'format:check')
     Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'node' -Arguments @('infrastructure/quality/check-source-quality.mjs')
     Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'node' -Arguments @('infrastructure/quality/check-doc-links.mjs')
+    Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'node' -Arguments @('infrastructure/quality/check-observability-contract.mjs')
     exit 0
 } catch {
     Write-Error $_.Exception.Message -ErrorAction Continue

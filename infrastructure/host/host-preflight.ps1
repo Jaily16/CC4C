@@ -6,12 +6,13 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'MySQL', 'Redis', 'RabbitMQ', 'SMTP', 'Backend', 'Frontend', 'Prometheus')]
+    [ValidateSet('All', 'MySQL', 'Redis', 'RabbitMQ', 'SMTP', 'Backend', 'Frontend', 'Observability', 'Prometheus')]
     [string] $Component = 'All',
     [string] $ConfirmDatabase,
     [ValidateRange(1, 65535)][int] $ApplicationPort = 4080,
     [ValidateRange(1, 65535)][int] $ManagementPort = 4081,
     [ValidateRange(1, 65535)][int] $FrontendPort = 5173,
+    [ValidateRange(1, 65535)][int] $ObservabilityPort = 5174,
     [string] $PrometheusUrl = 'http://127.0.0.1:9090'
 )
 
@@ -85,7 +86,7 @@ function Assert-Cc4cSmtp {
 }
 
 try {
-    if ($Component -notin @('Frontend', 'Prometheus')) {
+    if ($Component -notin @('Frontend', 'Observability', 'Prometheus')) {
         $values = Assert-Cc4cRuntimeEnvironment (Read-Cc4cEnvironmentFile -Kind Runtime) -ManagementPort $ManagementPort
     }
     if ($Component -in @('All', 'Backend', 'MySQL')) { Assert-Cc4cDatabase $values }
@@ -99,10 +100,17 @@ try {
     }
     if ($Component -in @('All', 'Frontend')) {
         $null = Read-Cc4cEnvironmentFile -Kind Frontend
-        if ($Component -eq 'All' -and $FrontendPort -in @($ApplicationPort, $ManagementPort)) {
-            throw 'Backend and frontend ports must differ.'
+        if ($Component -eq 'All' -and $FrontendPort -in @($ApplicationPort, $ManagementPort, $ObservabilityPort)) {
+            throw 'Backend, frontend and observability ports must differ.'
         }
         Assert-Cc4cFreePort $FrontendPort
+    }
+    if ($Component -in @('All', 'Observability')) {
+        $null = Read-Cc4cEnvironmentFile -Kind Observability
+        if ($Component -eq 'All' -and $ObservabilityPort -in @($ApplicationPort, $ManagementPort, $FrontendPort)) {
+            throw 'Backend, frontend and observability ports must differ.'
+        }
+        Assert-Cc4cFreePort $ObservabilityPort
     }
     if ($Component -in @('All', 'Prometheus')) { Assert-Cc4cPrometheusEndpoint -BaseUrl $PrometheusUrl }
     Write-Output "Host preflight passed for '$Component'. No service or data was changed."

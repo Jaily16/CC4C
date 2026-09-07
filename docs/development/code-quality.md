@@ -20,20 +20,25 @@ cd D:\codex\CC4C_v5\frontend
 npm run format
 npm run lint
 
+cd D:\codex\CC4C_v5\observability
+npm run format
+npm run lint
+
 cd D:\codex\CC4C_v5
 .\infrastructure\quality\check-code-quality.ps1
 ```
 
-本机质量入口执行 `spotless:check`、`npm run lint`、`npm run format:check`、源码质量和文档链接检查，不自动改写文件、不安装依赖、不运行自动化测试。当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
+本机质量入口执行 `spotless:check`、两端前端的 `npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查，不自动改写文件、不安装依赖、不运行自动化测试。当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
 
-两个 Node 检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、上传数据、历史 SQL 和锁文件不进入正文扫描。
+三个 Node 检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、上传数据、历史 SQL 和锁文件不进入正文扫描。观测契约检查固定验证 8 项总览、3 个 Dashboard、20 个面板、39 条查询和 20 条告警。
 
 ```powershell
 node .\infrastructure\quality\check-source-quality.mjs
 node .\infrastructure\quality\check-doc-links.mjs
+node .\infrastructure\quality\check-observability-contract.mjs
 ```
 
-受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用 `mvn --no-transfer-progress clean package -DskipTests` 和 `npm run build`；业务验证采用用户确认的隔离环境与浏览器 smoke。观测应用目前只有环境模板，不声称其 lint 或构建已通过。
+受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用 `mvn --no-transfer-progress clean package -DskipTests` 和两端前端各自的 `npm run build`；业务与观测验证采用用户确认的隔离环境和浏览器 smoke。
 
 ## 中文 Javadoc 边界
 

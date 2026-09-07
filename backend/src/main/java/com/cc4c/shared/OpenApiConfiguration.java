@@ -70,6 +70,18 @@ public class OpenApiConfiguration {
                             .type(SecurityScheme.Type.APIKEY)
                             .in(SecurityScheme.In.HEADER)
                             .name("X-XSRF-TOKEN"));
+            components.addSecuritySchemes(
+                    "CC4C_OBSERVABILITY_SESSION",
+                    new SecurityScheme()
+                            .type(SecurityScheme.Type.APIKEY)
+                            .in(SecurityScheme.In.COOKIE)
+                            .name("CC4C_OBSERVABILITY_SESSION"));
+            components.addSecuritySchemes(
+                    "X-CC4C-OBSERVABILITY-CSRF",
+                    new SecurityScheme()
+                            .type(SecurityScheme.Type.APIKEY)
+                            .in(SecurityScheme.In.HEADER)
+                            .name("X-CC4C-OBSERVABILITY-CSRF"));
 
             openApi.getPaths().forEach((path, item) -> item.readOperationsMap().forEach((method, operation) -> {
                 if (method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST && createdPaths.contains(path)) {
@@ -81,11 +93,20 @@ public class OpenApiConfiguration {
                     operation.getResponses().addApiResponse("201", createdResponse);
                 }
                 SecurityRequirement security = new SecurityRequirement();
-                if (requiresSession(path, method)) {
-                    security.addList("CC4C_SESSION");
-                }
-                if (requiresCsrf(method)) {
-                    security.addList("X-XSRF-TOKEN");
+                if (path.startsWith("/observability/")) {
+                    if (requiresObservabilitySession(path)) {
+                        security.addList("CC4C_OBSERVABILITY_SESSION");
+                    }
+                    if (requiresObservabilityCsrf(path, method)) {
+                        security.addList("X-CC4C-OBSERVABILITY-CSRF");
+                    }
+                } else {
+                    if (requiresSession(path, method)) {
+                        security.addList("CC4C_SESSION");
+                    }
+                    if (requiresCsrf(method)) {
+                        security.addList("X-XSRF-TOKEN");
+                    }
                 }
                 if (!security.isEmpty()) {
                     operation.setSecurity(List.of(security));
@@ -123,6 +144,17 @@ public class OpenApiConfiguration {
                 || method == io.swagger.v3.oas.models.PathItem.HttpMethod.PUT
                 || method == io.swagger.v3.oas.models.PathItem.HttpMethod.DELETE
                 || method == io.swagger.v3.oas.models.PathItem.HttpMethod.PATCH;
+    }
+
+    private boolean requiresObservabilitySession(String path) {
+        return !Set.of("/observability/auth/csrf", "/observability/auth/login", "/observability/auth/session")
+                .contains(path);
+    }
+
+    private boolean requiresObservabilityCsrf(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {
+        return method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST
+                && Set.of("/observability/auth/login", "/observability/auth/logout")
+                        .contains(path);
     }
 
     private boolean requiresSession(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {

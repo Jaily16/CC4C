@@ -31,12 +31,18 @@
   "data": {
     "mysql": "8.4.11",
     "redis": "8.2.9",
-    "rabbitmq": "4.3.5",
-    "mailpit": "1.31.0"
+    "rabbitmq": "4.3.5"
   },
   "observability": {
     "prometheus": "3.13.2",
-    "grafana": "13.1.0"
+    "vue": "3.5.42",
+    "vueRouter": "4.1.6",
+    "pinia": "4.0.3",
+    "echarts": "6.1.0",
+    "axios": "1.19.0",
+    "elementPlus": "2.14.5",
+    "vite": "8.2.2",
+    "vueDevtoolsApi": "8.2.1"
   },
   "quality": {
     "spotlessMavenPlugin": "2.44.5",
