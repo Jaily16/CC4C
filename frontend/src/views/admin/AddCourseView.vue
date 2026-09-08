@@ -139,9 +139,9 @@ import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import { apiErrorMessage } from '@/utils/apiError';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
-import CourseBasicsForm from '@/components/admin/CourseBasicsForm.vue';
-import CourseModuleEditor from '@/components/admin/CourseModuleEditor.vue';
-import MarkdownPreview from '@/components/common/MarkdownPreview.vue';
+import CourseBasicsForm from '@/views/admin/components/CourseBasicsForm.vue';
+import CourseModuleEditor from '@/views/admin/components/CourseModuleEditor.vue';
+import MarkdownPreview from '@/components/MarkdownPreview.vue';
 
 const languages = [
   { value: 1, name: 'java', label: 'Java' },

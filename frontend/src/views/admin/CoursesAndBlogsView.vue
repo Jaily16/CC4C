@@ -101,7 +101,7 @@ import { ref } from 'vue';
 import { listHomeCourses } from '@/api/catalog';
 import { listAllBlogs, listPendingBlogs } from '@/api/community';
 import { useRouter } from 'vue-router';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

@@ -15,7 +15,7 @@ $previous = [Environment]::GetEnvironmentVariable('CC4C_OBSERVABILITY_PASSWORD_F
 try {
     $protectedFile = Assert-Cc4cOrdinaryPath $PasswordFile -OutsideWorkspace
     $backendRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $backendRoot 'target\cc4c-5.0.0-SNAPSHOT-observability-password.jar')
+    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $backendRoot 'target\cc4c-6.0.0-SNAPSHOT-observability-password.jar')
     $javaPath = Assert-Cc4cOrdinaryPath (Get-Command java.exe -ErrorAction Stop).Source
     [Environment]::SetEnvironmentVariable('CC4C_OBSERVABILITY_PASSWORD_FILE', $protectedFile, 'Process')
     & $javaPath -jar $jarPath

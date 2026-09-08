@@ -104,7 +104,7 @@ import { listCoursesByLanguage, searchCourses as searchCoursesApi } from '@/api/
 import { Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { assets } from '@/assets';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

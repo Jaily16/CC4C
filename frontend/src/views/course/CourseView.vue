@@ -154,9 +154,9 @@ import { ElMessage } from 'element-plus';
 import store from '@/store';
 import { assets } from '@/assets';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
-import CommentThread from '@/components/community/CommentThread.vue';
+import CommentThread from '@/components/CommentThread.vue';
 import { useCurrentUser } from '@/composables/useCurrentUser';
 import { useCommentThread } from '@/composables/useCommentThread.js';
 

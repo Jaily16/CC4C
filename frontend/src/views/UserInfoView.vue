@@ -67,8 +67,8 @@
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { getCurrentUser } from '@/api/profile';
-import UserInfo from '@/components/common/UserInfo.vue';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import UserInfo from '@/components/UserInfo.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 import store from '@/store';
 import { useCurrentUser } from '@/composables/useCurrentUser';

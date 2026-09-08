@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - v5/restructure
+      - v6/readability
   pull_request:
     branches:
       - main
@@ -85,9 +86,9 @@ jobs:
       - name: Verify production artifacts
         shell: bash
         run: |
-          main_jar='backend/target/cc4c-5.0.0-SNAPSHOT.jar'
-          admin_jar='backend/target/cc4c-5.0.0-SNAPSHOT-admin-bootstrap.jar'
-          password_jar='backend/target/cc4c-5.0.0-SNAPSHOT-observability-password.jar'
+          main_jar='backend/target/cc4c-6.0.0-SNAPSHOT.jar'
+          admin_jar='backend/target/cc4c-6.0.0-SNAPSHOT-admin-bootstrap.jar'
+          password_jar='backend/target/cc4c-6.0.0-SNAPSHOT-observability-password.jar'
           test -f "$main_jar"
           test -f "$admin_jar"
           test -f "$password_jar"

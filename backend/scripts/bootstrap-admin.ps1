@@ -23,7 +23,7 @@ try {
     if ((Get-Cc4cDatabaseName $values) -cne $ConfirmDatabase) { throw 'ConfirmDatabase must exactly match the configured database.' }
     & (Join-Path $workspaceRoot 'infrastructure\host\host-preflight.ps1') -Component MySQL -ConfirmDatabase $ConfirmDatabase
     if ($LASTEXITCODE -ne 0) { throw 'MySQL preflight failed.' }
-    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $workspaceRoot 'backend\target\cc4c-5.0.0-SNAPSHOT-admin-bootstrap.jar')
+    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $workspaceRoot 'backend\target\cc4c-6.0.0-SNAPSHOT-admin-bootstrap.jar')
     $javaPath = Assert-Cc4cOrdinaryPath (Get-Command java.exe -ErrorAction Stop).Source
     $javaVersion = @(& $javaPath -version 2>&1)
     if ($LASTEXITCODE -ne 0 -or ($javaVersion -join ' ') -notmatch 'version "21(?:\.|"|-)') { throw 'Java 21 is required.' }

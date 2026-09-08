@@ -81,7 +81,7 @@ import {
   listMessages,
   retryMessage as retryMessageRequest,
 } from '@/api/messaging';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const messages = ref([]);

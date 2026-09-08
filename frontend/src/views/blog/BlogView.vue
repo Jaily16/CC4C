@@ -66,7 +66,7 @@ import { getSession } from '@/api/auth';
 import { incrementBlogClick, listPublicBlogs } from '@/api/community';
 import { ElMessage } from 'element-plus';
 import { View } from '@element-plus/icons-vue';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

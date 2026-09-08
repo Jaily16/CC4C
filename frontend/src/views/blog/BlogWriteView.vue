@@ -113,8 +113,8 @@ import { getDraft, removeDraft, saveDraft, submitBlog, uploadBlogImage } from '@
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
-import PageFeedback from '@/components/common/PageFeedback.vue';
-import MarkdownPreview from '@/components/common/MarkdownPreview.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
+import MarkdownPreview from '@/components/MarkdownPreview.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

@@ -48,11 +48,11 @@ public final class JavaCommentCoverage {
     private static final Pattern ESCAPED_UNICODE = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
     private static final Pattern RECORD_COMPONENT_NAME =
             Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*)\\s*(?:\\[\\])?\\s*$");
-    private static final int EXPECTED_PACKAGES = 10;
-    private static final int EXPECTED_TYPES = 226;
-    private static final int EXPECTED_CONSTRUCTORS = 106;
-    private static final int EXPECTED_METHODS = 584;
-    private static final int EXPECTED_TOTAL = 926;
+    private static final int EXPECTED_PACKAGES = 13;
+    private static final int EXPECTED_TYPES = 228;
+    private static final int EXPECTED_CONSTRUCTORS = 108;
+    private static final int EXPECTED_METHODS = 587;
+    private static final int EXPECTED_TOTAL = 936;
 
     private JavaCommentCoverage() {}
 
@@ -92,7 +92,7 @@ public final class JavaCommentCoverage {
         if (!inventoryMatches) {
             System.err.printf(
                     Locale.ROOT,
-                    "声明清单与方面六基线不一致：期望 package/type/constructor/method/total = %d/%d/%d/%d/%d。%n",
+                    "声明清单与 V6 方面二基线不一致：期望 package/type/constructor/method/total = %d/%d/%d/%d/%d。%n",
                     EXPECTED_PACKAGES,
                     EXPECTED_TYPES,
                     EXPECTED_CONSTRUCTORS,

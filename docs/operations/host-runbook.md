@@ -30,7 +30,11 @@ npm run format:check
 npm run build
 ~~~
 
-后端产物为 backend/target/cc4c-5.0.0-SNAPSHOT.jar、admin-bootstrap classifier 和 observability-password classifier。资源打包只过滤受控 application.yml 中的 Maven 版本标记，Spring 环境占位符保持原样，Flyway SQL 与观测 catalog 不过滤、不改写。两端前端产物分别为 frontend/dist 和 observability/dist；宿主运行入口不会自动安装依赖。
+后端产物为 backend/target/cc4c-6.0.0-SNAPSHOT.jar、admin-bootstrap classifier 和 observability-password classifier。资源打包只过滤受控 application.yml 中的 Maven 版本标记，Spring 环境占位符保持原样，Flyway SQL 与观测 catalog 不过滤、不改写。两端前端产物分别为 frontend/dist 和 observability/dist；宿主运行入口不会自动安装依赖。
+
+## V6 前台命令入口
+
+V6 增加 infrastructure/host/with-app-environment.ps1，包裹一个标准 Maven、Java 或 npm 前台命令；退出时恢复环境，不创建日志或 PID 状态。后端仍须精确确认数据库，业务前端继续使用既有上传映射。入口实现和使用示例见 [V6 规划](../v6-iteration-plan.md)；本机启动与功能验证留在方面三，以下原有脚本仍为可选入口。
 
 ## 三端配置入口
 

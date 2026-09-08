@@ -109,8 +109,8 @@ import { getSession } from '@/api/auth';
 import { deleteBlog, listMyBlogs } from '@/api/community';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
-import UserInfo from '@/components/common/UserInfo.vue';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import UserInfo from '@/components/UserInfo.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

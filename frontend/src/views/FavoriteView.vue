@@ -122,8 +122,8 @@ import { incrementBlogClick } from '@/api/community';
 import { listBlogFavorites, listCourseFavorites } from '@/api/interactions';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
-import UserInfo from '@/components/common/UserInfo.vue';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import UserInfo from '@/components/UserInfo.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { assets } from '@/assets';
 import { apiErrorMessage } from '@/utils/apiError';
 

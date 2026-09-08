@@ -3,13 +3,13 @@
 # 外部依赖：仅依赖 Git 与 PowerShell AST，不连接应用、中间件或外部服务。
 # 破坏性边界：只读源码和 Git 路径清单，不读取 .env.local、秘密、运行数据或构建产物。
 # 失败恢复：Git、路径、语法、脚本头或函数注释任一检查失败即报告，不修改任何文件。
-# 退出码：17 个脚本及其函数全部通过返回 0，否则返回 1。
+# 退出码：18 个脚本及其函数全部通过返回 0，否则返回 1。
 
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
-$script:ExpectedScriptCount = 17
+$script:ExpectedScriptCount = 18
 $script:ChinesePattern = '[\u3400-\u9fff]'
 $script:RequiredHeaders = @('运行前提', '外部依赖', '破坏性边界', '失败恢复', '退出码')
 

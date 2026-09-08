@@ -78,7 +78,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { View } from '@element-plus/icons-vue';
 import { incrementBlogClick, listAllBlogs } from '@/api/community';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

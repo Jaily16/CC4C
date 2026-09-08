@@ -1,6 +1,6 @@
 {
   "name": "cc4c",
-  "version": "5.0.0-SNAPSHOT",
+  "version": "6.0.0-SNAPSHOT",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.16.0",

@@ -1,6 +1,6 @@
 # CC4C 第六次迭代规划：可读性迭代
 
-> 状态：方面一的顶层决策、受控备份验证和 V6 本地分支准备已完成；方面二至六尚未开始。方面一的独立提交与最终 Git 验收以第六节及本次备份中的交接结果为准。
+> 状态：方面一的顶层决策、受控备份验证和 V6 本地分支准备已完成；方面二已完成重组与静态、生产构建、合成兼容验证，方面三至六尚未开始。方面一的独立提交与最终 Git 验收以第六节及本次备份中的交接结果为准。
 >
 > 执行方式：每个方面在独立新对话中先只读理解、制定详细计划，经用户确认后实施；验收后记录独立提交和交接信息。本文不是一次性执行全部方面的授权。
 
@@ -113,7 +113,7 @@
 ### 2.4 交接状态
 
 - [x] 方面一：顶层决策、基线备份和 V6 分支准备已完成；独立提交及最终验收按第六节交接。
-- [ ] 方面二：三端重组和静态／生产构建验证，未开始。
+- [x] 方面二：三端重组及静态／生产构建、合成兼容验证完成；独立提交与最终交接见第七节。
 - [ ] 方面三：直接命令启动和浏览器功能验证，未开始。
 - [ ] 方面四：文档收敛与资料迁移，未开始。
 - [ ] 方面五：中文可读性增强与轻量回归，未开始。
@@ -543,3 +543,100 @@ infrastructure/observability/
 原 HTTP 路径、DTO、Flyway V1–V7、三个消息协议、权限与身份隔离保持不变。三份本机配置、既有账户、namespace、密钥和上传路径由用户维护、原地复用；不重建或清理业务数据，不操作 Docker 或外部中间件。未来推送、创建 PR 和正常合并 main 分别等待授权。
 
 本方面没有执行构建、应用测试、依赖安装、应用预检或服务启停，不把这些未执行项标记为通过；也不声称已验证当前端口释放或中间件运行状态。
+
+## 七、方面二实施记录与验收入口
+
+### 7.1 批准范围、基线与检查点
+
+用户已批准实施方面二；迁移、静态、生产构建与离线兼容验证已完成，实际修复与验收见第 7.6 节，不表示本机功能已验证。方面三至六尚未开始。
+
+唯一工作区为 D:\codex\CC4C_v5，沿用本地 v6/readability，无 upstream。方面二父提交锁定为 31799169d56bb75555c5b7d09fdfa197ccd02424，tree 为 571fe16952ec97090d04690be7c95e90637ffc8d；执行前 378 个 tracked 文件、工作树和暂存区干净。实时 main、V5、归档和标签与方面一一致，远端 V6 分支不存在。
+
+方面一检查点不改写。方面二检查点为 D:\codex\CC4C_v2\temp\v6-backup\20260908-aspect2-31799169，记录了基线、378 文件 tree、完整迁移和修改白名单。已从固定 Git 提交导出完整历史 bundle 和 ZIP，完成无 prerequisite 的 bundle、严格自包含 pack、378 项 blob、十三张截图、七份 Flyway、OpenAPI、catalog 和 SHA-256 验证。没有复制本机配置、依赖、运行数据或整个 .git。
+
+迁移清单 migration-manifest.json 的 SHA-256 为 7C607AE14892273836691FDC7173CA63CBC86802E6C3C4E287C2D8C31A65BFE0；基线 SHA256SUMS.json 的 SHA-256 为 45AED71F9CFA0FB1468958F2782CC401B4112CAD924CBC317381C73C21E09160。后续离线校验与结果单独记录，不改写已封存清单。
+
+### 7.2 已落实的结构与兼容方案
+
+- 147 个 Java 类迁往十个技术包；五个 Mapper 承担 DAO，两个 JDBC Repository 同层保留。辅助程序继续位于 com.cc4ctools，主应用仍在 com.cc4c 根包。
+- 删除十份 Modulith 包元数据，新增十三份技术包说明；移除 Modulith BOM/API，不升级其余依赖。
+- 同步 import、必要跨包可见性、管理上下文 META-INF 完整类名和当前职责说明；保留 Bean 名称、扫描边界、安全链顺序与事务语义。
+- SessionJsonRedisSerializer 保留业务会话 Bean 名称和 JSON 写入约定。未知类型处理只精确映射 V5 Principal 与 SessionAuthenticationToken 两个旧类名，校验目标基类型与许可；根对象和嵌套类型均走受限映射器，不替换普通字符串、不清理 Redis。兼容方向为 V6 读取 V5，新写入使用 V6 类名。
+- MyBatis 根据完整 Mapper 名分类：User/Administrator 为 identity，Catalog 为 catalog，Blog 为 community，Interaction 为 interaction；未知 Mapper 保留 shared。
+- 十一个 Vue 组件调整归属；业务 Vuex、观测 Pinia、API、页面、路由及上传 URL 保留，观测端已符合目标的源码原地不动。
+- 项目版本统一为 6.0.0-SNAPSHOT，同步 POM、两端 package/lock、版本清单、三种 JAR、脚本和工作流引用；工作流增加 V6 分支，本方面不推送。
+- 原 HTTP/DTO、SQL、Flyway V1–V7、三个 v1 消息、缓存和观测 Session 字段不变。截图、OpenAPI 和协议资源不迁移，文档不收敛，README 留在方面四整理。
+
+### 7.3 前台命令辅助
+
+新增 [with-app-environment.ps1](../infrastructure/host/with-app-environment.ps1)，接受 Application、一个前台原生命令 ScriptBlock、后端必需的 ConfirmDatabase，以及默认 4081 的 ManagementPort。调用目录必须对应所选应用。
+
+辅助仅复用现有环境解析、校验和恢复机制，不创建日志或 PID、不调用预检、不管理进程。上传根解析移至共享辅助供新旧入口复用；业务前端仅获得公开 API 与两个非 VITE_ 上传根变量，观测端清除上传根和已知后端秘密。应用结束时恢复原环境，原生命令失败保留非零退出码。
+
+以下命令用于方面三，方面二未执行：
+
+~~~powershell
+# 在 backend 目录，先按现有工具链要求临时选择 Java 21。
+& ..\infrastructure\host\with-app-environment.ps1 -Application Backend -ConfirmDatabase cc4cv5a3smoke -Command { mvn spring-boot:run }
+
+# 在 frontend 目录。
+& ..\infrastructure\host\with-app-environment.ps1 -Application Frontend -Command { npm run dev -- --host localhost --port 5173 --strictPort }
+
+# 在 observability 目录。
+& ..\infrastructure\host\with-app-environment.ps1 -Application Observability -Command { npm run dev -- --host localhost --port 5174 --strictPort }
+
+# 后端生产 JAR 的替代入口，同样留在方面三验证。
+& ..\infrastructure\host\with-app-environment.ps1 -Application Backend -ConfirmDatabase cc4cv5a3smoke -Command { java -jar target/cc4c-6.0.0-SNAPSHOT.jar }
+~~~
+
+本机终端默认 Java 17；已只读确认 D:\tool\Java\jdk-21 为可用的 Java 21。构建命令只在自身进程中临时设置 JAVA_HOME/PATH，并在 finally 恢复，不安装或修改系统工具链。
+
+### 7.4 正式验收顺序与停止规则
+
+先核对逐文件白名单、旧源码引用、十个一级包及不变资产。AST 实际统计为十三个包说明、228 个具名类型、108 个显式构造器、587 个显式方法，共 936 个文档单元；PowerShell 变为十八份脚本。门禁采用真实清单，不降低覆盖要求。
+
+从 V5 根运行 check-code-quality.ps1；其 Maven 调用通过临时 MAVEN_ARGS=-o 保持离线。随后从 backend 运行 mvn -o -B -ntp clean package -DskipTests，再分别从 frontend 和 observability 运行 npm run build。格式整理限于白名单源码；不安装依赖，不读取私有配置，不执行应用预检或服务启停。
+
+用户另外批准一次纯内存合成数据校验，代码和所需本次构建产物仅留在本次 V2 verification 下，不引入仓库测试框架。覆盖新会话往返、旧根对象及嵌套类型恢复、USER/ADMIN、authorities/details、非法和近似类型拒绝、错误基类型、普通字符串不变、null/空输入/畸形 JSON，以及五个 Mapper 分类与兜底。
+
+任一基线偏差、碰撞、路径重定向、白名单外变化或门禁失败均保留现场并停止；不安装依赖、降低标准、自动重试、reset、clean、stash 或回退覆盖。构建只使用标准目标产物目录，不执行额外递归删除。
+
+通过后仅逐个非递归移除本次迁空的旧源码目录；方面一登记的其他旧目录保留。精确暂存后产生一个本地提交，提交说明为 refactor: reorganize applications for V6 readability，唯一父提交为本节锁定父提交。实际提交 SHA、tree、检查结果和未执行项写入本次检查点结果，不 amend 嵌入自身 SHA。
+
+### 7.5 验收状态与方面三交接
+
+静态门禁、三端生产构建与离线兼容已通过；独立提交及最终 Git 验收由本次检查点结果记录。
+
+方面三继续复用既有配置、cc4cv5a3smoke、账户和 namespace，不重建或清理数据。先验证新前台命令、旧业务 Session 恢复、业务与观测身份隔离、上传映射及 Prometheus 抓取；任何写入/删除仍逐项确认精确目标。停止优先各终端 Ctrl+C，顺序为观测端、业务前端、后端，不操作中间件。本方面不授权进入方面三至六或执行远端收口。
+
+### 7.6 修复、实际验收与交接
+
+用户在首次源码门禁失败后明确授权修复并继续完成方面二，追加允许修改 infrastructure/quality/check-source-quality.mjs；原迁移清单不改写，追加授权记在本次检查点 migration-manifest-extension.json。
+
+实际修复与证据：
+
+- 源码检查器原来只向前读取十六行，误判 OutboxMessage 的完整长 Javadoc。现在按完整注释边界查找，只允许空白和完整注解位于说明与声明之间；六个合成边界用例通过，未缩短原注释或降低 AST 门禁。
+- 编译发现 OpenApiConfiguration 同时导入项目 DTO 与 Swagger 的 ApiResponse，已移除误加的 DTO 导入。由该首个编译错误引出的 Lombok 访问器错误随之消失，没有改写实体字段或增加手工访问器。
+- 合成 Session 校验暴露 @class 对象与数组类型标识的读取差异。写入映射器保留原协议，读取映射器接受属性标识和既有数组回退，两者共用精确类型许可。修复后 64 项 Session 与 Mapper 断言全部通过。
+- 新增 public 的类恢复为“注解在前、public 在声明前”的常规布局，避免迁移造成紧凑但难读的注解排列。
+- 产物比对按已核实的 Git 检出行尾处理：七份 Flyway 为 CRLF，catalog 与 application 为 LF；管理上下文文件位于生产 JAR 根 META-INF。源码与受控 Git blob 不变，不为适配验证而改写资源。
+
+验收记录保存在本次检查点 verification 下，失败诊断与成功结果分别保留，不覆盖先前文件。
+
+| 验收项 | 实际结果 |
+| --- | --- |
+| Java 源码与包 | 167 个源码文件，十个一级技术包，十三份技术包说明 |
+| 迁移主体对照 | 除安全配置及指标分类两处明确行为调整外，145 个迁移类在忽略包导入、可见性、注释和空白后与原主体一致 |
+| Java 中文 Javadoc | 936/936 |
+| PowerShell 质量 | 18/18 |
+| 前端静态质量 | 两端 ESLint、Prettier 通过 |
+| 文档及观测契约 | 33 份 Markdown 链接有效；8 项总览、3 个 Dashboard、20 个面板、39 条查询、20 条告警 |
+| 生产构建 | 后端离线 clean package -DskipTests、业务和观测 npm run build 通过 |
+| 后端产物 | 主应用、管理员引导、观测密码工具三种 JAR 的入口与资源核对通过，无旧业务包或 Modulith |
+| 合成兼容校验 | 64 项通过，无 Spring 应用上下文、网络或真实会话访问 |
+| 配置、数据及远端 | 未直接读取本机配置或运行数据，未启停应用或中间件，未安装依赖，未操作远端 |
+| 构建提示 | 两端存在超过 500 kB 的分包提示，保留给后续有授权的优化，不扩大本方面范围 |
+
+运行行为仍未验证：方面三需验证三个前台入口、真实旧会话恢复、身份隔离、上传映射及 Prometheus 抓取。方面三至六继续未开始。
+
+方面二本地提交与最终工作树、引用、资产及空目录验收，以本次检查点 aspect2-result.json 和独立 SHA-256 为准；本文不嵌入自身提交 SHA，不为此 amend。

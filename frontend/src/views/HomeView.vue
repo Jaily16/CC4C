@@ -123,7 +123,7 @@ import { useRouter } from 'vue-router';
 import { incrementBlogClick, listHomeBlogs } from '@/api/community';
 import { listHomeCourses } from '@/api/catalog';
 import { assets } from '@/assets';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();

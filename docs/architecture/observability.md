@@ -2,7 +2,7 @@
 
 ## 安全边界
 
-中文观测后台由独立 Vue 3 应用和后端 `observability` 模块组成。它使用唯一 `OBSERVABILITY` 账户、
+中文观测后台由独立 Vue 3 应用和后端按 controller、service、security 和 support/monitoring 分层的观测实现组成。它使用唯一 `OBSERVABILITY` 账户、
 `CC4C_OBSERVABILITY_SESSION` HttpOnly Cookie、专用 CSRF Cookie 和独立 Redis namespace；不复用业务
 `USER`、`ADMIN`、`CC4C_SESSION` 或业务 CSRF。门户 Session 空闲 30 分钟失效，创建 8 小时后绝对失效。
 

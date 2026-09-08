@@ -27,7 +27,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Backend preflight failed.' }
     $values = Assert-Cc4cRuntimeEnvironment (Read-Cc4cEnvironmentFile -Kind Runtime) -ManagementPort $ManagementPort
     if ((Get-Cc4cDatabaseName $values) -cne $ConfirmDatabase) { throw 'Database configuration changed after preflight.' }
-    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $backendRoot 'target\cc4c-5.0.0-SNAPSHOT.jar')
+    $jarPath = Assert-Cc4cOrdinaryPath (Join-Path $backendRoot 'target\cc4c-6.0.0-SNAPSHOT.jar')
     $javaPath = Assert-Cc4cOrdinaryPath (Get-Command java.exe -ErrorAction Stop).Source
     $javaVersion = @(& $javaPath -version 2>&1)
     if ($LASTEXITCODE -ne 0 -or ($javaVersion -join ' ') -notmatch 'version "21(?:\.|"|-)') { throw 'Java 21 is required.' }
