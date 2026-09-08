@@ -1,5 +1,9 @@
 # CC4C 容器运行手册
 
+> [!NOTE]
+> 本文仅供追溯 V4 运行方式，不可作为当前版本的操作手册。当前入口见
+> [本机运行手册](../../../operations/host-runbook.md)。
+
 ## 适用范围
 
 本手册对应 V3 方面七的本机 Docker Compose 交付。默认环境用于开发、演示和验收，不直接等同生产部署。它使用 Mailpit 捕获邮件、HTTP Cookie Secure=false、显式开启 OpenAPI，并把宿主入口限制在 `127.0.0.1`。
@@ -15,7 +19,7 @@
 
 Java、Maven、Node、MySQL、Redis 与 RabbitMQ 不需要安装到宿主机；只有单独运行源码时才需要相应工具链。
 
-若使用宿主机双运行模式，请改读 [宿主机运行手册](host-runbook.md)。宿主机脚本不启动或停止外部 MySQL、Redis、RabbitMQ、Mailpit/SMTP，只管理自身启动的后端、前端和可选观测进程；两种模式不得同时连接同一数据身份。
+若使用当前本机运行模式，请改读 [本机运行手册](../../../operations/host-runbook.md)。宿主机脚本不启动或停止外部 MySQL、Redis、RabbitMQ、Mailpit/SMTP，只管理自身启动的后端、前端和可选观测进程；两种模式不得同时连接同一数据身份。
 
 ## 首次启动
 

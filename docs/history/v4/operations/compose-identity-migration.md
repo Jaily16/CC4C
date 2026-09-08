@@ -1,5 +1,8 @@
 # Compose 身份迁移说明
 
+> [!NOTE]
+> 本文是 V4 容器数据身份迁移的历史记录，不是当前版本的配置或运行入口。
+
 ## 身份与兼容边界
 
 方面五将默认 Compose 项目切换为 `cc4c`。当前活动配置使用逻辑卷名 `mysql_data`、`redis_security_data`、`redis_cache_data`、`rabbitmq_data`、`prometheus_data`、`grafana_data`、`blog_uploads` 和 `avatar_uploads`；在不写死卷 `name:` 的前提下，默认实际卷名为 `cc4c_*`。服务名、网络逻辑、端口、上传挂载、`deploy/secrets/local`、数据库结构以及 Redis/RabbitMQ 命名空间不变。

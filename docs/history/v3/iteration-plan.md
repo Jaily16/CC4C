@@ -243,7 +243,7 @@ V3 优先保留现有 URL 和业务语义；若接口契约必须调整，应同
 - GitHub Actions 已定义 PR/main 质量门禁、Testcontainers、审计、Trivy、Compose smoke、OpenAPI 漂移和 SemVer tag-only 多架构发布、SBOM/provenance/attestation；第三方 Action 固定完整 SHA。本地等价门禁与远程质量工作流均已通过。
 - 容器 `PublicReadSmoke` 为 10,656 请求、0 错误、p95 5 ms、p99 18 ms；`PublicReadStandard` 三轮中位数为 p50 1 ms、p95 2 ms、p99 4 ms、886.13 req/s、0 错误。结果只代表本机受控环境，不表示生产容量。
 - 用户完成深层路由刷新、Mailpit 注册/找回与验证码单次消费、登录/Session/CSRF、收藏/评论/回复、草稿/上传/提交、管理员审核/异步消息、上传和数据库卷持久化、Actuator/Prometheus/Grafana、Swagger/控制台/网络脱敏的浏览器验收。
-- 交付、性能、供应链和浏览器证据见 [方面七报告](../reports/v3/aspect7/README.md)，部署及回滚步骤见 [容器运行手册](../../operations/container-runbook.md)。
+- 交付、性能、供应链和浏览器证据见 [方面七报告](../reports/v3/aspect7/README.md)，部署及回滚步骤见 [容器运行手册](../v4/operations/container-runbook.md)。
 
 ## 6. 性能验证框架
 

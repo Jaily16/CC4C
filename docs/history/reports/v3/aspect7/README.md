@@ -11,9 +11,9 @@
 
 关联交付物：
 
-- [容器运行手册](../../../../operations/container-runbook.md)
-- [容器交付架构](../../../../architecture/container-delivery.md)
-- [ADR-0001](../../../../architecture/adr/0001-containerized-delivery.md)
+- [容器运行手册](../../../v4/operations/container-runbook.md)
+- [容器交付架构](../../../v4/architecture/container-delivery.md)
+- [ADR-0001](../../../v4/architecture/0001-containerized-delivery.md)
 - [OpenAPI 快照](../../../../reference/openapi.json)
 
 本目录只提交脱敏摘要。Testcontainers 状态、Gatling 原始报告、Prometheus TSDB、日志、数据库备份、卷数据、secret 和镜像导出均保持忽略。

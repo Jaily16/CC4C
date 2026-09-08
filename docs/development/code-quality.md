@@ -30,7 +30,9 @@ cd D:\codex\CC4C_v5
 
 本机质量入口先执行 PowerShell AST 与 Java 中文 Javadoc 覆盖检查，再执行 `spotless:check`、两端前端的
 `npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查。入口不自动改写文件、
-不安装依赖、不运行自动化测试；当前没有最终构建工作流，不把将来的 CI 门禁表述为已执行。
+不安装依赖、不运行自动化测试。[GitHub build 工作流](../../.github/workflows/build.yml)在
+`v5/restructure`、`main` 和面向 `main` 的拉取请求上执行相同质量门禁，并完成后端生产打包和两个前端
+生产构建；它不使用 Docker、不连接业务外部服务，也不发布构建产物。
 
 质量检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；
 Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、

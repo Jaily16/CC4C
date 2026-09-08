@@ -66,10 +66,6 @@
     "setupNode": {
       "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
       "version": "v7.0.0"
-    },
-    "dependencyReview": {
-      "uses": "actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3",
-      "version": "v4.8.0"
     }
   },
   "compatibility": {

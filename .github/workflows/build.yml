@@ -1,0 +1,109 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+      - v5/restructure
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Java 21
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            observability/package-lock.json
+
+      - name: Install and verify the fixed toolchain
+        shell: bash
+        run: |
+          npm install --global npm@11.16.0 --ignore-scripts --no-audit --no-fund
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+          java -version 2>&1 | grep -Eq 'version "21\.'
+          mvn --version | grep -Fq 'Apache Maven 3.9.16'
+          pwsh -NoProfile -Command 'if ($PSVersionTable.PSVersion.ToString() -ne "7.6.5") { exit 1 }'
+
+      - name: Install business frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install observability frontend dependencies
+        working-directory: observability
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run repository quality gates
+        shell: pwsh
+        run: ./infrastructure/quality/check-code-quality.ps1
+
+      - name: Package backend without tests
+        working-directory: backend
+        run: mvn -B --no-transfer-progress clean package -DskipTests
+
+      - name: Build business frontend
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run format:check
+          npm run build
+
+      - name: Build observability frontend
+        working-directory: observability
+        run: |
+          npm run lint
+          npm run format:check
+          npm run build
+
+      - name: Verify production artifacts
+        shell: bash
+        run: |
+          main_jar='backend/target/cc4c-5.0.0-SNAPSHOT.jar'
+          admin_jar='backend/target/cc4c-5.0.0-SNAPSHOT-admin-bootstrap.jar'
+          password_jar='backend/target/cc4c-5.0.0-SNAPSHOT-observability-password.jar'
+          test -f "$main_jar"
+          test -f "$admin_jar"
+          test -f "$password_jar"
+          test -f frontend/dist/index.html
+          test -f observability/dist/index.html
+
+          jar tf "$main_jar" > "$RUNNER_TEMP/cc4c-main-jar.txt"
+          grep -Fxq 'BOOT-INF/classes/application.yml' "$RUNNER_TEMP/cc4c-main-jar.txt"
+          grep -Fxq 'BOOT-INF/classes/observability/catalog.json' "$RUNNER_TEMP/cc4c-main-jar.txt"
+          test "$(grep -Ec '^BOOT-INF/classes/db/migration/V[1-7]__.*\.sql$' "$RUNNER_TEMP/cc4c-main-jar.txt")" -eq 7
+          if grep -Eiq '(^|/)(test|gatling)(/|$)|\.env\.local$' "$RUNNER_TEMP/cc4c-main-jar.txt"; then
+            echo 'Forbidden test, performance, or local environment asset found in the backend JAR.' >&2
+            exit 1
+          fi
+
+          if grep -RIlE 'CC4C_(MANAGEMENT_PASSWORD_HASH|OBSERVABILITY_PASSWORD_HASH|PROMETHEUS_USERNAME|PROMETHEUS_PASSWORD)|http://127\.0\.0\.1:9090' frontend/dist observability/dist; then
+            echo 'Backend-only observability configuration found in a browser artifact.' >&2
+            exit 1
+          fi

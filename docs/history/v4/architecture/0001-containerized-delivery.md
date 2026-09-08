@@ -1,5 +1,8 @@
 # ADR-0001：以 Compose、Testcontainers 和 tag-only 工作流交付 CC4C
 
+> [!NOTE]
+> 本文是 V4 交付决策的历史记录，不是当前版本的运行或发布入口。
+
 - 状态：已接受
 - 日期：2026-08-29
 - 基线：`f0f6fa1`
