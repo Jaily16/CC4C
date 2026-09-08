@@ -15,10 +15,19 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+/**
+ * 装配共享基础设施运行组件，并集中声明安全或基础设施策略。
+ */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 class RabbitMessagingConfiguration {
 
+    /**
+     * 创建并配置 RabbitMessagingConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param topology 调用方提供的 {@code topology} 值
+     * @return 当前操作产生的 Declarables 结果
+     */
     @Bean
     Declarables messagingDeclarables(MessagingTopology topology) {
         TopicExchange events = new TopicExchange(topology.eventExchange(), true, false);
@@ -58,6 +67,13 @@ class RabbitMessagingConfiguration {
         return new Declarables(declarations);
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @param name 调用方提供的 {@code name} 值
+     * @param extraArguments 调用方提供的 {@code extraArguments} 值
+     * @return 当前操作产生的 Queue 结果
+     */
     private Queue quorumQueue(String name, Map<String, Object> extraArguments) {
         Map<String, Object> arguments = new HashMap<>(extraArguments);
         arguments.put("x-queue-type", "quorum");

@@ -18,6 +18,9 @@ import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+/**
+ * 定义或实现共享基础设施状态的基础设施存取边界。
+ */
 final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingBean, DisposableBean {
     private static final Duration IO_TIMEOUT = Duration.ofSeconds(2);
     private static final DefaultRedisScript<Long> COMPARE_AND_DELETE = new DefaultRedisScript<>(
@@ -34,15 +37,29 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
     private LettuceConnectionFactory connectionFactory;
     private StringRedisTemplate template;
 
+    /**
+     * 创建 RedisBusinessCacheStore 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param redisUrl 调用方提供的 {@code redisUrl} 值
+     */
     RedisBusinessCacheStore(String redisUrl) {
         this(redisUrl, Cc4cMetrics.disabled());
     }
 
+    /**
+     * 创建 RedisBusinessCacheStore 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param redisUrl 调用方提供的 {@code redisUrl} 值
+     * @param metrics 调用方提供的 {@code metrics} 值
+     */
     RedisBusinessCacheStore(String redisUrl, Cc4cMetrics metrics) {
         this.redisUrl = redisUrl;
         this.metrics = metrics;
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     */
     @Override
     public void afterPropertiesSet() {
         URI uri = URI.create(redisUrl);
@@ -78,11 +95,24 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         template.afterPropertiesSet();
     }
 
+    /**
+     * 读取业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     * @return 按当前协议生成或读取的字符串值
+     */
     @Override
     public String get(String key) {
         return observe("get", () -> template.opsForValue().get(key));
     }
 
+    /**
+     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     * @param value 待处理或存储的值
+     * @param ttl 正向值的有效期
+     */
     @Override
     public void set(String key, String value, Duration ttl) {
         observe("set", () -> {
@@ -91,6 +121,14 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         });
     }
 
+    /**
+     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     * @param value 待处理或存储的值
+     * @param ttl 正向值的有效期
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Override
     public boolean setIfAbsent(String key, String value, Duration ttl) {
         return observe(
@@ -98,6 +136,12 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
                 () -> Boolean.TRUE.equals(template.opsForValue().setIfAbsent(key, value, ttl)));
     }
 
+    /**
+     * 记录业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     * @return 按当前规则计算或读取的数值
+     */
     @Override
     public long increment(String key) {
         Long result = observe("increment", () -> template.opsForValue().increment(key));
@@ -107,6 +151,11 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         return result;
     }
 
+    /**
+     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     */
     @Override
     public void delete(String key) {
         observe("delete", () -> {
@@ -115,6 +164,13 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         });
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param key 当前存取操作使用的稳定键
+     * @param expectedValue 调用方提供的 {@code expectedValue} 值
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Override
     public boolean compareAndDelete(String key, String expectedValue) {
         Long result =
@@ -122,6 +178,12 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         return result != null && result > 0;
     }
 
+    /**
+     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param prefix 调用方提供的 {@code prefix} 值
+     * @return 按当前规则计算或读取的数值
+     */
     @Override
     public long deleteByPrefix(String prefix) {
         long startedNanos = metrics.start();
@@ -153,6 +215,11 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         }
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Override
     public boolean ping() {
         return observe("ping", () -> {
@@ -162,6 +229,9 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         });
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     */
     @Override
     public void destroy() {
         if (connectionFactory != null) {
@@ -169,6 +239,12 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         }
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param uri 调用方提供的 {@code uri} 值
+     * @param standalone 调用方提供的 {@code standalone} 值
+     */
     private void configureCredentials(URI uri, RedisStandaloneConfiguration standalone) {
         String userInfo = uri.getUserInfo();
         if (userInfo == null || userInfo.isEmpty()) {
@@ -187,6 +263,12 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         standalone.setPassword(RedisPassword.of(password));
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param uri 调用方提供的 {@code uri} 值
+     * @param standalone 调用方提供的 {@code standalone} 值
+     */
     private void configureDatabase(URI uri, RedisStandaloneConfiguration standalone) {
         String path = uri.getPath();
         if (path == null || path.isBlank() || "/".equals(path)) {
@@ -199,6 +281,14 @@ final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingB
         }
     }
 
+    /**
+     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     *
+     * @param <T> 方法使用的类型参数
+     * @param operation 调用方提供的 {@code operation} 值
+     * @param action 调用方提供的 {@code action} 值
+     * @return 当前操作产生的 T 结果
+     */
     private <T> T observe(String operation, java.util.function.Supplier<T> action) {
         long startedNanos = metrics.start();
         try {

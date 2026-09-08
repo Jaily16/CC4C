@@ -70,7 +70,7 @@
               :total="courseTotal"
               @current-change="changeCoursePage"
             />
-            <el-empty v-else description="还没有收藏课程">
+            <el-empty v-if="!favoriteCourses.length" description="还没有收藏课程">
               <el-button type="primary" @click="router.push('/allCourses')">浏览课程</el-button>
             </el-empty>
           </template>
@@ -103,7 +103,7 @@
               :total="blogTotal"
               @current-change="changeBlogPage"
             />
-            <el-empty v-else description="还没有收藏博客">
+            <el-empty v-if="!favoriteBlogs.length" description="还没有收藏博客">
               <el-button type="primary" @click="router.push('/allBlogs')">浏览博客</el-button>
             </el-empty>
           </template>
@@ -114,6 +114,7 @@
 </template>
 
 <script setup>
+/** FavoriteView 页面组件，协调当前路由的展示状态和用户事件。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { getSession } from '@/api/auth';
@@ -137,11 +138,13 @@ const blogPage = ref(1);
 const courseTotal = ref(0);
 const blogTotal = ref(0);
 const pageSize = 8;
+/** 从现有响应式状态派生 tabs，不发起请求或写入外部数据。 */
 const tabs = computed(() => [
   { key: 'courses', label: '收藏课程', count: courseTotal.value },
   { key: 'blogs', label: '收藏博客', count: blogTotal.value },
 ]);
 
+/** courseImage 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function courseImage(languageName) {
   return (
     assets.languageCards[languageName] ||
@@ -150,6 +153,7 @@ function courseImage(languageName) {
   );
 }
 
+/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
 function formatDate(value) {
   if (!value) return '发布时间未知';
   const date = new Date(value);
@@ -157,6 +161,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
+/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 async function verifyUser() {
   const response = await getSession();
   if (response.data.data?.role !== 'USER') {
@@ -167,6 +172,7 @@ async function verifyUser() {
   return true;
 }
 
+/** 读取 loadFavorites 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadFavorites() {
   loading.value = true;
   errorMessage.value = '';
@@ -188,20 +194,24 @@ async function loadFavorites() {
   }
 }
 
+/** 处理 changeCoursePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function changeCoursePage(page) {
   coursePage.value = page;
   return loadFavorites();
 }
 
+/** 处理 changeBlogPage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function changeBlogPage(page) {
   blogPage.value = page;
   return loadFavorites();
 }
 
+/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
+/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
 function openBlog(blogId) {
   incrementBlogClick(blogId).catch((error) => reportClientError(error, 'frontend/src/views/FavoriteView.vue'));
   router.push({ path: '/blogDetail', query: { blogId } });

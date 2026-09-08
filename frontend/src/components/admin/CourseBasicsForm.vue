@@ -32,6 +32,7 @@
 </template>
 
 <script setup>
+/** 课程基础信息表单组件，向父级回传受控字段变更。 */
 defineProps({
   form: { type: Object, required: true },
   errors: { type: Object, required: true },
@@ -40,6 +41,7 @@ defineProps({
 
 const emit = defineEmits(['clear-error', 'update-field']);
 
+/** 处理 updateField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateField(field, value) {
   emit('update-field', field, value);
   if (field === 'courseName') emit('clear-error', field);

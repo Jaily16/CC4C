@@ -45,10 +45,19 @@ import org.springframework.session.Session;
 import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
+/**
+ * 装配身份认证运行组件，并集中声明安全或基础设施策略。
+ */
 @Configuration
 @EnableMethodSecurity
 class SecurityConfiguration {
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param properties 由容器注入的 SecurityProperties 协作组件
+     * @return 当前操作产生的 PasswordEncoder 结果
+     */
     @Bean
     PasswordEncoder passwordEncoder(SecurityProperties properties) {
         Map<String, PasswordEncoder> encoders =
@@ -56,16 +65,33 @@ class SecurityConfiguration {
         return new DelegatingPasswordEncoder("bcrypt", encoders);
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param provider 调用方提供的 {@code provider} 值
+     * @return 当前操作产生的 AuthenticationManager 结果
+     */
     @Bean
     AuthenticationManager authenticationManager(Cc4cAuthenticationProvider provider) {
         return new ProviderManager(provider);
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @return 当前操作产生的 SecurityContextRepository 结果
+     */
     @Bean
     SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param properties 由容器注入的 SecurityProperties 协作组件
+     * @return 当前操作产生的 CookieCsrfTokenRepository 结果
+     */
     @Bean
     CookieCsrfTokenRepository csrfTokenRepository(SecurityProperties properties) {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -76,6 +102,12 @@ class SecurityConfiguration {
         return repository;
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param properties 由容器注入的 SecurityProperties 协作组件
+     * @return 当前操作产生的 DefaultCookieSerializer 结果
+     */
     @Bean
     DefaultCookieSerializer cookieSerializer(SecurityProperties properties) {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
@@ -88,11 +120,24 @@ class SecurityConfiguration {
         return serializer;
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param <S> 方法使用的类型参数
+     * @param repository 调用方提供的 {@code repository} 值
+     * @return 当前操作产生的 SessionRegistry 结果
+     */
     @Bean
     <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> repository) {
         return new SpringSessionBackedSessionRegistry<>(repository);
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param sessionRegistry 调用方提供的 {@code sessionRegistry} 值
+     * @return 当前操作产生的 SessionAuthenticationStrategy 结果
+     */
     @Bean
     SessionAuthenticationStrategy sessionAuthenticationStrategy(SessionRegistry sessionRegistry) {
         RoleAwareConcurrentSessionStrategy concurrent = new RoleAwareConcurrentSessionStrategy(sessionRegistry);
@@ -101,6 +146,13 @@ class SecurityConfiguration {
         return new CompositeSessionAuthenticationStrategy(List.of(concurrent, fixation, register));
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param sessionRegistry 调用方提供的 {@code sessionRegistry} 值
+     * @param errorWriter 调用方提供的 {@code errorWriter} 值
+     * @return 当前操作产生的 ConcurrentSessionFilter 结果
+     */
     @Bean
     ConcurrentSessionFilter concurrentSessionFilter(SessionRegistry sessionRegistry, SecurityErrorWriter errorWriter) {
         return new ConcurrentSessionFilter(
@@ -108,6 +160,12 @@ class SecurityConfiguration {
                 event -> errorWriter.write(event.getResponse(), 401, BusinessCode.UNAUTHORIZED, "会话已失效，请重新登录"));
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param errorWriter 调用方提供的 {@code errorWriter} 值
+     * @return 当前操作产生的 FilterRegistrationBean<RedisFailureResponseFilter> 结果
+     */
     @Bean
     FilterRegistrationBean<RedisFailureResponseFilter> redisFailureResponseFilter(SecurityErrorWriter errorWriter) {
         FilterRegistrationBean<RedisFailureResponseFilter> registration =
@@ -116,6 +174,12 @@ class SecurityConfiguration {
         return registration;
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param source 由容器注入的 ObjectMapper 协作组件
+     * @return 当前操作产生的 RedisSerializer<Object> 结果
+     */
     @Bean(name = "springSessionDefaultRedisSerializer")
     RedisSerializer<Object> springSessionDefaultRedisSerializer(ObjectMapper source) {
         ObjectMapper objectMapper = source.copy();
@@ -132,6 +196,19 @@ class SecurityConfiguration {
         return new GenericJackson2JsonRedisSerializer(objectMapper);
     }
 
+    /**
+     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     *
+     * @param http 调用方提供的 {@code http} 值
+     * @param csrfTokenRepository 当前协议使用且不得记录的安全令牌
+     * @param securityContextRepository 由容器注入的 SecurityContextRepository 协作组件
+     * @param legacyCookieCleanupFilter 调用方提供的 {@code legacyCookieCleanupFilter} 值
+     * @param concurrentSessionFilter 调用方提供的 {@code concurrentSessionFilter} 值
+     * @param errorWriter 调用方提供的 {@code errorWriter} 值
+     * @param metrics 调用方提供的 {@code metrics} 值
+     * @return 当前操作产生的 SecurityFilterChain 结果
+     * @throws Exception 当输入、数据或依赖状态不满足当前方法约束时抛出
+     */
     @Bean
     @Order(2)
     SecurityFilterChain securityFilterChain(
@@ -152,7 +229,7 @@ class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
-                        .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/test/**")
+                        .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/csrf", "/auth/session")
                         .permitAll()
@@ -236,6 +313,11 @@ class SecurityConfiguration {
         return http.build();
     }
 
+    /**
+     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     *
+     * @return 按当前协议生成或读取的字符串值
+     */
     private static String currentRole() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

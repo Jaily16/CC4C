@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+/**
+ * 映射身份认证数据库记录，字段语义与现有表结构保持一致。
+ */
 @Data
 @TableName("administrator")
 class AdministratorEntity {

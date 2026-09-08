@@ -7,12 +7,18 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 
-/** 集中维护可靠消息的信封校验、引用解析、重试头和死信消息构造规则。 */
-/** ReliableMessageProtocolSupport 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
+/**
+ * 集中维护可靠消息的信封校验、引用解析、重试头和死信消息构造规则。
+ */
 public final class ReliableMessageProtocolSupport {
     private static final String RETRY_HEADER = "cc4c-retry-attempt";
 
-    /** 解析 AMQP messageId 中的事件 ID 与代际。 */
+    /**
+     * 解析 AMQP messageId 中的事件 ID 与代际。
+     *
+     * @param message 待处理的消息及其属性
+     * @return 存在时包含目标值，否则为空
+     */
     public Optional<MessageReference> messageReference(Message message) {
         String messageId = message.getMessageProperties().getMessageId();
         if (messageId == null) {
@@ -35,7 +41,12 @@ public final class ReliableMessageProtocolSupport {
         }
     }
 
-    /** 校验消息信封版本、必需字段和队列事件类型。 */
+    /**
+     * 校验消息信封版本、必需字段和队列事件类型。
+     *
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @param expectedEventType 调用方提供的 {@code expectedEventType} 值
+     */
     public void validateEnvelope(MessageEnvelope envelope, String expectedEventType) {
         if (envelope == null
                 || envelope.eventId() == null
@@ -55,7 +66,13 @@ public final class ReliableMessageProtocolSupport {
         }
     }
 
-    /** 读取并限制消息重试次数，非法或缺失头按首次投递处理。 */
+    /**
+     * 读取并限制消息重试次数，非法或缺失头按首次投递处理。
+     *
+     * @param message 待处理的消息及其属性
+     * @param retryLimit 调用方提供的 {@code retryLimit} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public int retryAttempt(Message message, int retryLimit) {
         Object value = message.getMessageProperties().getHeaders().get(RETRY_HEADER);
         if (value instanceof Number number) {
@@ -64,7 +81,14 @@ public final class ReliableMessageProtocolSupport {
         return 0;
     }
 
-    /** 构造保留原始正文、关联 ID 和递增重试头的持久消息。 */
+    /**
+     * 构造保留原始正文、关联 ID 和递增重试头的持久消息。
+     *
+     * @param original 调用方提供的 {@code original} 值
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @param attempt 调用方提供的 {@code attempt} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public Message copyForRetry(Message original, MessageEnvelope envelope, int attempt) {
         return MessageBuilder.withBody(original.getBody())
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
@@ -77,7 +101,14 @@ public final class ReliableMessageProtocolSupport {
                 .build();
     }
 
-    /** 构造保留原始正文、关联 ID 和错误码的持久死信消息。 */
+    /**
+     * 构造保留原始正文、关联 ID 和错误码的持久死信消息。
+     *
+     * @param original 调用方提供的 {@code original} 值
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public Message copyForDead(Message original, MessageEnvelope envelope, String errorCode) {
         return MessageBuilder.withBody(original.getBody())
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
@@ -90,7 +121,11 @@ public final class ReliableMessageProtocolSupport {
                 .build();
     }
 
-    /** 可用于幂等持久化的消息引用。 */
-    /** MessageReference 是不可变的数据载体，保持现有字段语义和序列化契约。 */
+    /**
+     * 可用于幂等持久化的消息引用。
+     *
+     * @param eventId 目标对象的稳定标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     public record MessageReference(String eventId, int generation) {}
 }

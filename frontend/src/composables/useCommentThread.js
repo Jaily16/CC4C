@@ -1,15 +1,23 @@
-import { nextTick, ref, unref } from 'vue';
+import { nextTick, onScopeDispose, ref, unref } from 'vue';
 
 import { apiErrorMessage } from '../utils/apiError.js';
 import { reportClientError } from '../utils/reportClientError.js';
 
+/** 把现有数据转换为 resolve 所需展示结构，不产生外部副作用。 */
 function resolve(value) {
   return typeof value === 'function' ? value() : unref(value);
 }
 
+/** 校验 isSuccessfulMutation 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function isSuccessfulMutation(response) {
   const result = response?.data?.data;
   return result === true || (result !== null && typeof result === 'object');
+}
+
+/** 保留雪花 ID 的十进制字符串精度；缺失值和已失真的数值一律视为无效身份。 */
+function commentIdentity(value) {
+  if (typeof value === 'string') return /^[1-9]\d*$/.test(value) ? value : '';
+  return Number.isSafeInteger(value) && value > 0 ? String(value) : '';
 }
 
 /**
@@ -20,6 +28,9 @@ export function useCommentThread({
   fetchPage,
   createComment,
   createReply,
+  currentUserId,
+  deleteComment,
+  confirmDelete,
   focusIdPrefix = 'replies-',
   loadErrorMessage = '评论加载失败，请检查网络后重试。',
   commentErrorMessage = '评论发布失败，请稍后重试。',
@@ -38,7 +49,94 @@ export function useCommentThread({
   const commentPage = ref(1);
   const commentPageSize = ref(10);
   const commentTotal = ref(0);
+  const deletingCommentId = ref(null);
+  const deleteError = ref('');
+  let scopeVersion = 0;
 
+  // 离开详情组件时使未确认的删除失效，避免全局确认弹窗在旧页面销毁后仍发送请求。
+  onScopeDispose(() => {
+    scopeVersion += 1;
+  });
+
+  /** 仅控制本人删除入口的展示；后端仍必须独立验证登录身份与评论归属。 */
+  function canDeleteComment(commentItem) {
+    const userId = commentIdentity(resolve(currentUserId));
+    return Boolean(
+      userId &&
+      userId === commentIdentity(commentItem?.userId) &&
+      commentIdentity(commentItem?.commentId) &&
+      typeof deleteComment === 'function' &&
+      typeof confirmDelete === 'function',
+    );
+  }
+
+  /** 在当前已加载的评论树中定位目标，避免确认弹窗结束后操作已经切走的评论。 */
+  function findComment(commentId, items = commentList.value) {
+    for (const item of items) {
+      if (commentIdentity(item.commentId) === commentId) return item;
+      const replyItem = findComment(commentId, item.subCommentList || []);
+      if (replyItem) return replyItem;
+    }
+    return null;
+  }
+
+  /**
+   * 串行完成本人评论的确认、删除和列表刷新；不做乐观移除，也不自动重试写请求。
+   * 页面切换或身份变化会使待确认操作失效；删除成功后的刷新失败会单独提示，避免误删第二次。
+   */
+  async function removeComment(commentItem) {
+    if (deletingCommentId.value !== null || !canDeleteComment(commentItem)) return false;
+    const commentId = commentIdentity(commentItem.commentId);
+    const userId = commentIdentity(resolve(currentUserId));
+    const version = scopeVersion;
+    deletingCommentId.value = commentId;
+    deleteError.value = '';
+    try {
+      await confirmDelete(commentItem);
+      if (
+        version !== scopeVersion ||
+        userId !== commentIdentity(resolve(currentUserId)) ||
+        !canDeleteComment(findComment(commentId))
+      ) {
+        return false;
+      }
+      const response = await deleteComment(commentId);
+      if (version !== scopeVersion) return false;
+      if (response?.data?.data !== true) {
+        deleteError.value = response?.data?.msg || '评论删除失败，请稍后重试。';
+        return false;
+      }
+      if (commentIdentity(replyingTo.value) === commentId) {
+        replyingTo.value = null;
+        replyText.value = '';
+        replyInputError.value = '';
+      }
+      // 当前页只剩被删的顶层评论时回到上一页；删除回复不改变顶层分页。
+      if (
+        commentPage.value > 1 &&
+        commentList.value.length === 1 &&
+        commentIdentity(commentList.value[0].commentId) === commentId
+      ) {
+        commentPage.value -= 1;
+      }
+      const refreshed = await loadComments();
+      if (version !== scopeVersion) return false;
+      if (!refreshed) {
+        deleteError.value = '评论已删除，但列表刷新失败，请点击重新加载。';
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (version !== scopeVersion || error === 'cancel' || error === 'close') return false;
+      deleteError.value = apiErrorMessage(error, '评论删除失败，请稍后重试。');
+      reportClientError(error, 'useCommentThread.removeComment');
+      return false;
+    } finally {
+      if (version === scopeVersion) deletingCommentId.value = null;
+    }
+  }
+
+  /** 读取 loadComments 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
   async function loadComments() {
     const currentSubjectId = resolve(subjectId);
     if (!currentSubjectId) {
@@ -56,6 +154,7 @@ export function useCommentThread({
       });
       commentList.value = response?.data?.data?.items || [];
       commentTotal.value = response?.data?.data?.total || 0;
+      deleteError.value = '';
       return response;
     } catch (error) {
       commentList.value = [];
@@ -68,6 +167,7 @@ export function useCommentThread({
     }
   }
 
+  /** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
   async function comment() {
     commentInputError.value = '';
     const content = commentText.value.trim();
@@ -96,12 +196,14 @@ export function useCommentThread({
     }
   }
 
+  /** 响应 toggleReply 导航或界面事件，更新当前组件的受控展示状态。 */
   function toggleReply(commentId) {
     replyingTo.value = replyingTo.value === commentId ? null : commentId;
     replyText.value = '';
     replyInputError.value = '';
   }
 
+  /** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
   async function reply(fatherId) {
     replyInputError.value = '';
     const content = replyText.value.trim();
@@ -134,13 +236,18 @@ export function useCommentThread({
     }
   }
 
+  /** 处理 changeCommentPage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
   function changeCommentPage(page) {
     commentPage.value = page;
     replyingTo.value = null;
     return loadComments();
   }
 
+  /** 处理 resetComments 清理操作，仅影响当前功能明确指向的状态或资源。 */
   function resetComments() {
+    scopeVersion += 1;
+    deletingCommentId.value = null;
+    deleteError.value = '';
     commentList.value = [];
     commentsLoading.value = false;
     commentsError.value = '';
@@ -169,6 +276,10 @@ export function useCommentThread({
     commentPage,
     commentPageSize,
     commentTotal,
+    deletingCommentId,
+    deleteError,
+    canDeleteComment,
+    removeComment,
     loadComments,
     comment,
     toggleReply,

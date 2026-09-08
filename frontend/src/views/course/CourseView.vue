@@ -134,6 +134,7 @@
 </template>
 
 <script setup>
+/** CourseView 课程页面，协调课程目录、阅读状态和用户交互。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -180,6 +181,7 @@ const langs = [
   { no: '4', name: 'c', icon: assets.languageIcons.c },
 ];
 const { user: currentUser, isUser: loggedIn } = useCurrentUser();
+/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
 const userInitial = computed(() => (currentUser.value.name || '用户').trim().slice(0, 1).toUpperCase());
 const commentThread = useCommentThread({
   subjectId: () => courseData.value?.courseId,
@@ -213,10 +215,12 @@ const {
   resetComments,
 } = commentThread;
 
+/** 响应 selectedLanguage 导航或界面事件，更新当前组件的受控展示状态。 */
 function selectedLanguage() {
   return langs.find((lang) => lang.name === mainLang.value) || langs[0];
 }
 
+/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 async function verifyUser() {
   try {
     const resp = await getSession();
@@ -233,6 +237,7 @@ async function verifyUser() {
   }
 }
 
+/** 读取 loadCourseModules 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadCourseModules() {
   const language = selectedLanguage();
   modulesLoading.value = true;
@@ -249,6 +254,7 @@ async function loadCourseModules() {
   }
 }
 
+/** 响应 selectLang 导航或界面事件，更新当前组件的受控展示状态。 */
 function selectLang() {
   courseData.value = null;
   text.value = '';
@@ -257,6 +263,7 @@ function selectLang() {
   return loadCourseModules();
 }
 
+/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
 async function openCourse(courseName) {
   courseLoading.value = true;
   courseError.value = '';
@@ -285,10 +292,12 @@ async function openCourse(courseName) {
   }
 }
 
+/** 处理 retryCourse 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function retryCourse() {
   if (courseData.value?.courseName) return openCourse(courseData.value.courseName);
 }
 
+/** starCourse 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function starCourse() {
   if (!courseData.value?.courseId) return;
   try {
@@ -307,10 +316,12 @@ async function starCourse() {
   }
 }
 
+/** 处理 submitComment 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function submitComment() {
   if (await submitCommentState()) ElMessage.success('评论成功');
 }
 
+/** 处理 submitReply 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function submitReply(fatherId) {
   if (await submitReplyState(fatherId)) ElMessage.success('回复成功');
 }

@@ -1,0 +1,173 @@
+spring:
+  application:
+    name: CC4C
+  datasource:
+    #数据库驱动名称
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 连接和账号必须由 backend/.env.local 经启动脚本提供，不回退到其他数据库。
+    url: "${CC4C_DB_URL}"
+    #数据库访问用户名
+    username: "${CC4C_DB_USERNAME}"
+    #数据库访问密码
+    password: "${CC4C_DB_PASSWORD}"
+    hikari:
+      connection-timeout: "${CC4C_DB_CONNECTION_TIMEOUT_MS:3000}"
+      validation-timeout: "${CC4C_DB_VALIDATION_TIMEOUT_MS:1000}"
+  flyway:
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  data:
+    redis:
+      url: "${CC4C_REDIS_URL}"
+      connect-timeout: 2s
+      timeout: 2s
+  session:
+    store-type: redis
+    timeout: 2h
+    redis:
+      repository-type: indexed
+      namespace: "${CC4C_SESSION_NAMESPACE}"
+  mail:
+    host: "${CC4C_MAIL_HOST}"
+    password: "${CC4C_MAIL_PASSWORD:}"
+    username: "${CC4C_MAIL_USERNAME:}"
+    default-encoding: UTF-8
+    port: "${CC4C_MAIL_PORT}"
+    properties:
+      mail:
+        smtp:
+          auth: "${CC4C_MAIL_AUTH:false}"
+          ssl:
+            enable: "${CC4C_MAIL_SSL_ENABLED:false}"
+          starttls:
+            enable: "${CC4C_MAIL_STARTTLS_ENABLED:false}"
+  rabbitmq:
+    addresses: "${CC4C_RABBITMQ_URL}"
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 5
+        concurrency: 1
+        default-requeue-rejected: false
+        missing-queues-fatal: false
+  servlet:
+    multipart:
+      #文件传输的大小上限
+      max-file-size: 100MB
+      max-request-size: 1000MB
+server:
+  #项目启动的端口号，可以自己设定，但请与前端设置的不同
+  port: 4080
+
+management:
+  server:
+    address: "${CC4C_MANAGEMENT_ADDRESS:127.0.0.1}"
+    port: "${CC4C_MANAGEMENT_PORT:4081}"
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      roles: OBSERVABILITY
+      probes:
+        enabled: true
+      status:
+        order: down,out-of-service,degraded,unknown,up
+        http-mapping:
+          down: 503
+          out-of-service: 503
+          degraded: 200
+      group:
+        liveness:
+          include: livenessState
+          show-details: never
+        readiness:
+          include: readinessState,db,securityRedis
+          show-details: never
+        dependencies:
+          include: businessCache,rabbit,asyncMessaging
+          show-details: when-authorized
+  health:
+    redis:
+      enabled: false
+  metrics:
+    tags:
+      application: cc4c-backend
+      environment: "${CC4C_OBSERVABILITY_ENVIRONMENT:local}"
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,250ms,500ms,1s,2s,5s
+
+info:
+  app:
+    name: CC4C
+    version: "@project.version@"
+
+logging:
+  structured:
+    format:
+      console: "${CC4C_LOG_FORMAT:ecs}"
+
+springdoc:
+  api-docs:
+    enabled: "${CC4C_API_DOCS_ENABLED:false}"
+  swagger-ui:
+    enabled: "${CC4C_API_DOCS_ENABLED:false}"
+
+#自定义配置属性
+cc4c:
+  observability:
+    enabled: "${CC4C_OBSERVABILITY_ENABLED:true}"
+    environment: "${CC4C_OBSERVABILITY_ENVIRONMENT:local}"
+    management-username: "${CC4C_MANAGEMENT_USERNAME}"
+    management-password-hash: "${CC4C_MANAGEMENT_PASSWORD_HASH}"
+    messaging-sample-interval: "${CC4C_MESSAGING_SAMPLE_INTERVAL:15s}"
+    max-http-uri-tags: "${CC4C_MAX_HTTP_URI_TAGS:100}"
+    portal:
+      username: "${CC4C_OBSERVABILITY_USERNAME}"
+      password-hash: "${CC4C_OBSERVABILITY_PASSWORD_HASH}"
+      session-namespace: "${CC4C_OBSERVABILITY_SESSION_NAMESPACE}"
+      cookie-secure: "${CC4C_OBSERVABILITY_COOKIE_SECURE:false}"
+      allowed-origin: "${CC4C_OBSERVABILITY_ALLOWED_ORIGIN:http://localhost:5174}"
+      idle-timeout: 30m
+      absolute-timeout: 8h
+    prometheus:
+      url: "${CC4C_PROMETHEUS_URL:http://127.0.0.1:9090}"
+      username: "${CC4C_PROMETHEUS_USERNAME:}"
+      password: "${CC4C_PROMETHEUS_PASSWORD:}"
+  messaging:
+    namespace: "${CC4C_RABBITMQ_NAMESPACE}"
+    active-key-id: "${CC4C_MESSAGING_ACTIVE_KEY_ID}"
+    payload-keys: "${CC4C_MESSAGING_PAYLOAD_KEYS}"
+    moderation-recipients: "${CC4C_MODERATION_NOTIFICATION_RECIPIENTS}"
+    confirm-timeout: "${CC4C_MESSAGING_CONFIRM_TIMEOUT:5s}"
+    consumer-retry-delays: "${CC4C_MESSAGING_CONSUMER_RETRY_DELAYS:30s,5m,30m}"
+    poll-interval: "${CC4C_MESSAGING_POLL_INTERVAL:500ms}"
+    dispatcher-enabled: "${CC4C_OUTBOX_DISPATCHER_ENABLED:true}"
+    consumers-enabled: "${CC4C_MESSAGE_CONSUMERS_ENABLED:true}"
+  cache:
+    enabled: "${CC4C_BUSINESS_CACHE_ENABLED}"
+    namespace: "${CC4C_CACHE_NAMESPACE}"
+  security:
+    pepper: "${CC4C_SECURITY_PEPPER}"
+    cookie-secure: "${CC4C_SESSION_COOKIE_SECURE}"
+    allowed-origins: "${CC4C_ALLOWED_ORIGINS}"
+    bcrypt-strength: "${CC4C_BCRYPT_STRENGTH:12}"
+    key-prefix: "${CC4C_SESSION_NAMESPACE}:security"
+  #存储博客图片的路径
+  save-img-path: "${CC4C_SAVE_IMG_PATH}"
+  #返回的请求访问博客图片的路径
+  request-img-path: "${CC4C_REQUEST_IMG_PATH:http://localhost:5173/blogImg/}"
+  #头像存储路径
+  save-avatar-path: "${CC4C_SAVE_AVATAR_PATH}"
+  #返回的请求访问头像图片的路径
+  request-avatar-path: "${CC4C_REQUEST_AVATAR_PATH:http://localhost:5173/avatar/}"

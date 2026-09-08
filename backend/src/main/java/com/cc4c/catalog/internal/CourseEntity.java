@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+/**
+ * 映射课程目录数据库记录，字段语义与现有表结构保持一致。
+ */
 @Data
 @TableName("course")
 class CourseEntity {

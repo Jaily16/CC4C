@@ -7,8 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Optional;
 
-/** 编解码业务缓存信封，并统一无效值、负缓存和大小上限的语义。 */
-/** BusinessCacheValueCodec 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
+/**
+ * 编解码业务缓存信封，并统一无效值、负缓存和大小上限的语义。
+ */
 public final class BusinessCacheValueCodec {
     /** 缓存信封的当前协议版本。 */
     public static final int ENVELOPE_VERSION = 1;
@@ -18,12 +19,24 @@ public final class BusinessCacheValueCodec {
 
     private final ObjectMapper objectMapper;
 
-    /** 使用应用共用的 JSON 映射器创建编解码器。 */
+    /**
+     * 使用应用共用的 JSON 映射器创建编解码器。
+     *
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     */
     public BusinessCacheValueCodec(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    /** 将缓存 JSON 解码为值、负缓存或缺失值。无效信封通过异常交由上层旁路。 */
+    /**
+     * 将缓存 JSON 解码为值、负缓存或缺失值。无效信封通过异常交由上层旁路。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param json 调用方提供的 {@code json} 值
+     * @param type 调用方提供的 {@code type} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     * @throws JsonProcessingException 既有声明所描述的失败条件发生时抛出
+     */
     public <T> DecodedValue<T> decode(String json, JavaType type) throws JsonProcessingException {
         JsonNode root = objectMapper.readTree(json);
         if (root.path("schemaVersion").asInt(-1) != ENVELOPE_VERSION) {
@@ -46,7 +59,14 @@ public final class BusinessCacheValueCodec {
         }
     }
 
-    /** 将值或空 Optional 编码为带 schemaVersion=1 的缓存信封。 */
+    /**
+     * 将值或空 Optional 编码为带 schemaVersion=1 的缓存信封。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param value 调用方提供的 {@code value} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     * @throws JsonProcessingException 既有声明所描述的失败条件发生时抛出
+     */
     public <T> String encode(Optional<T> value) throws JsonProcessingException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("schemaVersion", ENVELOPE_VERSION);
@@ -59,22 +79,39 @@ public final class BusinessCacheValueCodec {
         return objectMapper.writeValueAsString(root);
     }
 
-    /** 表示一次缓存解码结果，调用方据此区分命中、负缓存和缺失。 */
-    /** DecodedValue 是不可变的数据载体，保持现有字段语义和序列化契约。 */
+    /**
+     * 表示一次缓存解码结果，调用方据此区分命中、负缓存和缺失。
+     *
+     * @param <T> 该声明处理的数据或结果类型
+     * @param state 调用方提供的 {@code state} 值
+     * @param value 调用方提供的 {@code value} 值
+     */
     public record DecodedValue<T>(State state, T value) {
-        /** 缓存解码结果的状态。 */
-        /** State 枚举稳定的状态或协议取值，避免调用方自行解释字符串。 */
+        /**
+         * 缓存解码结果的状态。
+         */
         public enum State {
             VALUE,
             NEGATIVE
         }
 
-        /** 创建普通值结果。 */
+        /**
+         * 创建普通值结果。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @param value 调用方提供的 {@code value} 值
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         public static <T> DecodedValue<T> value(T value) {
             return new DecodedValue<>(State.VALUE, value);
         }
 
-        /** 创建负缓存结果。 */
+        /**
+         * 创建负缓存结果。
+         *
+         * @param <T> 该声明处理的数据或结果类型
+         * @return 按当前声明计算、查询或转换得到的结果
+         */
         public static <T> DecodedValue<T> negative() {
             return new DecodedValue<>(State.NEGATIVE, null);
         }

@@ -13,22 +13,74 @@
 本地可以显式执行：
 
 ```powershell
-cd D:\codex\CC4C_v2\backend
+cd D:\codex\CC4C_v5\backend
 mvn spotless:apply
 
-cd D:\codex\CC4C_v2\frontend
+cd D:\codex\CC4C_v5\frontend
 npm run format
 npm run lint
 
-cd D:\codex\CC4C_v2
-.\scripts\check-code-quality.ps1
+cd D:\codex\CC4C_v5\observability
+npm run format
+npm run lint
+
+cd D:\codex\CC4C_v5
+.\infrastructure\quality\check-code-quality.ps1
 ```
 
-CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无依赖源码质量检查，不自动改写文件、不安装额外工具、不读取本机秘密。
+本机质量入口先执行 PowerShell AST 与 Java 中文 Javadoc 覆盖检查，再执行 `spotless:check`、两端前端的
+`npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查。入口不自动改写文件、
+不安装依赖、不运行自动化测试。[GitHub build 工作流](../../.github/workflows/build.yml)在
+`v5/restructure`、`main` 和面向 `main` 的拉取请求上执行相同质量门禁，并完成后端生产打包和两个前端
+生产构建；它不使用 Docker、不连接业务外部服务，也不发布构建产物。
+
+质量检查器位于 `infrastructure/quality/`，只使用 Git tracked 与非忽略未跟踪文件清单，排除已删除路径；
+Git 查询失败即停止，不回退为递归扫描。源文件和父路径必须是普通路径，秘密、本机配置、构建产物、
+上传数据、历史 SQL 和锁文件不进入正文扫描。观测契约检查固定验证 8 项总览、3 个 Dashboard、
+20 个面板、39 条查询和 20 条告警。
+
+```powershell
+node .\infrastructure\quality\check-source-quality.mjs
+node .\infrastructure\quality\check-doc-links.mjs
+node .\infrastructure\quality\check-observability-contract.mjs
+java --source 21 .\infrastructure\quality\JavaCommentCoverage.java --repository-root .
+.\infrastructure\quality\check-powershell-quality.ps1
+```
+
+受控 PowerShell 使用 7.6.5，通过 AST 语法检查而不执行脚本主体。生产构建使用
+`mvn --no-transfer-progress clean package -DskipTests` 和两端前端各自的 `npm run build`；
+业务与观测验证采用用户确认的隔离环境和浏览器 smoke。
 
 ## 中文 Javadoc 边界
 
-生产 Java 的公开类型必须使用准确的中文 Javadoc 说明用途、约束、事务边界、幂等、重试、故障旁路、安全脱敏或退出码。注释不改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键。测试代码可以使用测试意图注释，但不以注释代替行为断言。
+`JavaCommentCoverage.java` 使用 JDK 21 Compiler Tree API 检查生产 Java，不依赖正则推测声明。当前基线包含
+10 个包说明、226 个具名类型、106 个显式构造器和 584 个显式方法，共 926 个文档单元。具名类型、
+匿名类中的显式覆盖方法和全部显式构造器/方法都必须具有中文 Javadoc；匿名类类型本身、隐式 record
+访问器和隐式构造器不计入覆盖。
+
+- 类型说明职责、边界和主要协作对象；record 还要为每个组件提供 `@param`。
+- 方法和构造器为全部值参数及类型参数提供 `@param`；非 `void` 方法提供 `@return`，显式异常提供
+  `@throws` 或 `@exception`。
+- 涉及事务、权限、脱敏、幂等、缓存失效、重试、故障旁路或外部副作用时，说明必须与当前实现一致，
+  不得虚构额外保证。
+- 注释不得改变标识符、HTTP/API 契约、SQL、数据库迁移、消息事件名或日志键，也不为已移除的测试资产
+  保留伪入口。
+
+## Vue 与 JavaScript 功能边界
+
+两个 ESLint 配置共同加载本地 `eslint-functional-comments.mjs`。每个 `.vue` 组件需要中文职责说明；
+具名/导出函数、API wrapper、composable、Pinia/Vuex action、事件处理器、业务派生函数以及生命周期、
+`watch`、路由守卫、定时器、事件监听和 Axios 拦截器边界需要紧邻中文说明。
+
+API 注释应区分只读请求和写入副作用，并写清 Session/CSRF 与错误处理责任。局部
+`map`/`filter`/`reduce`/`find`/`forEach` 回调、Promise 链回调和懒加载组件由所属语义函数统一说明，
+不要求逐行翻译式注释。规则只检查职责说明是否存在，评审仍需核对文字与实现一致。
+
+## PowerShell 功能边界
+
+`check-powershell-quality.ps1` 使用 PowerShell AST 校验语法，不执行被检查脚本。当前 17 个受控脚本必须
+同时具有 `运行前提`、`外部依赖`、`破坏性边界`、`失败恢复` 和 `退出码` 五项头部；每个具名函数必须
+有紧邻中文说明。检查范围来自 Git 清单，身份不明的路径或 Git 查询失败都会直接阻断。
 
 ## 日志脱敏
 
@@ -37,11 +89,11 @@ CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无�
 
 ## 生成物和兼容资产
 
-`target`、`node_modules`、`dist`、性能输出和临时扫描缓存属于可重建产物或历史证据，不进入源码格式化。Flyway V1–V7、OpenAPI 契约、RabbitMQ `*.v1` 事件、DTO、Cookie、CSRF 和 Compose `cc4c-v3` 数据身份属于兼容资产，不能因为格式或静态引用结果而删除或改写。
+`target`、`node_modules`、`dist`、性能输出和临时扫描缓存属于可重建产物或历史证据，不进入源码格式化。Flyway V1–V7、OpenAPI 契约、RabbitMQ `*.v1` 事件、DTO、Cookie、CSRF 和既有隔离环境数据身份属于兼容资产，不能因为格式或静态引用结果而删除或改写。
 
 ## 超长活动文件审查记录
 
-核心文件超过 300 行时，优先抽取纯转换、协议、表单、评论或错误处理职责；保留页面/服务作为协调入口。当前仍超过 300 行的文件均已完成相应审查：
+核心文件超过 300 行时，优先抽取纯转换、协议、表单、评论或错误处理职责；保留页面/服务作为协调入口。下面保留业务文件的既有职责审查记录；它不是对所有当前文件行数的自动断言。共享 `infrastructure/host/host-environment.ps1` 集中维护配置解析与精确进程身份规则，避免各入口出现安全行为分歧：
 
 | 文件 | 保留原因 |
 | --- | --- |
@@ -66,7 +118,5 @@ CI 只执行 `spotless:check`、`npm run lint`、`npm run format:check` 和无�
 | `frontend/src/layout/components/Sidebar.vue` | 保留全局导航、权限菜单和响应式布局协调；作为布局组件需要同时处理路由、菜单和移动端展示，拆分会增加状态边界。 |
 | `frontend/src/views/UserInfoView.vue` | 保留用户资料路由容器和页面布局协调；实际资料编辑职责已由 `UserInfo.vue` 及共享对话框承担。 |
 | `backend/src/main/java/com/cc4c/shared/OutboxRepository.java` | 保留 Outbox SQL、租约和状态更新的一致性边界；仓储语句必须与 Flyway V6/V7 和消息重试语义一起维护，不适合按 SQL 方法拆成多个组件。 |
-| `backend/src/test/java/com/cc4c/performance/PerformanceBenchmarkApplication.java`、`PerformanceDataSeeder.java` | 性能测试工具的启动配置与数据语义必须保持完整，不属于生产业务组件。 |
-| `scripts/check-versions.mjs`、`scripts/check-structure.mjs` | 无依赖检查器集中定义受控路径、兼容例外和错误契约；拆分会削弱单一门禁入口。 |
 
-每次继续拆分都必须先保存行为基线，并以现有测试、API 快照、消息协议测试和前端页面回归证明等价性。
+每次继续拆分都必须先保存行为基线，并以编译、lint、格式检查、API/消息协议静态对照和浏览器人工 smoke 证明等价性，不恢复自动化测试或性能资产。

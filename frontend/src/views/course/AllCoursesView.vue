@@ -97,6 +97,7 @@
 </template>
 
 <script setup>
+/** AllCoursesView 课程页面，协调课程目录、阅读状态和用户交互。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { listCoursesByLanguage, searchCourses as searchCoursesApi } from '@/api/catalog';
@@ -123,6 +124,7 @@ const langs = [
   { name: 'c', icon: assets.languageIcons.c },
 ];
 
+/** 从现有响应式状态派生 resultLabel，不发起请求或写入外部数据。 */
 const resultLabel = computed(() => {
   if (loading.value) return '正在加载课程…';
   if (isSearching.value) return `“${searchInfo.value}” 的搜索结果`;
@@ -138,6 +140,7 @@ const courseLevelLabels = {
   66: '难度：必须展示',
 };
 
+/** courseDifficulty 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function courseDifficulty(course) {
   const level = course.level ?? course.difficulty;
   if (level === null || level === undefined || level === '') {
@@ -146,10 +149,12 @@ function courseDifficulty(course) {
   return courseLevelLabels[String(level)] || '系统化学习路径';
 }
 
+/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
+/** 读取 requestCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function requestCourses() {
   loading.value = true;
   errorMessage.value = '';
@@ -170,6 +175,7 @@ async function requestCourses() {
   }
 }
 
+/** 读取 loadLanguageCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 function loadLanguageCourses() {
   isSearching.value = false;
   searchInfo.value = '';
@@ -177,6 +183,7 @@ function loadLanguageCourses() {
   return requestCourses();
 }
 
+/** searchCourses 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function searchCourses() {
   if (!searchInfo.value) return loadLanguageCourses();
   isSearching.value = true;
@@ -184,15 +191,18 @@ function searchCourses() {
   return requestCourses();
 }
 
+/** 处理 clearSearch 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function clearSearch() {
   searchInfo.value = '';
   return loadLanguageCourses();
 }
 
+/** 处理 retryLoad 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function retryLoad() {
   return requestCourses();
 }
 
+/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function changePage(page) {
   currentPage.value = page;
   return retryLoad();

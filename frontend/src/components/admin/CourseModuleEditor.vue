@@ -90,6 +90,7 @@
 </template>
 
 <script setup>
+/** 课程模块编辑组件，维护模块列表输入并向父级同步更新。 */
 import { Loading, Plus } from '@element-plus/icons-vue';
 
 defineProps({
@@ -120,6 +121,7 @@ const emit = defineEmits([
   'update-module-field',
 ]);
 
+/** 处理 updateModuleField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateModuleField(field, value) {
   emit('update-module-field', field, value);
   if (field === 'moduleName') emit('clear-module-error');

@@ -12,12 +12,22 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Cc4cAuthenticationProvider 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
+ */
 @Component
 final class Cc4cAuthenticationProvider implements AuthenticationProvider {
     private final IdentityService identityService;
     private final PasswordEncoder passwordEncoder;
     private final Cc4cMetrics metrics;
 
+    /**
+     * 创建 Cc4cAuthenticationProvider 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param identityService 由容器注入的 IdentityService 协作组件
+     * @param passwordEncoder 仅用于当前安全校验的密码或密码摘要
+     * @param metrics 调用方提供的 {@code metrics} 值
+     */
     @Autowired
     Cc4cAuthenticationProvider(IdentityService identityService, PasswordEncoder passwordEncoder, Cc4cMetrics metrics) {
         this.identityService = identityService;
@@ -25,10 +35,23 @@ final class Cc4cAuthenticationProvider implements AuthenticationProvider {
         this.metrics = metrics;
     }
 
+    /**
+     * 创建 Cc4cAuthenticationProvider 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param identityService 由容器注入的 IdentityService 协作组件
+     * @param passwordEncoder 仅用于当前安全校验的密码或密码摘要
+     */
     Cc4cAuthenticationProvider(IdentityService identityService, PasswordEncoder passwordEncoder) {
         this(identityService, passwordEncoder, Cc4cMetrics.disabled());
     }
 
+    /**
+     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     *
+     * @param authentication 调用方提供的 {@code authentication} 值
+     * @return 当前操作产生的 Authentication 结果
+     * @throws AuthenticationException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     */
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         Cc4cAuthenticationToken request = (Cc4cAuthenticationToken) authentication;
@@ -55,6 +78,12 @@ final class Cc4cAuthenticationProvider implements AuthenticationProvider {
         }
     }
 
+    /**
+     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     *
+     * @param authentication 调用方提供的 {@code authentication} 值
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Override
     public boolean supports(Class<?> authentication) {
         return Cc4cAuthenticationToken.class.isAssignableFrom(authentication);

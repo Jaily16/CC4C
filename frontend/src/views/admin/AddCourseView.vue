@@ -130,6 +130,7 @@
 </template>
 
 <script setup>
+/** AddCourseView 管理页面，协调管理员只可访问的查询与操作状态。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { createCourse, createModule, listModules } from '@/api/catalog';
@@ -177,11 +178,15 @@ const courseForm = reactive({ courseName: '', description: '', level: 0 });
 const moduleForm = reactive({ languageId: 1, moduleName: '', level: 0, priority: 1 });
 const formErrors = reactive({ courseName: '', module: '', description: '' });
 
+/** 从现有响应式状态派生 moduleCount，不发起请求或写入外部数据。 */
 const moduleCount = computed(() => modules.value.reduce((total, language) => total + language.children.length, 0));
+/** 从现有响应式状态派生 moduleAvailable，不发起请求或写入外部数据。 */
 const moduleAvailable = computed(() => moduleCount.value > 0);
+/** 从现有响应式状态派生 editorStatus，不发起请求或写入外部数据。 */
 const editorStatus = computed(() =>
   uploading.value ? '正在上传图片…' : `约 ${courseForm.description.trim().length} 个字符`,
 );
+/** 从现有响应式状态派生 publishDisabledReason，不发起请求或写入外部数据。 */
 const publishDisabledReason = computed(() => {
   if (moduleLoading.value) return '语言模块仍在加载中。';
   if (moduleError.value) return '语言模块加载失败，请重试。';
@@ -189,20 +194,25 @@ const publishDisabledReason = computed(() => {
   if (uploading.value) return '图片仍在上传中。';
   return '';
 });
+/** 从现有响应式状态派生 publishDisabled，不发起请求或写入外部数据。 */
 const publishDisabled = computed(() => Boolean(publishDisabledReason.value) || publishing.value);
 
+/** 处理 clearFormError 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function clearFormError(field) {
   if (Object.prototype.hasOwnProperty.call(formErrors, field)) formErrors[field] = '';
 }
 
+/** 处理 updateCourseFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateCourseFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(courseForm, field)) courseForm[field] = value;
 }
 
+/** 处理 updateModuleFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateModuleFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(moduleForm, field)) moduleForm[field] = value;
 }
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(
   () => courseForm.description,
   (value) => {
@@ -210,6 +220,7 @@ watch(
   },
 );
 
+/** 读取 loadModules 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadModules() {
   moduleLoading.value = true;
   moduleError.value = '';
@@ -237,10 +248,12 @@ async function loadModules() {
   }
 }
 
+/** 响应 openModuleDialog 导航或界面事件，更新当前组件的受控展示状态。 */
 function openModuleDialog() {
   moduleDialogOpen.value = true;
 }
 
+/** 处理 resetModuleForm 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function resetModuleForm() {
   moduleForm.languageId = 1;
   moduleForm.moduleName = '';
@@ -249,6 +262,7 @@ function resetModuleForm() {
   moduleNameError.value = '';
 }
 
+/** 处理 addModule 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function addModule() {
   moduleNameError.value = moduleForm.moduleName.trim() ? '' : '请输入模块名称。';
   if (moduleNameError.value || moduleSubmitting.value) return;
@@ -275,6 +289,7 @@ async function addModule() {
   }
 }
 
+/** 校验 validateCourse 对应的输入或会话条件，仅返回受控结果或页面提示。 */
 function validateCourse() {
   formErrors.courseName = courseForm.courseName.trim() ? '' : '请输入课程标题。';
   formErrors.module = selectedModule.value.length === 2 ? '' : '请选择课程语言模块。';
@@ -282,6 +297,7 @@ function validateCourse() {
   return !formErrors.courseName && !formErrors.module && !formErrors.description;
 }
 
+/** 处理 publishCourse 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function publishCourse() {
   if (!validateCourse() || publishDisabled.value) return;
   const language = languages.find((item) => item.name === selectedModule.value[0]);
@@ -316,10 +332,12 @@ async function publishCourse() {
   }
 }
 
+/** codeSave 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function codeSave() {
   ElMessage.info('内容保留在当前编辑器中，发布后才会保存为课程');
 }
 
+/** onUploadImg 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function onUploadImg(files, callback) {
   uploading.value = true;
   try {

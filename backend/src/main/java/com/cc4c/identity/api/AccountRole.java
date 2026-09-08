@@ -1,6 +1,8 @@
 package com.cc4c.identity.api;
 
-/** AccountRole 定义模块之间稳定、可验证的公开契约。 */
+/**
+ * AccountRole 枚举身份认证的有限状态或协议取值。
+ */
 public enum AccountRole {
     USER,
     ADMIN

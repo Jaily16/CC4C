@@ -9,14 +9,32 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 封装共享基础设施持久化、租约与状态更新操作，集中维护数据库语义。
+ */
 @Repository
 class InboxRepository {
     private final JdbcTemplate jdbc;
 
+    /**
+     * 创建 InboxRepository 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param jdbc 调用方提供的 {@code jdbc} 值
+     */
     InboxRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param workerId 目标对象的稳定标识
+     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
+     * @return 当前操作产生的 InboxClaim 结果
+     */
     @Transactional
     public InboxClaim claim(String consumerName, String eventId, int generation, String workerId, Instant leaseUntil) {
         int inserted = jdbc.update(
@@ -73,6 +91,14 @@ class InboxRepository {
         return InboxClaim.ACQUIRED;
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     */
     void markRetryWaiting(String consumerName, String eventId, int generation, String errorCode) {
         jdbc.update(
                 """
@@ -86,6 +112,13 @@ class InboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     void markDone(String consumerName, String eventId, int generation) {
         jdbc.update(
                 """
@@ -99,6 +132,14 @@ class InboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param consumerName 调用方提供的 {@code consumerName} 值
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     */
     void markDead(String consumerName, String eventId, int generation, String errorCode) {
         jdbc.update(
                 """
@@ -113,6 +154,13 @@ class InboxRepository {
                 generation);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param before 调用方提供的 {@code before} 值
+     * @param limit 调用方提供的 {@code limit} 值
+     * @return 按当前规则计算或读取的数值
+     */
     int cleanupDone(Instant before, int limit) {
         return jdbc.update(
                 """
@@ -124,6 +172,11 @@ class InboxRepository {
                 limit);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @return 当前操作产生的 Map<String,Long> 结果
+     */
     Map<String, Long> statusCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
         jdbc.query("SELECT status, COUNT(*) AS count_value FROM async_inbox GROUP BY status", result -> {
@@ -132,5 +185,12 @@ class InboxRepository {
         return Map.copyOf(counts);
     }
 
+    /**
+     * 承载共享基础设施查询返回的一行投影数据。
+     *
+     * @param status 当前对象或流程的有限状态
+     * @param leaseOwner 调用方提供的 {@code leaseOwner} 值
+     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
+     */
     private record InboxRow(String status, String leaseOwner, Instant leaseUntil) {}
 }

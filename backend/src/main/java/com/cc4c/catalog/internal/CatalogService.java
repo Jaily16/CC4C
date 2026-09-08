@@ -25,8 +25,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * CatalogService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
+ */
 @Service
-/** CatalogService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public class CatalogService implements CatalogLookup {
     private static final String HOME_REGION = "catalog:home";
     private static final String LANGUAGE_REGION = "catalog:language";
@@ -44,11 +46,23 @@ public class CatalogService implements CatalogLookup {
     private final CatalogMapper mapper;
     private final BusinessCache cache;
 
+    /**
+     * 创建 CatalogService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param mapper 调用方提供的 {@code mapper} 值
+     * @param cache 调用方提供的 {@code cache} 值
+     */
     CatalogService(CatalogMapper mapper, BusinessCache cache) {
         this.mapper = mapper;
         this.cache = cache;
     }
 
+    /**
+     * 执行 CatalogService 中的 home 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CourseResponse> home(PageQuery query) {
         return cachedPage(
                 HOME_REGION,
@@ -57,6 +71,13 @@ public class CatalogService implements CatalogLookup {
                 () -> toPage(mapper.selectHome(new Page<>(query.page(), query.size()))));
     }
 
+    /**
+     * 执行 CatalogService 中的 search 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param searchText 调用方提供的 {@code searchText} 值
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CourseResponse> search(String searchText, PageQuery query) {
         LambdaQueryWrapper<CourseEntity> wrapper = new LambdaQueryWrapper<CourseEntity>()
                 .and(condition -> condition
@@ -67,6 +88,13 @@ public class CatalogService implements CatalogLookup {
         return toPage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper));
     }
 
+    /**
+     * 执行 CatalogService 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageName 调用方提供的 {@code languageName} 值
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<CourseResponse> byLanguage(String languageName, PageQuery query) {
         return cachedPage(LANGUAGE_REGION, languageName + ":" + pageKey(query), DETAIL_TTL, () -> {
             LambdaQueryWrapper<CourseEntity> wrapper = new LambdaQueryWrapper<CourseEntity>()
@@ -76,6 +104,12 @@ public class CatalogService implements CatalogLookup {
         });
     }
 
+    /**
+     * 执行 CatalogService 中的 byName 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param courseName 调用方提供的 {@code courseName} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public CourseResponse byName(String courseName) {
         return cache.getOrLoad(
                         DETAIL_REGION, courseName, COURSE_TYPE, DETAIL_TTL, NEGATIVE_TTL, () -> Optional.ofNullable(
@@ -86,6 +120,12 @@ public class CatalogService implements CatalogLookup {
                         HttpStatus.NOT_FOUND, BusinessCode.COURSE_GET_ONE_FAILED, "Course does not exist"));
     }
 
+    /**
+     * 执行 CatalogService 中的 modules 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public List<CourseModuleResponse> modules(int languageId) {
         return cache.getOrLoad(
                         MODULES_REGION,
@@ -97,6 +137,13 @@ public class CatalogService implements CatalogLookup {
                 .orElseThrow();
     }
 
+    /**
+     * 执行 CatalogService 中的 recommend 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param major 调用方提供的 {@code major} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public List<CourseModuleResponse> recommend(int languageId, int major) {
         int moduleMinimum = major == -1 ? -1 : 0;
         int moduleMaximum = major == 1 ? 1 : 0;
@@ -114,6 +161,12 @@ public class CatalogService implements CatalogLookup {
                 .orElseThrow();
     }
 
+    /**
+     * 变更 CatalogService 对应状态，并维持既有校验、事务及外部副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public CourseModuleResponse createModule(CourseModuleCreateRequest request) {
         if (!languageExists(request.languageId())) {
@@ -131,6 +184,12 @@ public class CatalogService implements CatalogLookup {
                 request.languageId(), request.priority(), request.moduleName(), request.level(), List.of());
     }
 
+    /**
+     * 变更 CatalogService 对应状态，并维持既有校验、事务及外部副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public CourseResponse createCourse(CourseCreateRequest request) {
         if (mapper.exists(
@@ -157,21 +216,42 @@ public class CatalogService implements CatalogLookup {
         return toResponse(course);
     }
 
+    /**
+     * 执行 CatalogService 中的 languageExists 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Override
     public boolean languageExists(int languageId) {
         return mapper.findLanguageName(languageId) != null;
     }
 
+    /**
+     * 执行 CatalogService 中的 courseExists 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param courseId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Override
     public boolean courseExists(int courseId) {
         return mapper.selectById(courseId) != null;
     }
 
+    /**
+     * 执行 CatalogService 中的 invalidateCoursePopularity 职责，并保持既有权限、事务与副作用边界。
+     */
     @Override
     public void invalidateCoursePopularity() {
         cache.invalidateAfterCommit(HOME_REGION);
     }
 
+    /**
+     * 执行 CatalogService 中的 loadModules 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private List<CourseModuleResponse> loadModules(int languageId) {
         Map<Integer, List<String>> courseNames = groupCourseNames(mapper.selectCourseNamesByLanguage(languageId));
         return mapper.selectModules(languageId).stream()
@@ -179,6 +259,16 @@ public class CatalogService implements CatalogLookup {
                 .toList();
     }
 
+    /**
+     * 执行 CatalogService 中的 loadRecommendation 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param moduleMinimum 调用方提供的 {@code moduleMinimum} 值
+     * @param moduleMaximum 调用方提供的 {@code moduleMaximum} 值
+     * @param courseMinimum 调用方提供的 {@code courseMinimum} 值
+     * @param courseMaximum 调用方提供的 {@code courseMaximum} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private List<CourseModuleResponse> loadRecommendation(
             int languageId, int moduleMinimum, int moduleMaximum, int courseMinimum, int courseMaximum) {
         Map<Integer, List<String>> courseNames = groupCourseNames(
@@ -188,6 +278,12 @@ public class CatalogService implements CatalogLookup {
                 .toList();
     }
 
+    /**
+     * 执行 CatalogService 中的 groupCourseNames 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param rows 调用方提供的 {@code rows} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private Map<Integer, List<String>> groupCourseNames(List<ModuleCourseNameRow> rows) {
         return rows.stream()
                 .collect(Collectors.groupingBy(
@@ -196,6 +292,13 @@ public class CatalogService implements CatalogLookup {
                         Collectors.mapping(ModuleCourseNameRow::getCourseName, Collectors.toList())));
     }
 
+    /**
+     * 执行 CatalogService 中的 moduleResponse 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param module 调用方提供的 {@code module} 值
+     * @param courseNames 调用方提供的 {@code courseNames} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private CourseModuleResponse moduleResponse(CourseModuleRow module, Map<Integer, List<String>> courseNames) {
         return new CourseModuleResponse(
                 module.getLanguageId(),
@@ -205,16 +308,37 @@ public class CatalogService implements CatalogLookup {
                 courseNames.getOrDefault(module.getPriority(), List.of()));
     }
 
+    /**
+     * 执行 CatalogService 中的 cachedPage 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param region 调用方提供的 {@code region} 值
+     * @param key 调用方提供的 {@code key} 值
+     * @param ttl 调用方提供的 {@code ttl} 值
+     * @param loader 调用方提供的 {@code loader} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private PageResult<CourseResponse> cachedPage(
             String region, String key, Duration ttl, Supplier<PageResult<CourseResponse>> loader) {
         return cache.getOrLoad(region, key, COURSE_PAGE_TYPE, ttl, NEGATIVE_TTL, () -> Optional.of(loader.get()))
                 .orElseThrow();
     }
 
+    /**
+     * 执行 CatalogService 中的 pageKey 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String pageKey(PageQuery query) {
         return query.page() + ":" + query.size();
     }
 
+    /**
+     * 执行 CatalogService 中的 toPage 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param page 分页查询边界值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private PageResult<CourseResponse> toPage(IPage<CourseEntity> page) {
         return new PageResult<>(
                 page.getRecords().stream().map(this::toResponse).toList(),
@@ -223,6 +347,12 @@ public class CatalogService implements CatalogLookup {
                 page.getTotal());
     }
 
+    /**
+     * 执行 CatalogService 中的 toResponse 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param course 调用方提供的 {@code course} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private CourseResponse toResponse(CourseEntity course) {
         return new CourseResponse(
                 course.getCourseId(),

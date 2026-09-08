@@ -1,6 +1,8 @@
 package com.cc4c.shared;
 
-/** BusinessCode 枚举稳定的状态或协议取值，避免调用方自行解释字符串。 */
+/**
+ * BusinessCode 枚举共享基础设施的有限状态或协议取值。
+ */
 public enum BusinessCode {
     SUCCESS(200),
     FAIL(201),
@@ -54,10 +56,20 @@ public enum BusinessCode {
 
     private final int code;
 
+    /**
+     * 创建 BusinessCode 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param code 调用方提供的 {@code code} 值
+     */
     BusinessCode(int code) {
         this.code = code;
     }
 
+    /**
+     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     *
+     * @return 按当前规则计算或读取的数值
+     */
     public int code() {
         return code;
     }

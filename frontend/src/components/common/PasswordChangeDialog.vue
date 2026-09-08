@@ -43,6 +43,7 @@
 </template>
 
 <script setup>
+/** 密码修改对话框，收集受控输入并把提交责任交给父组件。 */
 defineProps({
   modelValue: { type: Boolean, default: false },
   form: { type: Object, required: true },
@@ -52,6 +53,7 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue', 'closed', 'clear-error', 'update-field', 'save']);
 
+/** 处理 updateField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateField(field, value) {
   emit('update-field', field, value);
   emit('clear-error', field);

@@ -1,6 +1,26 @@
 {
   "components": {
     "schemas": {
+      "AdminLoginRequest": {
+        "properties": {
+          "adminId": {
+            "maxLength": 7,
+            "minLength": 0,
+            "type": "string"
+          },
+          "adminPassword": {
+            "maxLength": 64,
+            "minLength": 4,
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "adminId",
+          "adminPassword"
+        ],
+        "type": "object"
+      },
       "AdministratorPasswordRequest": {
         "properties": {
           "newPassword": {
@@ -22,24 +42,74 @@
         ],
         "type": "object"
       },
-      "AdminLoginRequest": {
+      "AlertRuleResponse": {
         "properties": {
-          "adminId": {
-            "maxLength": 7,
-            "minLength": 0,
+          "description": {
             "type": "string"
           },
-          "adminPassword": {
-            "maxLength": 64,
-            "minLength": 4,
-            "type": "string",
-            "writeOnly": true
+          "health": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastEvaluationAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
         },
-        "required": [
-          "adminId",
-          "adminPassword"
-        ],
+        "type": "object"
+      },
+      "AlertsResponse": {
+        "properties": {
+          "expected": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "firing": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "loaded": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pending": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AlertRuleResponse"
+            },
+            "type": "array"
+          },
+          "sourceStatus": {
+            "enum": [
+              "AVAILABLE",
+              "PARTIAL",
+              "EMPTY",
+              "UNAVAILABLE"
+            ],
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ApiErrorResponse": {
@@ -50,6 +120,21 @@
           },
           "data": {
             "type": "object"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseAlertsResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AlertsResponse"
           },
           "msg": {
             "type": "string"
@@ -192,6 +277,36 @@
         },
         "type": "object"
       },
+      "ApiResponseDashboardResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardResponse"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseDependenciesResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DependenciesResponse"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListCourseModuleResponse": {
         "properties": {
           "code": {
@@ -203,6 +318,51 @@
               "$ref": "#/components/schemas/CourseModuleResponse"
             },
             "type": "array"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseLoginResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoginResponse"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseObservabilityCsrfResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ObservabilityCsrfResponse"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseOverviewResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OverviewResponse"
           },
           "msg": {
             "type": "string"
@@ -293,6 +453,21 @@
           },
           "data": {
             "$ref": "#/components/schemas/PageResponseCourseResponse"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseSessionResponse": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SessionResponse"
           },
           "msg": {
             "type": "string"
@@ -762,15 +937,96 @@
         },
         "type": "object"
       },
-      "EditorUploadResponse": {
+      "DashboardResponse": {
         "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/PanelResponse"
+            },
+            "type": "array"
+          },
+          "range": {
+            "type": "string"
+          },
+          "sourceStatus": {
+            "enum": [
+              "AVAILABLE",
+              "PARTIAL",
+              "EMPTY",
+              "UNAVAILABLE"
+            ],
+            "type": "string"
+          },
+          "stepSeconds": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DependenciesResponse": {
+        "properties": {
+          "checkedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyItemResponse"
+            },
+            "type": "array"
+          },
+          "liveness": {
+            "type": "string"
+          },
+          "overall": {
+            "type": "string"
+          },
+          "readiness": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DependencyItemResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
           "message": {
             "type": "string"
           },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EditorUploadResponse": {
+        "properties": {
           "MSG": {
             "type": "string"
           },
           "STATUS": {
+            "type": "string"
+          },
+          "message": {
             "type": "string"
           },
           "success": {
@@ -801,6 +1057,89 @@
           "email",
           "password"
         ],
+        "type": "object"
+      },
+      "LoginResponse": {
+        "properties": {
+          "absoluteExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "idleExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MetricCardResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "EMPTY",
+              "ERROR"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "ObservabilityCsrfResponse": {
+        "properties": {
+          "headerName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OverviewResponse": {
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricCardResponse"
+            },
+            "type": "array"
+          },
+          "sourceStatus": {
+            "enum": [
+              "AVAILABLE",
+              "PARTIAL",
+              "EMPTY",
+              "UNAVAILABLE"
+            ],
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "PageResponseAsyncMessageSummary": {
@@ -1001,6 +1340,53 @@
         },
         "type": "object"
       },
+      "PanelResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesResponse"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "EMPTY",
+              "ERROR"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PointResponse": {
+        "properties": {
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "value": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "RegisterRequest": {
         "properties": {
           "avatar": {
@@ -1092,6 +1478,48 @@
         ],
         "type": "object"
       },
+      "SeriesResponse": {
+        "properties": {
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "name": {
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/PointResponse"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SessionResponse": {
+        "properties": {
+          "absoluteExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "authenticated": {
+            "type": "boolean"
+          },
+          "idleExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UserResponse": {
         "properties": {
           "avatar": {
@@ -1172,9 +1600,19 @@
       }
     },
     "securitySchemes": {
+      "CC4C_OBSERVABILITY_SESSION": {
+        "in": "cookie",
+        "name": "CC4C_OBSERVABILITY_SESSION",
+        "type": "apiKey"
+      },
       "CC4C_SESSION": {
         "in": "cookie",
         "name": "CC4C_SESSION",
+        "type": "apiKey"
+      },
+      "X-CC4C-OBSERVABILITY-CSRF": {
+        "in": "header",
+        "name": "X-CC4C-OBSERVABILITY-CSRF",
         "type": "apiKey"
       },
       "X-XSRF-TOKEN": {
@@ -2638,208 +3076,6 @@
         },
         "tags": [
           "authentication-controller"
-        ]
-      }
-    },
-    "/blogs/{id}": {
-      "get": {
-        "operationId": "detail",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "exclusiveMinimum": 0,
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseBlogResponse"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Invalid DTO, path or paging parameter",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Authentication or session validation failed",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Role, ownership or CSRF validation failed",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Resource does not exist",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Unique or state conflict",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Referenced resource or business state is invalid",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Request rate limit exceeded",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Unexpected server error",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": "Security infrastructure is unavailable",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Request correlation identifier",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "community-controller"
         ]
       }
     },
@@ -6846,13 +7082,13 @@
         ]
       }
     },
-    "/comments/{commentId}": {
-      "delete": {
-        "operationId": "deleteComment",
+    "/blogs/{id}": {
+      "get": {
+        "operationId": "detail",
         "parameters": [
           {
             "in": "path",
-            "name": "commentId",
+            "name": "id",
             "required": true,
             "schema": {
               "exclusiveMinimum": 0,
@@ -6866,7 +7102,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseBoolean"
+                  "$ref": "#/components/schemas/ApiResponseBlogResponse"
                 }
               }
             },
@@ -7043,14 +7279,8 @@
             }
           }
         },
-        "security": [
-          {
-            "CC4C_SESSION": [],
-            "X-XSRF-TOKEN": []
-          }
-        ],
         "tags": [
-          "interaction-controller"
+          "community-controller"
         ]
       }
     },
@@ -8122,18 +8352,18 @@
         ]
       }
     },
-    "/courses/{name}": {
-      "get": {
-        "operationId": "byName",
+    "/comments/{commentId}": {
+      "delete": {
+        "operationId": "deleteComment",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "commentId",
             "required": true,
             "schema": {
-              "maxLength": 200,
-              "minLength": 1,
-              "type": "string"
+              "exclusiveMinimum": 0,
+              "format": "int64",
+              "type": "integer"
             }
           }
         ],
@@ -8142,7 +8372,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCourseResponse"
+                  "$ref": "#/components/schemas/ApiResponseBoolean"
                 }
               }
             },
@@ -8319,8 +8549,14 @@
             }
           }
         },
+        "security": [
+          {
+            "CC4C_SESSION": [],
+            "X-XSRF-TOKEN": []
+          }
+        ],
         "tags": [
-          "catalog-controller"
+          "interaction-controller"
         ]
       }
     },
@@ -10653,6 +10889,208 @@
         ]
       }
     },
+    "/courses/{name}": {
+      "get": {
+        "operationId": "byName",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCourseResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "catalog-controller"
+        ]
+      }
+    },
     "/csrf": {
       "get": {
         "operationId": "csrf",
@@ -10840,6 +11278,1596 @@
         },
         "tags": [
           "authentication-controller"
+        ]
+      }
+    },
+    "/observability/api/alerts": {
+      "get": {
+        "operationId": "alerts",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAlertsResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CC4C_OBSERVABILITY_SESSION": []
+          }
+        ],
+        "summary": "读取二十条固定 Prometheus 告警",
+        "tags": [
+          "observability-data-controller"
+        ]
+      }
+    },
+    "/observability/api/dashboard/{dashboardId}": {
+      "get": {
+        "operationId": "dashboard",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboardId",
+            "required": true,
+            "schema": {
+              "pattern": "api-jvm|data-cache-security|messaging",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1h",
+              "pattern": "15m|1h|6h|24h",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDashboardResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CC4C_OBSERVABILITY_SESSION": []
+          }
+        ],
+        "summary": "读取固定观测 Dashboard",
+        "tags": [
+          "observability-data-controller"
+        ]
+      }
+    },
+    "/observability/api/dependencies": {
+      "get": {
+        "operationId": "dependencies",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDependenciesResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CC4C_OBSERVABILITY_SESSION": []
+          }
+        ],
+        "summary": "读取脱敏依赖及应用可用性",
+        "tags": [
+          "observability-data-controller"
+        ]
+      }
+    },
+    "/observability/api/overview": {
+      "get": {
+        "operationId": "overview",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOverviewResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CC4C_OBSERVABILITY_SESSION": []
+          }
+        ],
+        "summary": "读取八项固定观测总览",
+        "tags": [
+          "observability-data-controller"
+        ]
+      }
+    },
+    "/observability/auth/csrf": {
+      "get": {
+        "operationId": "observabilityCsrf",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObservabilityCsrfResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "签发观测门户 CSRF Token",
+        "tags": [
+          "observability-auth-controller"
+        ]
+      }
+    },
+    "/observability/auth/login": {
+      "post": {
+        "operationId": "observabilityLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "X-CC4C-OBSERVABILITY-CSRF": []
+          }
+        ],
+        "summary": "登录独立观测门户",
+        "tags": [
+          "observability-auth-controller"
+        ]
+      }
+    },
+    "/observability/auth/logout": {
+      "post": {
+        "operationId": "observabilityLogout",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBoolean"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CC4C_OBSERVABILITY_SESSION": [],
+            "X-CC4C-OBSERVABILITY-CSRF": []
+          }
+        ],
+        "summary": "注销观测门户 Session",
+        "tags": [
+          "observability-auth-controller"
+        ]
+      }
+    },
+    "/observability/auth/session": {
+      "get": {
+        "operationId": "observabilitySession",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSessionResponse"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid DTO, path or paging parameter",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Authentication or session validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Role, ownership or CSRF validation failed",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Resource does not exist",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unique or state conflict",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Referenced resource or business state is invalid",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request rate limit exceeded",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected server error",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Security infrastructure is unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "读取观测门户 Session 状态",
+        "tags": [
+          "observability-auth-controller"
         ]
       }
     },

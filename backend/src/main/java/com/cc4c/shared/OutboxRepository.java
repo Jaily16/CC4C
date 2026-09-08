@@ -14,6 +14,9 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 封装共享基础设施持久化、租约与状态更新操作，集中维护数据库语义。
+ */
 @Repository
 class OutboxRepository {
     private static final String COLUMNS =
@@ -28,10 +31,30 @@ class OutboxRepository {
 
     private final JdbcTemplate jdbc;
 
+    /**
+     * 创建 OutboxRepository 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param jdbc 调用方提供的 {@code jdbc} 值
+     */
     OutboxRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param correlationId 目标对象的稳定标识
+     * @param eventType 带版本的异步事件类型
+     * @param aggregateType 调用方提供的 {@code aggregateType} 值
+     * @param aggregateId 目标对象的稳定标识
+     * @param routingKey 调用方提供的 {@code routingKey} 值
+     * @param occurredAt 当前操作使用的时间点
+     * @param expiresAt 当前操作使用的时间点
+     * @param payload 按当前协议处理的业务载荷
+     * @param initialStatus 调用方提供的 {@code initialStatus} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     */
     void insert(
             String eventId,
             String correlationId,
@@ -70,6 +93,14 @@ class OutboxRepository {
                 errorCode);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param workerId 目标对象的稳定标识
+     * @param limit 调用方提供的 {@code limit} 值
+     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
+     * @return 按当前方法约定返回结果集合
+     */
     @Transactional
     public List<OutboxMessage> claimBatch(String workerId, int limit, Instant leaseUntil) {
         List<Long> ids = jdbc.queryForList(
@@ -103,6 +134,12 @@ class OutboxRepository {
                 ids.toArray());
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     void markPublished(String eventId, int generation) {
         jdbc.update(
                 """
@@ -116,6 +153,15 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param nextAttempt 调用方提供的 {@code nextAttempt} 值
+     * @param terminal 调用方提供的 {@code terminal} 值
+     */
     void markPublishFailure(String eventId, int generation, String errorCode, Instant nextAttempt, boolean terminal) {
         jdbc.update(
                 """
@@ -133,6 +179,12 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     void markDelivered(String eventId, int generation) {
         jdbc.update(
                 """
@@ -144,6 +196,12 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     void incrementConsumeAttempt(String eventId, int generation) {
         jdbc.update(
                 """
@@ -154,6 +212,13 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param errorCode 调用方提供的 {@code errorCode} 值
+     */
     void markDead(String eventId, int generation, String errorCode) {
         jdbc.update(
                 """
@@ -166,6 +231,12 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     */
     void markExpired(String eventId, int generation) {
         jdbc.update(
                 """
@@ -177,12 +248,26 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @return 存在时返回目标值，否则返回空的 Optional
+     */
     Optional<OutboxMessage> findByEventId(String eventId) {
         List<OutboxMessage> rows =
                 jdbc.query("SELECT " + COLUMNS + " FROM async_outbox WHERE event_id = ?", ROW_MAPPER, eventId);
         return rows.stream().findFirst();
     }
 
+    /**
+     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param status 当前对象或流程的有限状态
+     * @param eventType 带版本的异步事件类型
+     * @param query 调用方提供的 {@code query} 值
+     * @return 包含分页元数据的查询结果
+     */
     PageResult<AsyncMessageSummary> findPage(OutboxStatus status, String eventType, PageQuery query) {
         StringBuilder where = new StringBuilder();
         List<Object> arguments = new ArrayList<>();
@@ -212,6 +297,14 @@ class OutboxRepository {
         return new PageResult<>(items, query.page(), query.size(), total);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param message 当前处理的消息或用户提示
+     * @param encrypted 调用方提供的 {@code encrypted} 值
+     * @param nextGeneration 调用方提供的 {@code nextGeneration} 值
+     * @return 按当前规则计算或读取的数值
+     */
     int resetForManualRetry(OutboxMessage message, EncryptedMessagePayload encrypted, int nextGeneration) {
         return jdbc.update(
                 """
@@ -231,6 +324,14 @@ class OutboxRepository {
                 message.generation());
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param eventId 异步事件的全局唯一标识
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param actorId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     int ignore(String eventId, int generation, String actorId) {
         return jdbc.update(
                 """
@@ -244,6 +345,13 @@ class OutboxRepository {
                 generation);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param before 调用方提供的 {@code before} 值
+     * @param limit 调用方提供的 {@code limit} 值
+     * @return 按当前规则计算或读取的数值
+     */
     int cleanupCompleted(Instant before, int limit) {
         return jdbc.update(
                 """
@@ -255,6 +363,11 @@ class OutboxRepository {
                 limit);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @return 当前操作产生的 Map<String,Long> 结果
+     */
     Map<String, Long> statusCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
         jdbc.query("SELECT status, COUNT(*) AS count_value FROM async_outbox GROUP BY status", result -> {
@@ -263,6 +376,11 @@ class OutboxRepository {
         return Map.copyOf(counts);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @return 按当前规则计算或读取的数值
+     */
     double oldestPendingSeconds() {
         Double seconds = jdbc.queryForObject(
                 """
@@ -276,6 +394,14 @@ class OutboxRepository {
         return seconds == null ? 0.0 : Math.max(0.0, seconds);
     }
 
+    /**
+     * 转换所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param result 调用方提供的 {@code result} 值
+     * @param rowNumber 调用方提供的 {@code rowNumber} 值
+     * @return 当前操作产生的 OutboxMessage 结果
+     * @throws SQLException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     */
     private static OutboxMessage map(ResultSet result, int rowNumber) throws SQLException {
         return new OutboxMessage(
                 result.getLong("id"),
@@ -301,10 +427,22 @@ class OutboxRepository {
                 result.getString("error_code"));
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param value 待处理或存储的值
+     * @return 当前操作产生的 Timestamp 结果
+     */
     private static Timestamp timestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
     }
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param value 待处理或存储的值
+     * @return 当前操作产生的 Instant 结果
+     */
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
     }

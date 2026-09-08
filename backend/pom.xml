@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.cc4c</groupId>
     <artifactId>cc4c</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>5.0.0-SNAPSHOT</version>
     <name>CC4C</name>
     <description>CC4C</description>
 
@@ -19,8 +19,6 @@
         <spring-modulith.version>1.4.12</spring-modulith.version>
         <springdoc.version>2.8.17</springdoc.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
-        <gatling.version>3.15.1</gatling.version>
-        <gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
         <!-- Security overrides for fixed releases newer than Boot 3.5.16's BOM. -->
         <rabbit-amqp-client.version>5.33.1</rabbit-amqp-client.version>
         <netty.version>4.1.136.Final</netty.version>
@@ -120,54 +118,39 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
         </dependency>
-        <!--springboot的测试驱动-->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.modulith</groupId>
-            <artifactId>spring-modulith-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>mysql</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>rabbitmq</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
-                <excludes>
-                    <exclude>application.yml</exclude>
-                </excludes>
+                <filtering>true</filtering>
+                <includes>
+                    <include>application.yml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>db/migration/**</include>
+                    <include>META-INF/**</include>
+                    <include>observability/**</include>
+                </includes>
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <configuration>
+                    <!-- 只展开 Maven 的 @project.version@，保留运行期环境变量占位符。 -->
+                    <useDefaultDelimiters>false</useDefaultDelimiters>
+                    <delimiters>
+                        <delimiter>@</delimiter>
+                    </delimiters>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
@@ -177,8 +160,6 @@
                         <lineEndings>UNIX</lineEndings>
                         <includes>
                             <include>src/main/java/**/*.java</include>
-                            <include>src/test/java/**/*.java</include>
-                            <include>src/gatling/java/**/*.java</include>
                         </includes>
                         <palantirJavaFormat>
                             <version>${palantir-java-format.version}</version>
@@ -194,6 +175,60 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <!-- Spring Boot 的父 POM 预置了一个全量 shade 执行；本项目只保留下方的最小密码工具。 -->
+                    <execution>
+                        <id>default</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>observability-password</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>observability-password</shadedClassifierName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <minimizeJar>true</minimizeJar>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.springframework.security:spring-security-crypto</include>
+                                    <include>org.springframework:spring-core</include>
+                                    <include>org.springframework:spring-jcl</include>
+                                </includes>
+                            </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>com.cc4c:cc4c</artifact>
+                                    <includes>
+                                        <include>com/cc4ctools/observability/**</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.cc4ctools.observability.ObservabilityPasswordHashApplication</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -248,115 +283,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <runOrder>alphabetical</runOrder>
-                    <systemPropertyVariables>
-                        <spring.config.name>application-test</spring.config.name>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>performance-benchmark</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>seed-performance-data</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>java</goal>
-                                </goals>
-                                <configuration>
-                                    <classpathScope>test</classpathScope>
-                                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                                    <mainClass>com.cc4c.performance.PerformanceDataSeeder</mainClass>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>run-performance-gate</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>java</goal>
-                                </goals>
-                                <configuration>
-                                    <classpathScope>test</classpathScope>
-                                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                                    <mainClass>com.cc4c.performance.PerformanceBenchmarkApplication</mainClass>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>performance-gatling</id>
-            <dependencyManagement>
-                <dependencies>
-                    <!--
-                      Gatling 3.15 uses Netty 4.2. Keep this override inside the
-                      explicit performance profile so the Spring Boot runtime
-                      continues to use its managed Netty 4.1 line.
-                    -->
-                    <dependency>
-                        <groupId>io.netty</groupId>
-                        <artifactId>netty-bom</artifactId>
-                        <version>4.2.14.Final</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                    </dependency>
-                </dependencies>
-            </dependencyManagement>
-            <dependencies>
-                <dependency>
-                    <groupId>io.gatling.highcharts</groupId>
-                    <artifactId>gatling-charts-highcharts</artifactId>
-                    <version>${gatling.version}</version>
-                    <scope>test</scope>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.6.1</version>
-                        <executions>
-                            <execution>
-                                <id>add-gatling-test-source</id>
-                                <phase>generate-test-sources</phase>
-                                <goals>
-                                    <goal>add-test-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/gatling/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>io.gatling</groupId>
-                        <artifactId>gatling-maven-plugin</artifactId>
-                        <version>${gatling-maven-plugin.version}</version>
-                        <configuration>
-                            <resultsFolder>${gatling.resultsFolder}</resultsFolder>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>

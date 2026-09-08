@@ -98,6 +98,9 @@
         :comments="commentList"
         :comments-loading="commentsLoading"
         :comments-error="commentsError"
+        :can-delete-comment="canDeleteComment"
+        :deleting-comment-id="deletingCommentId"
+        :delete-error="deleteError"
         :comment-input-error="commentInputError"
         :comment-submitting="commentSubmitting"
         :replying-to="replyingTo"
@@ -111,6 +114,7 @@
         reply-focus-prefix="replies-"
         @submit-comment="comment"
         @submit-reply="reply"
+        @delete-comment="deleteOwnComment"
         @toggle-reply="toggleReply"
         @change-page="changeCommentPage"
         @retry="loadComments"
@@ -131,11 +135,12 @@ import {
   removeCourseFavorite,
   createCourseComment,
   createReply,
+  deleteComment,
   getCourseComments,
 } from '@/api/interactions';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import store from '@/store';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
@@ -160,10 +165,19 @@ const isCommentOpen = ref(false);
 const catalogOpen = ref(false);
 
 const { isUser: loggedIn } = useCurrentUser();
+/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
 const userInitial = computed(() => commentInitial(store.state.user.name));
 const commentThread = useCommentThread({
   subjectId: () => courseData.value?.courseId,
   fetchPage: getCourseComments,
+  currentUserId: () => (loggedIn.value ? store.state.user.id : null),
+  deleteComment,
+  confirmDelete: () =>
+    ElMessageBox.confirm('确认删除这条本人评论？删除后该评论及其下的回复将不再展示。', '删除本人评论', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }),
   createComment: (content) =>
     createCourseComment({
       content,
@@ -189,35 +203,45 @@ const {
   commentPage,
   commentPageSize,
   commentTotal,
+  canDeleteComment,
+  deletingCommentId,
+  deleteError,
   loadComments,
   toggleReply,
   changeCommentPage,
   resetComments,
 } = commentThread;
 
+/** commentInitial 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function commentInitial(name) {
   return (name || '用户').trim().slice(0, 1).toUpperCase();
 }
 
+/** 把现有数据转换为 normalizeCourseMarkdown 所需展示结构，不产生外部副作用。 */
 function normalizeCourseMarkdown(content) {
   return String(content || '').replace(/:star:/gi, '⭐');
 }
 
+/** 响应 backToCourses 导航或界面事件，更新当前组件的受控展示状态。 */
 function backToCourses() {
   router.push('/allCourses');
 }
 
+/** 响应 goToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
 function goToLogin() {
   ElMessage.warning('登录后即可收藏课程和参与评论');
   router.push('/login');
 }
 
+/** 响应 closeCatalogAfterNavigation 导航或界面事件，更新当前组件的受控展示状态。 */
 function closeCatalogAfterNavigation() {
+  /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
   window.setTimeout(() => {
     catalogOpen.value = false;
   }, 0);
 }
 
+/** 读取 loadCourse 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function loadCourse() {
   const courseName = String(route.query.courseName || '');
   courseData.value = null;
@@ -260,6 +284,7 @@ async function loadCourse() {
   }
 }
 
+/** 响应 toggleCollect 导航或界面事件，更新当前组件的受控展示状态。 */
 async function toggleCollect() {
   if (!courseData.value?.courseId || !loggedIn.value) return;
   try {
@@ -278,16 +303,25 @@ async function toggleCollect() {
   }
 }
 
+/** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function reply(fatherId) {
   const succeeded = await commentThread.reply(fatherId);
   if (succeeded) ElMessage.success('回复成功');
 }
 
+/** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function comment() {
   const succeeded = await commentThread.comment();
   if (succeeded) ElMessage.success('评论成功');
 }
 
+/** 课程评论复用同一删除接口与确认流程，不改变课程、收藏及评论的后端数据语义。 */
+async function deleteOwnComment(commentItem) {
+  const succeeded = await commentThread.removeComment(commentItem);
+  if (succeeded) ElMessage.success('评论已删除');
+}
+
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(() => route.query.courseName, loadCourse, { immediate: true });
 </script>
 

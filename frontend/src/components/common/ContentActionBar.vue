@@ -12,6 +12,7 @@
 </template>
 
 <script setup>
+/** 内容操作栏组件，呈现收藏与评论入口并转发用户操作。 */
 import { ChatDotRound, Star, StarFilled } from '@element-plus/icons-vue';
 
 const props = defineProps({
@@ -23,6 +24,7 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-collect', 'toggle-comment', 'require-login']);
 
+/** handleCollect 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function handleCollect() {
   if (!props.loggedIn) {
     emit('require-login');

@@ -1,33 +1,47 @@
+# Local application environments: only sanitized examples may be committed.
+**/.env
+**/.env.*
+!**/.env.example
+*.local
 
-.vscode/extensions.json
-
-# Front-end dependencies and build output
-/front-end/CC4C/node_modules/
-/front-end/CC4C/dist/
-/front-end/CC4C/.env.local
-/front-end/CC4C/.env.*.local
-/frontend/node_modules/
-/frontend/dist/
-/frontend/.env.local
-/frontend/.env.*.local
-
-# Back-end build and functional-test output
-/back-end/CC4C/target/
-/back-end/CC4C/src/main/resources/application.yml
-/back-end/CC4C/.env.test.local
-/back-end/CC4C/.env.runtime.local
-/back-end/CC4C/.env.performance.local
+# Build output, dependencies, scratch data, logs, and uploaded resources.
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/coverage/
 /backend/target/
-/backend/src/main/resources/application.yml
-/backend/.env.*.local
-/.env.observability.local
-/observability/.env.observability.local
-/infrastructure/observability/.env.observability.local
-/deploy/secrets/local/
-/deploy/secrets/runtime/
-
-# Local scratch files
+/backend/logs/
 /temp/
 /logs/
-/back-end/CC4C/logs/
 *.log
+/frontend/public/avatar/
+/frontend/public/blogImg/
+
+# Only the controlled backend application.yml is a tracked framework resource.
+/backend/src/main/resources/application*.yml
+/backend/src/main/resources/application*.yaml
+/backend/src/main/resources/application*.properties
+!/backend/src/main/resources/application.yml
+
+# Protect ignored legacy data without retaining runtime fallback paths.
+/back-end/CC4C/target/
+/back-end/CC4C/logs/
+/back-end/CC4C/src/main/resources/application.yml
+/front-end/CC4C/public/avatar/
+/front-end/CC4C/public/blogImg/
+/deploy/secrets/local/
+/deploy/secrets/runtime/
+/infrastructure/secrets/local/
+/infrastructure/secrets/runtime/
+
+# Editor and operating-system files; keep the existing frontend extension list.
+/.vscode/
+/frontend/.vscode/*
+!/frontend/.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

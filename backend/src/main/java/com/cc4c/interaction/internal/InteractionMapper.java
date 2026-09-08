@@ -10,19 +10,50 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+/**
+ * 定义收藏与评论的 MyBatis 持久化及结果映射边界。
+ */
 @Mapper
 interface InteractionMapper extends BaseMapper<CommentEntity> {
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param courseId 目标对象的稳定标识
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Select("SELECT COUNT(*) FROM user_favors_course WHERE user_id = #{userId} AND course_id = #{courseId}")
     boolean courseFavoriteExists(@Param("userId") long userId, @Param("courseId") int courseId);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param courseId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert(
             "INSERT INTO user_favors_course(user_id, course_id, time) VALUES(#{userId}, #{courseId}, CURRENT_TIMESTAMP)")
     int insertCourseFavorite(@Param("userId") long userId, @Param("courseId") int courseId);
 
+    /**
+     * 删除或失效所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param courseId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Delete("DELETE FROM user_favors_course WHERE user_id = #{userId} AND course_id = #{courseId}")
     int deleteCourseFavorite(@Param("userId") long userId, @Param("courseId") int courseId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param page 从零或接口约定起算的页码
+     * @param userId 目标对象的稳定标识
+     * @return 当前操作产生的 IPage<CourseFavoriteRow> 结果
+     */
     @Select(
             """
             SELECT c.course_id, c.course_name, c.language_name
@@ -33,15 +64,43 @@ interface InteractionMapper extends BaseMapper<CommentEntity> {
             """)
     IPage<CourseFavoriteRow> selectCourseFavorites(Page<CourseFavoriteRow> page, long userId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param blogId 目标对象的稳定标识
+     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     */
     @Select("SELECT COUNT(*) FROM user_collects_blog WHERE user_id = #{userId} AND blog_id = #{blogId}")
     boolean blogFavoriteExists(@Param("userId") long userId, @Param("blogId") long blogId);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert("INSERT INTO user_collects_blog(user_id, blog_id, time) VALUES(#{userId}, #{blogId}, CURRENT_TIMESTAMP)")
     int insertBlogFavorite(@Param("userId") long userId, @Param("blogId") long blogId);
 
+    /**
+     * 删除或失效所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param userId 目标对象的稳定标识
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Delete("DELETE FROM user_collects_blog WHERE user_id = #{userId} AND blog_id = #{blogId}")
     int deleteBlogFavorite(@Param("userId") long userId, @Param("blogId") long blogId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param page 从零或接口约定起算的页码
+     * @param userId 目标对象的稳定标识
+     * @return 当前操作产生的 IPage<BlogFavoriteRow> 结果
+     */
     @Select(
             """
             SELECT b.blog_id, b.writer_id, b.title, b.publish_time, b.click, b.state
@@ -52,18 +111,53 @@ interface InteractionMapper extends BaseMapper<CommentEntity> {
             """)
     IPage<BlogFavoriteRow> selectBlogFavorites(Page<BlogFavoriteRow> page, long userId);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param commentId 目标对象的稳定标识
+     * @param courseId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert("INSERT INTO course_direct_comment(comment_id, course_id) VALUES(#{commentId}, #{courseId})")
     int insertCourseComment(@Param("commentId") long commentId, @Param("courseId") int courseId);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param commentId 目标对象的稳定标识
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert("INSERT INTO blog_direct_comment(comment_id, blog_id) VALUES(#{commentId}, #{blogId})")
     int insertBlogComment(@Param("commentId") long commentId, @Param("blogId") long blogId);
 
+    /**
+     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param commentId 目标对象的稳定标识
+     * @param fatherId 目标对象的稳定标识
+     * @param layer 调用方提供的 {@code layer} 值
+     * @return 按当前规则计算或读取的数值
+     */
     @Insert("INSERT INTO indirect_comment(comment_id, father_id, layer) VALUES(#{commentId}, #{fatherId}, #{layer})")
     int insertReply(@Param("commentId") long commentId, @Param("fatherId") long fatherId, @Param("layer") int layer);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param commentId 目标对象的稳定标识
+     * @return 按当前规则计算或读取的数值
+     */
     @Select("SELECT layer FROM indirect_comment WHERE comment_id = #{commentId}")
     Integer selectLayer(long commentId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param page 从零或接口约定起算的页码
+     * @param courseId 目标对象的稳定标识
+     * @return 当前操作产生的 IPage<CommentRow> 结果
+     */
     @Select(
             """
             SELECT c.comment_id, c.user_id, c.content, c.time, c.\u0060like\u0060,
@@ -76,6 +170,13 @@ interface InteractionMapper extends BaseMapper<CommentEntity> {
             """)
     IPage<CommentRow> selectCourseComments(Page<CommentRow> page, int courseId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param page 从零或接口约定起算的页码
+     * @param blogId 目标对象的稳定标识
+     * @return 当前操作产生的 IPage<CommentRow> 结果
+     */
     @Select(
             """
             SELECT c.comment_id, c.user_id, c.content, c.time, c.\u0060like\u0060,
@@ -88,6 +189,12 @@ interface InteractionMapper extends BaseMapper<CommentEntity> {
             """)
     IPage<CommentRow> selectBlogComments(Page<CommentRow> page, long blogId);
 
+    /**
+     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     *
+     * @param fatherIds 目标对象的稳定标识
+     * @return 按当前方法约定返回结果集合
+     */
     @Select({
         "<script>",
         "SELECT c.comment_id, c.user_id, c.content, c.time, c.\u0060like\u0060,",

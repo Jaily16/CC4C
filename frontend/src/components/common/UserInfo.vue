@@ -74,6 +74,7 @@
 </template>
 
 <script setup>
+/** 用户资料组件，协调资料读取、头像预览、资料更新与密码修改状态。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { resetCsrfToken } from '@/api/client';
@@ -116,16 +117,22 @@ const navItems = [
 ];
 
 const { user: currentUser } = useCurrentUser();
+/** 从现有响应式状态派生 activeKey，不发起请求或写入外部数据。 */
 const activeKey = computed(() => String(props.activeIndex));
+/** 从现有响应式状态派生 displayName，不发起请求或写入外部数据。 */
 const displayName = computed(() => currentUser.value.name || 'CC4C 用户');
+/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
 const userInitial = computed(() => displayName.value.trim().slice(0, 1).toUpperCase());
+/** 从现有响应式状态派生 majorLabel，不发起请求或写入外部数据。 */
 const majorLabel = computed(
   () => majorList.find((item) => item.value === Number(currentUser.value.major))?.label || '未设置',
 );
+/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
 const languageLabel = computed(
   () => languageList.find((item) => item.value === Number(currentUser.value.language))?.label || '未设置',
 );
 const avatarLoadFailed = ref(false);
+/** 从现有响应式状态派生 profileAvatar，不发起请求或写入外部数据。 */
 const profileAvatar = computed(() => (avatarLoadFailed.value ? '' : currentUser.value.avatar || ''));
 
 const editDialogOpen = ref(false);
@@ -138,16 +145,20 @@ const infoForm = reactive({ name: '', major: 0, language: 1, avatar: '' });
 const passwordForm = reactive({ password: '', newPassword: '' });
 const editErrors = reactive({ name: '', avatar: '' });
 const passwordErrors = reactive({ password: '', newPassword: '' });
+/** 从现有响应式状态派生 editAvatarPreview，不发起请求或写入外部数据。 */
 const editAvatarPreview = computed(() => uploadedAvatar.value || infoForm.avatar || '');
 
+/** 处理 updateInfoFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updateInfoFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(infoForm, field)) infoForm[field] = value;
 }
 
+/** 处理 updatePasswordFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 function updatePasswordFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(passwordForm, field)) passwordForm[field] = value;
 }
 
+/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
 watch(
   () => currentUser.value.avatar,
   () => {
@@ -155,11 +166,13 @@ watch(
   },
 );
 
+/** handleAvatarError 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function handleAvatarError() {
   avatarLoadFailed.value = true;
   return true;
 }
 
+/** fillProfileForm 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 function fillProfileForm() {
   infoForm.name = currentUser.value.name || '';
   infoForm.major = Number(currentUser.value.major);
@@ -167,6 +180,7 @@ function fillProfileForm() {
   infoForm.avatar = currentUser.value.avatar || '';
 }
 
+/** 响应 openEditDialog 导航或界面事件，更新当前组件的受控展示状态。 */
 function openEditDialog() {
   fillProfileForm();
   uploadedAvatar.value = '';
@@ -175,12 +189,14 @@ function openEditDialog() {
   editDialogOpen.value = true;
 }
 
+/** 响应 openPasswordDialog 导航或界面事件，更新当前组件的受控展示状态。 */
 function openPasswordDialog() {
   passwordErrors.password = '';
   passwordErrors.newPassword = '';
   passwordDialogOpen.value = true;
 }
 
+/** 处理 resetEditDialog 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function resetEditDialog() {
   if (profileSaving.value) return;
   uploadedAvatar.value = '';
@@ -189,11 +205,13 @@ function resetEditDialog() {
   fillProfileForm();
 }
 
+/** 处理 clearPasswords 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function clearPasswords() {
   passwordForm.password = '';
   passwordForm.newPassword = '';
 }
 
+/** 处理 resetPasswordDialog 清理操作，仅影响当前功能明确指向的状态或资源。 */
 function resetPasswordDialog() {
   if (passwordSaving.value) return;
   clearPasswords();
@@ -201,6 +219,7 @@ function resetPasswordDialog() {
   passwordErrors.newPassword = '';
 }
 
+/** syncCurrentUser 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 async function syncCurrentUser() {
   const response = await getCurrentUser();
   const user = response.data.data;
@@ -215,6 +234,7 @@ async function syncCurrentUser() {
   return user;
 }
 
+/** 读取 refreshCurrentUser 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
 async function refreshCurrentUser() {
   try {
     await syncCurrentUser();
@@ -225,6 +245,7 @@ async function refreshCurrentUser() {
   }
 }
 
+/** 处理 uploadAvatar 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function uploadAvatar({ file }) {
   editErrors.avatar = '';
   const isSupported = file.type === 'image/jpeg' || file.type === 'image/png';
@@ -258,6 +279,7 @@ async function uploadAvatar({ file }) {
   }
 }
 
+/** 处理 saveProfile 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function saveProfile() {
   editErrors.name = infoForm.name.trim() ? '' : '请输入用户名。';
   if (editErrors.name || profileSaving.value || avatarUploading.value) return;
@@ -292,6 +314,7 @@ async function saveProfile() {
   }
 }
 
+/** 处理 changePassword 用户操作，提交既有写入请求并在成功后同步页面状态。 */
 async function changePassword() {
   passwordErrors.password = passwordForm.password ? '' : '请输入原密码。';
   const bytes = new TextEncoder().encode(passwordForm.newPassword).length;

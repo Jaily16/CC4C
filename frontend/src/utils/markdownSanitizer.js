@@ -4,6 +4,7 @@ const HEADING_ID_PATTERN = /^cc4c-md-\d+-[a-z0-9-]{1,64}$/;
 
 const allowedTags = [...sanitizeHtml.defaults.allowedTags, 'img', 'input', 'del', 'details', 'summary'];
 
+/** headingTransform 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 const headingTransform = (tagName, attribs) => {
   const nextAttributes = { ...attribs };
   if (!HEADING_ID_PATTERN.test(nextAttributes.id || '')) {
@@ -62,6 +63,7 @@ const markdownSanitizeOptions = {
   },
 };
 
+/** markdownHeadingId 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 export const markdownHeadingId = (text, _level, index) => {
   const slug =
     String(text ?? '')
@@ -75,4 +77,5 @@ export const markdownHeadingId = (text, _level, index) => {
   return `cc4c-md-${Number.isInteger(index) && index > 0 ? index : 1}-${slug}`;
 };
 
+/** sanitizeMarkdownHtml 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
 export const sanitizeMarkdownHtml = (html) => sanitizeHtml(String(html ?? ''), markdownSanitizeOptions);

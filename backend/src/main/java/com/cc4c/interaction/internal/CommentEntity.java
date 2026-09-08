@@ -8,6 +8,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.util.Date;
 import lombok.Data;
 
+/**
+ * 映射收藏与评论数据库记录，字段语义与现有表结构保持一致。
+ */
 @Data
 @TableName("comment")
 class CommentEntity {

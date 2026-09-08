@@ -1,0 +1,12 @@
+<script setup>
+/** API 与 JVM 页面，固定展示对应观测仪表板。 */
+import DashboardPage from '@/components/DashboardPage.vue';
+</script>
+
+<template>
+  <DashboardPage
+    dashboard-id="api-jvm"
+    title="API 与 JVM"
+    description="查看 HTTP 请求、延迟、状态码、堆内存、CPU、GC 和线程趋势。"
+  />
+</template>

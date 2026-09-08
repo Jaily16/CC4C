@@ -38,8 +38,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * CommunityService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
+ */
 @Service
-/** CommunityService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public class CommunityService implements CommunityLookup, BlogModerationUseCase {
     private static final int DENIED = -1;
     private static final int PENDING = 0;
@@ -64,6 +66,19 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     private final MessagingProperties messagingProperties;
     private final CommunityResponseMapper responseMapper;
 
+    /**
+     * 创建 CommunityService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param mapper 调用方提供的 {@code mapper} 值
+     * @param identityLookup 调用方提供的 {@code identityLookup} 值
+     * @param identityNotificationLookup 调用方提供的 {@code identityNotificationLookup} 值
+     * @param catalogLookup 调用方提供的 {@code catalogLookup} 值
+     * @param currentActor 调用方提供的 {@code currentActor} 值
+     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
+     * @param cache 调用方提供的 {@code cache} 值
+     * @param outbox 调用方提供的 {@code outbox} 值
+     * @param messagingProperties 调用方提供的 {@code messagingProperties} 值
+     */
     CommunityService(
             BlogMapper mapper,
             IdentityLookup identityLookup,
@@ -86,6 +101,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         this.responseMapper = new CommunityResponseMapper(mapper);
     }
 
+    /**
+     * 执行 CommunityService 中的 home 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogResponse> home(PageQuery query) {
         return cachedPage(HOME_REGION, pageKey(query), () -> {
             LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
@@ -97,6 +118,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         });
     }
 
+    /**
+     * 执行 CommunityService 中的 all 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogResponse> all(PageQuery query) {
         return cachedPage(ALL_REGION, pageKey(query), () -> {
             LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
@@ -108,6 +135,13 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         });
     }
 
+    /**
+     * 执行 CommunityService 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param languageId 目标对象的稳定标识
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogResponse> byLanguage(int languageId, PageQuery query) {
         return cachedPage(
                 LANGUAGE_REGION,
@@ -116,6 +150,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                         mapper.selectByLanguage(new Page<>(query.page(), query.size()), languageId), false));
     }
 
+    /**
+     * 执行 CommunityService 中的 byCurrentWriter 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogResponse> byCurrentWriter(PageQuery query) {
         long userId = currentActor.requiredUserId();
         if (identityLookup.findUser(userId).isEmpty()) {
@@ -125,6 +165,13 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                 mapper.selectByWriter(new Page<>(query.page(), query.size()), userId), false);
     }
 
+    /**
+     * 执行 CommunityService 中的 search 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param text 调用方提供的 {@code text} 值
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public PageResult<BlogResponse> search(String text, PageQuery query) {
         LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
                 .eq(BlogEntity::getState, VERIFIED)
@@ -134,6 +181,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return responseMapper.toResponsePage(mapper.selectPage(new Page<>(query.page(), query.size()), wrapper), false);
     }
 
+    /**
+     * 执行 CommunityService 中的 detail 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public BlogResponse detail(long blogId) {
         Optional<BlogResponse> publicDetail = cache.getOrLoad(
                 DETAIL_REGION, Long.toString(blogId), BLOG_TYPE, PUBLIC_TTL, NEGATIVE_TTL, () -> Optional.ofNullable(
@@ -153,6 +206,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return responseMapper.toResponse(blog, true);
     }
 
+    /**
+     * 执行 CommunityService 中的 submit 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Transactional
     public BlogResponse submit(BlogSubmitRequest request) {
         long writerId = currentActor.requiredUserId();
@@ -189,6 +248,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return responseMapper.toResponse(blog, true);
     }
 
+    /**
+     * 删除 CommunityService 指定状态，并维持既有权限、事务与缓存失效边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean delete(long blogId) {
         long userId = currentActor.requiredUserId();
@@ -201,6 +266,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return true;
     }
 
+    /**
+     * 执行 CommunityService 中的 saveDraft 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param request 已经过声明式校验的接口请求体
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean saveDraft(BlogDraftRequest request) {
         long userId = currentActor.requiredUserId();
@@ -208,16 +279,32 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return true;
     }
 
+    /**
+     * 执行 CommunityService 中的 draft 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public String draft() {
         return mapper.selectDraft(currentActor.requiredUserId());
     }
 
+    /**
+     * 删除 CommunityService 指定状态，并维持既有权限、事务与缓存失效边界。
+     *
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean deleteDraft() {
         mapper.deleteDraft(currentActor.requiredUserId());
         return true;
     }
 
+    /**
+     * 执行 CommunityService 中的 click 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 当前条件是否成立
+     */
     @Transactional
     public boolean click(long blogId) {
         if (mapper.incrementClick(blogId) == 0) {
@@ -226,6 +313,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return true;
     }
 
+    /**
+     * 查询并返回 CommunityService 中与 findBlog 对应的数据，不改变业务状态。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 存在时包含目标值，否则为空
+     */
     @Override
     public Optional<BlogSnapshot> findBlog(long blogId) {
         BlogEntity blog = mapper.selectById(blogId);
@@ -234,6 +327,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                         new BlogSnapshot(value.getBlogId(), value.getWriterId(), value.getTitle(), value.getState()));
     }
 
+    /**
+     * 查询并返回 CommunityService 中与 findPending 对应的数据，不改变业务状态。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     @Override
     public PageResult<BlogSummary> findPending(PageQuery query) {
         LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
@@ -248,18 +347,37 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                 page.getTotal());
     }
 
+    /**
+     * 执行 CommunityService 中的 approve 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Override
     @Transactional
     public BlogSummary approve(long blogId) {
         return moderate(blogId, VERIFIED);
     }
 
+    /**
+     * 执行 CommunityService 中的 deny 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     @Override
     @Transactional
     public BlogSummary deny(long blogId) {
         return moderate(blogId, DENIED);
     }
 
+    /**
+     * 执行 CommunityService 中的 moderate 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @param state 调用方提供的 {@code state} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private BlogSummary moderate(long blogId, int state) {
         BlogEntity blog = requiredBlog(blogId);
         if (blog.getState() != PENDING) {
@@ -308,6 +426,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return responseMapper.toSummary(blog);
     }
 
+    /**
+     * 校验 CommunityService 中与 requiredBlog 对应的前置条件，不满足时沿用既有失败语义。
+     *
+     * @param blogId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private BlogEntity requiredBlog(long blogId) {
         BlogEntity blog = mapper.selectById(blogId);
         if (blog == null) {
@@ -316,6 +440,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
         return blog;
     }
 
+    /**
+     * 判断 CommunityService 中与 canReadNonPublic 对应的条件是否成立。
+     *
+     * @param blog 调用方提供的 {@code blog} 值
+     * @return 当前条件是否成立
+     */
     private boolean canReadNonPublic(BlogEntity blog) {
         return currentActor
                 .current()
@@ -325,15 +455,32 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
                 .orElse(false);
     }
 
+    /**
+     * 执行 CommunityService 中的 cachedPage 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param region 调用方提供的 {@code region} 值
+     * @param key 调用方提供的 {@code key} 值
+     * @param loader 调用方提供的 {@code loader} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private PageResult<BlogResponse> cachedPage(String region, String key, Supplier<PageResult<BlogResponse>> loader) {
         return cache.getOrLoad(region, key, BLOG_PAGE_TYPE, PUBLIC_TTL, NEGATIVE_TTL, () -> Optional.of(loader.get()))
                 .orElseThrow();
     }
 
+    /**
+     * 执行 CommunityService 中的 pageKey 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param query 调用方提供的 {@code query} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private String pageKey(PageQuery query) {
         return query.page() + ":" + query.size();
     }
 
+    /**
+     * 执行 CommunityService 中的 invalidatePublicBlogs 职责，并保持既有权限、事务与副作用边界。
+     */
     private void invalidatePublicBlogs() {
         cache.invalidateAfterCommit(HOME_REGION, ALL_REGION, LANGUAGE_REGION, DETAIL_REGION);
     }

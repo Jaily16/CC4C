@@ -13,9 +13,21 @@ import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * MessagingProperties 绑定外部配置，并集中表达运行时约束和安全默认值。
+ *
+ * @param namespace 调用方提供的 {@code namespace} 值
+ * @param activeKeyId 目标对象的稳定标识
+ * @param payloadKeys 调用方提供的 {@code payloadKeys} 值
+ * @param moderationRecipients 调用方提供的 {@code moderationRecipients} 值
+ * @param confirmTimeout 调用方提供的 {@code confirmTimeout} 值
+ * @param consumerRetryDelays 调用方提供的 {@code consumerRetryDelays} 值
+ * @param pollInterval 调用方提供的 {@code pollInterval} 值
+ * @param dispatcherEnabled 调用方提供的 {@code dispatcherEnabled} 值
+ * @param consumersEnabled 调用方提供的 {@code consumersEnabled} 值
+ */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.messaging")
-/** MessagingProperties 绑定外部配置，并集中表达运行时约束和安全默认值。 */
 public record MessagingProperties(
         @NotBlank String namespace,
         @NotBlank String activeKeyId,
@@ -30,6 +42,19 @@ public record MessagingProperties(
     private static final Pattern KEY_ID = Pattern.compile("[A-Za-z0-9._-]{1,64}");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
+    /**
+     * 创建 MessagingProperties 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param namespace 调用方提供的 {@code namespace} 值
+     * @param activeKeyId 目标对象的稳定标识
+     * @param payloadKeys 调用方提供的 {@code payloadKeys} 值
+     * @param moderationRecipients 调用方提供的 {@code moderationRecipients} 值
+     * @param confirmTimeout 调用方提供的 {@code confirmTimeout} 值
+     * @param consumerRetryDelays 调用方提供的 {@code consumerRetryDelays} 值
+     * @param pollInterval 调用方提供的 {@code pollInterval} 值
+     * @param dispatcherEnabled 调用方提供的 {@code dispatcherEnabled} 值
+     * @param consumersEnabled 调用方提供的 {@code consumersEnabled} 值
+     */
     public MessagingProperties {
         if (namespace != null && !NAMESPACE.matcher(namespace).matches()) {
             throw new IllegalStateException("CC4C RabbitMQ namespace contains unsupported characters");
@@ -53,6 +78,11 @@ public record MessagingProperties(
         }
     }
 
+    /**
+     * 执行 MessagingProperties 中的 payloadKeyMap 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public Map<String, byte[]> payloadKeyMap() {
         Map<String, byte[]> result = new LinkedHashMap<>();
         for (String entry : payloadKeys.split(";")) {
@@ -82,10 +112,21 @@ public record MessagingProperties(
         return Map.copyOf(result);
     }
 
+    /**
+     * 执行 MessagingProperties 中的 moderationRecipientList 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     public List<String> moderationRecipientList() {
         return parseModerationRecipients(moderationRecipients);
     }
 
+    /**
+     * 执行 MessagingProperties 中的 parseModerationRecipients 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param rawRecipients 调用方提供的 {@code rawRecipients} 值
+     * @return 符合当前条件且保持稳定顺序的结果集合
+     */
     private static List<String> parseModerationRecipients(String rawRecipients) {
         List<String> recipients = Arrays.stream(rawRecipients.split(","))
                 .map(String::trim)

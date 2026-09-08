@@ -17,6 +17,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * 向外部基础设施发布共享基础设施消息，并保留当前投递失败语义。
+ */
 @Component
 @ConditionalOnProperty(prefix = "cc4c.messaging", name = "dispatcher-enabled", havingValue = "true")
 final class OutboxPublisher {
@@ -38,6 +41,15 @@ final class OutboxPublisher {
     private final Cc4cMetrics metrics;
     private final String workerId = "publisher-" + UUID.randomUUID();
 
+    /**
+     * 创建 OutboxPublisher 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param repository 由容器注入的 OutboxRepository 协作组件
+     * @param publisher 由容器注入的 RabbitMessagePublisher 协作组件
+     * @param topology 调用方提供的 {@code topology} 值
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param metrics 调用方提供的 {@code metrics} 值
+     */
     @Autowired
     OutboxPublisher(
             OutboxRepository repository,
@@ -52,6 +64,14 @@ final class OutboxPublisher {
         this.metrics = metrics;
     }
 
+    /**
+     * 创建 OutboxPublisher 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param repository 由容器注入的 OutboxRepository 协作组件
+     * @param publisher 由容器注入的 RabbitMessagePublisher 协作组件
+     * @param topology 调用方提供的 {@code topology} 值
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     */
     OutboxPublisher(
             OutboxRepository repository,
             RabbitMessagePublisher publisher,
@@ -60,6 +80,9 @@ final class OutboxPublisher {
         this(repository, publisher, topology, objectMapper, Cc4cMetrics.disabled());
     }
 
+    /**
+     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     */
     @Scheduled(fixedDelayString = "${cc4c.messaging.poll-interval:500ms}")
     void dispatch() {
         List<OutboxMessage> messages;
@@ -76,6 +99,11 @@ final class OutboxPublisher {
         messages.forEach(this::publish);
     }
 
+    /**
+     * 发布可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     *
+     * @param outbox 调用方提供的 {@code outbox} 值
+     */
     private void publish(OutboxMessage outbox) {
         long startedNanos = metrics.start();
         Message message;

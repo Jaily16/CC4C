@@ -13,8 +13,10 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 
+/**
+ * MessagePayloadCipher 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
+ */
 @Component
-/** MessagePayloadCipher 协调 CC4C 的一项运行职责，并保持现有外部行为不变。 */
 public final class MessagePayloadCipher {
     static final int MAX_PLAINTEXT_BYTES = 64 * 1024;
     private static final int GCM_TAG_BITS = 128;
@@ -25,6 +27,12 @@ public final class MessagePayloadCipher {
     private final Map<String, byte[]> keys;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    /**
+     * 创建 MessagePayloadCipher 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     *
+     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param properties 调用方提供的 {@code properties} 值
+     */
     public MessagePayloadCipher(ObjectMapper objectMapper, MessagingProperties properties) {
         this.objectMapper = objectMapper;
         this.activeKeyId = properties.activeKeyId();
@@ -32,6 +40,18 @@ public final class MessagePayloadCipher {
         properties.moderationRecipientList();
     }
 
+    /**
+     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     *
+     * @param eventId 目标对象的稳定标识
+     * @param eventType 调用方提供的 {@code eventType} 值
+     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param occurredAt 调用方提供的 {@code occurredAt} 值
+     * @param expiresAt 调用方提供的 {@code expiresAt} 值
+     * @param payload 调用方提供的 {@code payload} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public EncryptedMessagePayload encrypt(
             String eventId,
             String eventType,
@@ -52,6 +72,18 @@ public final class MessagePayloadCipher {
         return encryptBytes(eventId, eventType, schemaVersion, generation, occurredAt, expiresAt, plaintext);
     }
 
+    /**
+     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     *
+     * @param eventId 目标对象的稳定标识
+     * @param eventType 调用方提供的 {@code eventType} 值
+     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param occurredAt 调用方提供的 {@code occurredAt} 值
+     * @param expiresAt 调用方提供的 {@code expiresAt} 值
+     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     EncryptedMessagePayload encryptBytes(
             String eventId,
             String eventType,
@@ -75,6 +107,12 @@ public final class MessagePayloadCipher {
         }
     }
 
+    /**
+     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     *
+     * @param envelope 调用方提供的 {@code envelope} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     public byte[] decrypt(MessageEnvelope envelope) {
         if (envelope.ciphertext().length > MAX_PLAINTEXT_BYTES + 32) {
             throw new MessagePayloadException("PAYLOAD_TOO_LARGE", "Encrypted message payload is too large");
@@ -102,6 +140,12 @@ public final class MessagePayloadCipher {
         }
     }
 
+    /**
+     * 执行 MessagePayloadCipher 中的 key 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param keyId 目标对象的稳定标识
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private SecretKeySpec key(String keyId) {
         byte[] key = keys.get(keyId);
         if (key == null) {
@@ -110,6 +154,17 @@ public final class MessagePayloadCipher {
         return new SecretKeySpec(key, "AES");
     }
 
+    /**
+     * 执行 MessagePayloadCipher 中的 aad 职责，并保持既有权限、事务与副作用边界。
+     *
+     * @param eventId 目标对象的稳定标识
+     * @param eventType 调用方提供的 {@code eventType} 值
+     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
+     * @param generation 调用方提供的 {@code generation} 值
+     * @param occurredAt 调用方提供的 {@code occurredAt} 值
+     * @param expiresAt 调用方提供的 {@code expiresAt} 值
+     * @return 按当前声明计算、查询或转换得到的结果
+     */
     private byte[] aad(
             String eventId,
             String eventType,
