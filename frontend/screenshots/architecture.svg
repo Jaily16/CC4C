@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1120" viewBox="0 0 1480 1120" role="img" aria-labelledby="title desc">
+  <title id="title">CC4C 项目架构</title>
+  <desc id="desc">业务 Vue 前端与独立观测前端访问同一个 Spring Boot 应用。业务通过安全链、服务与数据访问层使用 MySQL 和 Redis；Outbox、RabbitMQ、Inbox 驱动邮件通知。Prometheus 抓取 Actuator 与 RabbitMQ，观测前端通过后端的固定查询读取指标。</desc>
+  <defs>
+    <linearGradient id="canvas" x2="0.8" y2="1"><stop stop-color="#f5f9ff"/><stop offset="1" stop-color="#eef3fa"/></linearGradient>
+    <linearGradient id="brand" x2="1" y2="1"><stop stop-color="#174bd8"/><stop offset="1" stop-color="#4e94ff"/></linearGradient>
+    <linearGradient id="backend" x2="0" y2="1"><stop stop-color="#e9f1ff"/><stop offset="1" stop-color="#f8fbff"/></linearGradient>
+    <linearGradient id="observe" x2="1" y2="1"><stop stop-color="#e7f6f4"/><stop offset="1" stop-color="#f9fdfb"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%"><feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#233a6b" flood-opacity=".08"/></filter>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#c9d8ef" opacity=".5"/></pattern>
+    <marker id="blueArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9Z" fill="#4678d8"/></marker>
+    <marker id="orangeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9Z" fill="#dc892c"/></marker>
+    <marker id="greenArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9Z" fill="#219487"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-serif;fill:#182b4c}
+      .title{font-size:36px;font-weight:700;letter-spacing:1px}
+      .h{font-size:24px;font-weight:700}
+      .body{font-size:20px}
+      .small{font-size:17px}
+      .muted{fill:#5e7392}
+      .blue{fill:#285ac4}
+      .green{fill:#147c72}
+      .orange{fill:#aa641b}
+      .sync{fill:none;stroke:#4678d8;stroke-width:3;marker-end:url(#blueArrow)}
+      .async{fill:none;stroke:#dc892c;stroke-width:3;marker-end:url(#orangeArrow)}
+      .metric{fill:none;stroke:#219487;stroke-width:3;stroke-dasharray:7 6;marker-end:url(#greenArrow)}
+      .icon{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <rect width="1480" height="1120" rx="28" fill="url(#canvas)"/>
+  <rect x="1050" width="430" height="335" fill="url(#dots)"/>
+  <circle cx="1420" cy="80" r="180" fill="#dfeafe" opacity=".5"/>
+  <rect x="54" y="44" width="72" height="72" rx="22" fill="url(#brand)"/>
+  <path d="M104 65C77 52 59 82 76 98C85 106 96 103 104 96M97 72C84 65 74 82 83 90" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+  <text x="148" y="76" class="title">CC4C</text>
+  <text x="150" y="106" class="body muted">课程 · 社区 · 可靠消息 · 运行观测</text>
+  <g class="small">
+    <path d="M878 78h46" class="sync"/><text x="934" y="84">业务 / 查询</text>
+    <path d="M1088 78h40" class="async"/><text x="1140" y="84">异步</text>
+    <path d="M1226 78h40" class="metric"/><text x="1278" y="84">指标抓取</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="54" y="166" width="880" height="122" rx="23" fill="white"/>
+    <rect x="1014" y="166" width="412" height="122" rx="23" fill="white"/>
+  </g>
+  <rect x="76" y="190" width="74" height="74" rx="20" fill="#edf3ff"/>
+  <g class="icon" color="#386cce"><rect x="92" y="209" width="43" height="29" rx="3"/><path d="M102 247h23m-12-9v9M102 218h9m-9 9h23"/></g>
+  <text x="170" y="210" class="h">业务前端</text>
+  <text x="170" y="244" class="body muted">Vue 3 · Vuex</text>
+  <path d="M408 193v67" stroke="#e3ebf7" stroke-width="2"/>
+  <text x="438" y="210" class="body">学习者</text>
+  <text x="438" y="244" class="small muted">课程 · 博客 · 收藏 · 评论</text>
+  <path d="M689 193v67" stroke="#e3ebf7" stroke-width="2"/>
+  <text x="720" y="210" class="body">管理员</text>
+  <text x="720" y="244" class="small muted">课程发布 · 内容审核</text>
+  <rect x="1036" y="190" width="62" height="74" rx="19" fill="#eaf8f4"/>
+  <g class="icon" color="#279386"><path d="M1050 244v-32h35M1055 235l9-11 8 5 11-16"/></g>
+  <text x="1116" y="210" class="h">独立观测前端</text>
+  <text x="1116" y="244" class="body muted">Vue 3 · Pinia · ECharts</text>
+
+  <path d="M497 289v85" class="sync"/>
+  <rect x="516" y="303" width="330" height="26" rx="13" fill="#eef4ff"/>
+  <text x="530" y="322" class="small blue">Session / CSRF · HTTP :4080</text>
+  <path d="M1370 289v85" class="sync"/>
+  <text x="1034" y="322" class="small green">独立 Session · HTTP :4080</text>
+
+  <rect x="54" y="355" width="1372" height="420" rx="26" fill="url(#backend)" stroke="#ccdcef" stroke-width="2"/>
+  <path d="M497 355v31" class="sync"/>
+  <path d="M1370 355v23" class="sync"/>
+  <rect x="76" y="341" width="345" height="33" rx="16" fill="#225ccb"/>
+  <text x="92" y="364" font-size="18" fill="white" style="fill:white;font-weight:700">Spring Boot · 单体后端 · Java 21</text>
+
+  <rect x="80" y="393" width="879" height="80" rx="17" fill="white"/>
+  <rect x="94" y="409" width="49" height="48" rx="14" fill="#eef3ff"/>
+  <g class="icon" color="#416cc1"><path d="M119 417l15 6v10c0 10-15 18-15 18s-15-8-15-18v-10z"/><path d="m113 432 5 5 9-10"/></g>
+  <text x="163" y="425" class="h">HTTP 接口与安全链</text>
+  <text x="163" y="452" class="small muted">Controller · USER / ADMIN 授权 · Session · CSRF · 限流</text>
+  <rect x="785" y="419" width="149" height="30" rx="15" fill="#edf4ff"/>
+  <text x="805" y="440" class="small blue">统一响应 / 校验</text>
+
+  <path d="M500 474v31" class="sync"/>
+  <rect x="80" y="511" width="879" height="77" rx="17" fill="white"/>
+  <text x="107" y="543" class="h">Service · 业务规则与事务</text>
+  <text x="107" y="572" class="small muted">课程查询 / 内容创作 / 互动 / 审核 / 通知编排</text>
+  <rect x="641" y="532" width="293" height="34" rx="17" fill="#edf4ff"/>
+  <text x="660" y="555" class="small blue">DTO · Entity · Common · Config</text>
+  <path d="M311 589v30" class="sync"/>
+  <path d="M751 589v30" class="async"/>
+
+  <rect x="80" y="627" width="410" height="107" rx="17" fill="white"/>
+  <text x="105" y="663" class="h">数据访问与缓存</text>
+  <text x="105" y="694" class="small muted">5 Mapper · 2 JDBC Repository</text>
+  <text x="105" y="720" class="small blue">显式 SQL / 事务访问 · Cache</text>
+
+  <rect x="523" y="627" width="436" height="107" rx="17" fill="#fff7ec" stroke="#f2d6ad"/>
+  <text x="550" y="663" class="h orange">可靠消息支撑</text>
+  <text x="550" y="694" class="small orange">Outbox → 确认投递 · Inbox → 幂等消费</text>
+  <text x="550" y="720" class="small muted">租约 · ACK / NACK · 重试 · 邮件适配</text>
+
+  <rect x="996" y="385" width="405" height="365" rx="19" fill="url(#observe)" stroke="#c6e4dd"/>
+  <text x="1022" y="420" class="h green">观测查询与指标</text>
+  <text x="1022" y="450" class="small muted">业务登录不授予观测身份</text>
+  <rect x="1020" y="473" width="355" height="73" rx="14" fill="white"/>
+  <text x="1040" y="503" class="body green">固定目录 · 有界查询</text>
+  <text x="1040" y="529" class="small muted">39 查询 / 20 面板 / 20 告警</text>
+  <rect x="1020" y="566" width="355" height="83" rx="14" fill="white"/>
+  <text x="1040" y="597" class="body green">Micrometer · Actuator</text>
+  <text x="1040" y="626" class="small muted">API / JVM / SQL / 缓存 / 消息</text>
+  <text x="1023" y="683" class="small green">:4081 · loopback · Basic 认证</text>
+  <text x="1023" y="719" class="small muted">健康探测 · 安全审计 · 依赖状态</text>
+
+  <path d="M204 735C204 788 182 790 182 839" class="sync"/>
+  <path d="M415 735C415 790 464 787 464 839" class="sync"/>
+  <path d="M747 735C747 785 778 790 778 839" class="async" marker-start="url(#orangeArrow)"/>
+  <path d="M926 734C926 802 1055 792 1055 839" class="async"/>
+  <path d="M1378 495C1438 495 1438 823 1400 862" class="sync"/>
+  <rect x="1348" y="782" width="112" height="24" rx="12" fill="#eef4ff"/>
+  <text x="1361" y="800" font-size="15" class="blue">后端查询 API</text>
+  <path d="M1289 844C1289 797 1270 792 1270 731" class="metric"/>
+  <text x="1169" y="808" class="small green">抓取 Actuator</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="848" width="223" height="137" rx="22" fill="white"/>
+    <rect x="353" y="848" width="223" height="137" rx="22" fill="white"/>
+    <rect x="666" y="848" width="224" height="137" rx="22" fill="white"/>
+    <rect x="941" y="848" width="227" height="137" rx="22" fill="white"/>
+    <rect x="1206" y="848" width="221" height="137" rx="22" fill="white"/>
+  </g>
+  <g class="icon" color="#5276aa">
+    <ellipse cx="108" cy="876" rx="18" ry="7" fill="#eff5fc"/><path d="M90 876v28c0 10 36 10 36 0v-28M90 890c0 9 36 9 36 0"/>
+  </g>
+  <text x="142" y="889" class="h">MySQL</text>
+  <text x="93" y="930" class="body muted">业务表 · Flyway</text>
+  <text x="93" y="960" class="small muted">Outbox / Inbox</text>
+  <g class="icon" color="#c26766"><path d="m377 878 19-9 19 9-19 9zM377 888l19 9 19-9M377 898l19 9 19-9"/></g>
+  <text x="431" y="889" class="h">Redis</text>
+  <text x="376" y="930" class="body muted">会话 · 缓存</text>
+  <text x="376" y="960" class="small muted">三个 namespace</text>
+  <g class="icon" color="#cf882e"><path d="M690 875h35v30h-35zM698 875v-10m14 10v-10m-14 23h6m8 0h6"/></g>
+  <text x="737" y="889" class="h" style="font-size:22px">RabbitMQ</text>
+  <text x="689" y="930" class="body muted">事件 · 消费确认</text>
+  <text x="689" y="960" class="small muted">专用 vhost</text>
+  <g class="icon" color="#ab7bba"><rect x="963" y="873" width="37" height="27" rx="3"/><path d="m964 875 18 14 17-14"/></g>
+  <text x="1013" y="889" class="h">SMTP</text>
+  <text x="964" y="930" class="body muted">验证码 · 通知</text>
+  <text x="964" y="960" class="small muted">外部邮件服务</text>
+  <g class="icon" color="#229486"><circle cx="1240" cy="885" r="17"/><path d="m1230 889 6-13 5 8 9-2"/></g>
+  <text x="1266" y="889" class="h" style="font-size:21px">Prometheus</text>
+  <text x="1227" y="930" class="body muted">采集 · 时序 · 告警</text>
+  <text x="1227" y="960" class="small muted">:9090 · 后端访问</text>
+  <path d="M1317 986v33q0 12-12 12H792q-14 0-14-14v-30" class="metric"/>
+  <rect x="918" y="1015" width="296" height="30" rx="15" fill="#eef8f4"/>
+  <text x="939" y="1036" class="small green">抓取 RabbitMQ /metrics/per-object</text>
+
+  <path d="M65 1067h1350" stroke="#dce5f1"/>
+  <text x="68" y="1096" class="small muted">业务事务 → Outbox → RabbitMQ → Inbox → 通知邮件</text>
+  <text x="999" y="1096" class="small muted">CC4C · 6.0.0-SNAPSHOT</text>
+</svg>
