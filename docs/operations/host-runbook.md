@@ -34,7 +34,84 @@ npm run build
 
 ## V6 前台命令入口
 
-V6 增加 infrastructure/host/with-app-environment.ps1，包裹一个标准 Maven、Java 或 npm 前台命令；退出时恢复环境，不创建日志或 PID 状态。后端仍须精确确认数据库，业务前端继续使用既有上传映射。入口实现和使用示例见 [V6 规划](../v6-iteration-plan.md)；本机启动与功能验证留在方面三，以下原有脚本仍为可选入口。
+V6 使用 infrastructure/host/with-app-environment.ps1 包裹一个标准 Maven、Java 或 npm 前台命令；退出时恢复环境，不创建日志或 PID 状态。2026-09-09 的方面三已验证以下入口、最小业务闭环及 Maven 到 JAR 的会话恢复，具体证据和限制见 [V6 规划](../v6-iteration-plan.md)。以下原有整栈脚本仍是可选入口，其状态文件不适用于这些前台命令。
+
+准备三个独立 PowerShell 7 终端。Windows PowerShell 5.1 不能执行这些脚本；先运行 pwsh -NoProfile，出现新提示符后用 $PSVersionTable.PSVersion.ToString() 确认版本。本机本次使用的 PowerShell 7.6.5 绝对路径如下；其他机器应使用自身已安装路径，不自动安装或修改 PATH：
+
+~~~powershell
+& 'C:\Users\31880\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe' -NoProfile
+~~~
+
+先由用户准备好原有 MySQL、Redis、RabbitMQ、SMTP 和 Prometheus。复用隔离数据库 cc4cv5a3smoke，不重复引导账户。启动会执行应用已有的数据库迁移校验、Session 和消息处理，不能视为无数据副作用。三个应用启动前确认 4080、4081、5173、5174 空闲；有占用时停止，不自动换端口或结束占用者。
+
+终端一启动后端，仅在本次调用期间选择 Java 21，Maven 保持离线：
+
+~~~powershell
+Set-Location -LiteralPath 'D:\codex\CC4C_v5\backend'
+$previousJavaHome = $env:JAVA_HOME
+$previousPath = $env:PATH
+$previousMavenArgs = $env:MAVEN_ARGS
+try {
+    $env:JAVA_HOME = 'D:\tool\Java\jdk-21'
+    $env:PATH = "$env:JAVA_HOME\bin;$previousPath"
+    $env:MAVEN_ARGS = '-o'
+    & ..\infrastructure\host\with-app-environment.ps1 `
+        -Application Backend -ConfirmDatabase cc4cv5a3smoke `
+        -Command { mvn -o spring-boot:run }
+}
+finally {
+    $env:JAVA_HOME = $previousJavaHome
+    $env:PATH = $previousPath
+    $env:MAVEN_ARGS = $previousMavenArgs
+}
+~~~
+
+确认后端 health、liveness、readiness 全部正常后，终端二和终端三分别执行：
+
+~~~powershell
+# 终端二：业务前端。
+Set-Location -LiteralPath 'D:\codex\CC4C_v5\frontend'
+& ..\infrastructure\host\with-app-environment.ps1 `
+    -Application Frontend `
+    -Command { npm run dev -- --host localhost --port 5173 --strictPort }
+
+# 终端三：观测前端。
+Set-Location -LiteralPath 'D:\codex\CC4C_v5\observability'
+& ..\infrastructure\host\with-app-environment.ps1 `
+    -Application Observability `
+    -Command { npm run dev -- --host localhost --port 5174 --strictPort }
+~~~
+
+浏览器分别访问 http://localhost:5173 和 http://localhost:5174。本次 localhost 对应的 Vite 监听为 ::1；两个非 VITE_ 上传根变量仍由辅助注入业务前端，已有头像与新博客图片映射均已验证。
+
+使用方面二已构建的 JAR 时，先停止 Maven 后端并确认 4080、4081 释放；在上述同一个 Java 21 环境包裹块中，仅替换命令为：
+
+~~~powershell
+& ..\infrastructure\host\with-app-environment.ps1 `
+    -Application Backend -ConfirmDatabase cc4cv5a3smoke `
+    -Command { java -jar target/cc4c-6.0.0-SNAPSHOT.jar }
+~~~
+
+不同时运行 Maven 和 JAR 两个后端，不为切换入口重新安装依赖或构建。方面三已确认两端刷新后恢复原有 V6 会话；真实 V5 会话恢复没有执行，方面二的合成旧格式校验是独立证据。
+
+只读健康检查无需配置或凭据。PowerShell 对 Actuator 媒体类型可能返回字节数组，应先按 UTF-8 解码；本次默认前端请求曾返回 502，而明确直连返回 200，因此检查本机 URL 使用 -NoProxy，不修改系统代理：
+
+~~~powershell
+foreach ($endpoint in @('health', 'health/liveness', 'health/readiness')) {
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:4081/actuator/$endpoint" `
+        -NoProxy -TimeoutSec 10 -MaximumRedirection 0
+    $json = if ($response.Content -is [byte[]]) {
+        [Text.Encoding]::UTF8.GetString($response.Content)
+    } else { [string]$response.Content }
+    if ($response.StatusCode -ne 200 -or ($json | ConvertFrom-Json).status -ne 'UP') {
+        throw "Health check failed: $endpoint"
+    }
+}
+~~~
+
+失败时停止后续操作，不自动重复登录、重试请求或读取私有日志。本次遇到过 Redis 不监听导致后端启动失败或 readiness 为 DOWN，以及 Prometheus 未启动导致观测不可用；应恢复既有外部依赖，再分别检查后端健康和抓取。抓取 up=1 不代表所有依赖或登录正常。
+
+停止由用户在各自前台终端依次按 Ctrl+C：观测端、业务前端、后端。核对本次记录的 PID 已退出及四个端口释放，不调用旧状态文件停止器，不按进程名称、端口或进程树批量结束。前端可执行文件路径若无法由操作系统取得，应记录该限制；不能据此执行自动强制停止。外部中间件继续保留。
 
 ## 三端配置入口
 
