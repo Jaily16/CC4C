@@ -101,7 +101,7 @@ V5 保留单个原生 Redis 的独立 namespace、MySQL／RabbitMQ／SMTP 与外
 | 三：本机启动与功能 | 验证方面二真实运行、身份隔离与 Maven → JAR 会话恢复 | 已完成，有限制 |
 | 四：文档收敛与资料迁移 | 依赖前述事实，保留证据后合并为三份文档 | 已完成 |
 | 五：中文注释增强 | 全量审阅、按需改写，并核对非注释结构与静态门禁 | 已完成 |
-| 六：GitHub 收口 | 依赖前五方面，再复核目录、质量、运行和精确 Actions | 未开始 |
+| 六：GitHub 收口 | 依赖前五方面，再复核目录、质量、运行和精确 Actions | 本地验收完成；远端结果待后续 PR、Actions 与检查点确认 |
 
 后端保留十个全局技术包和 support 的 cache／messaging／monitoring 三个子包；Mapper 承担 DAO 职责，不增加机械包装层。业务前端继续 Vuex，观测端继续 Pinia。不得以可读性整理改变 HTTP／DTO／SQL／事件／权限语义，不以清空 Session、日志或运行目录消除兼容问题。
 
@@ -111,7 +111,7 @@ V5 保留单个原生 Redis 的独立 namespace、MySQL／RabbitMQ／SMTP 与外
 
 保留六个受控顶层目录：backend、frontend、observability、infrastructure、.github、docs；根 README、versions.yml、.gitignore、.editorconfig 保留。共用基础设施不并入后端；本机 node_modules、target、dist、temp、秘密和 Git 元数据原地保留，不纳入受控备份。
 
-下列是“没有 tracked 文件但不能认定为空”的候选，方面一没有删除，本方面也没有处理：
+下列是“没有 tracked 文件但不能认定为空”的候选，方面一没有删除；方面六经精确授权核查后的处理结果见下文：
 `database/`、`deploy/`、`scripts/`、`backend/docker/`、`frontend/docker/`、`frontend/tests/`、`observability/grafana/`、`observability/prometheus/`、`infrastructure/observability/`。
 
 未来清理需批准精确路径，排除受保护后代，确认位于 V5 且不是链接／reparse point，单层包含隐藏项检查。只对确实为空的普通目录逐个非递归删除；未知文件、运行数据或非空目录立即停止，不为整齐而移动秘密。
@@ -182,7 +182,7 @@ V5 保留单个原生 Redis 的独立 namespace、MySQL／RabbitMQ／SMTP 与外
 
 ### 方面五：中文注释审阅与结构对照
 
-本方面从方面四提交原地实施，版本仍为 6.0.0-SNAPSHOT。独立检查点为
+方面五提交为 6c734fc2ef1cbf2b26add4e411e1832e628a3692，唯一父提交为方面四提交，tree 为 d78ba66cf2caf40e54d6798dc6ae6ec62cba996c。本方面从方面四提交原地实施，版本仍为 6.0.0-SNAPSHOT。独立检查点为
 `D:\codex\CC4C_v2\temp\v6-backup\20260909-aspect5-08e1f107`；旧检查点没有重新读取。固定 HEAD 的 356 项 tree、受控 ZIP、V6 完整历史 bundle、严格 PACK 自包含验证和 SHA-256 清单在源码编辑前已保存并校验。
 
 全量审阅 259 个受控文件，按实现决定保留或改写，不以模板检索数量代替质量结论：
@@ -208,11 +208,36 @@ V5 保留单个原生 Redis 的独立 namespace、MySQL／RabbitMQ／SMTP 与外
 - 版本、依赖、模板、Flyway、catalog、Prometheus 规则、十三张截图及 OpenAPI 保持；配置仍被忽略，非 V6 本地引用和实时远端不变。
 - 生产构建、应用测试、浏览器验证、服务启停、数据库维护均未执行，不以方面二或三的结果冒充本轮通过。
 
-源码审阅另外记录 `CourseView.vue` 模板引用 `goToLogin`，但当前脚本没有对应声明；本轮不修复或运行页面验证。方面六应先评估该静态发现及修复范围，不能将其写为已验证的运行故障或已解决事项。
+源码审阅另外记录 `CourseView.vue` 模板引用 `goToLogin`，但方面五结束时脚本没有对应声明；方面五没有修复或运行页面验证。方面六按单独批准的最小范围补齐处理器，结果与运行证据分别记录如下。
 
-### 方面六入口与停止规则
+### 方面六：最终验证与 GitHub 收口
 
-方面六从本总结和项目指南继续，复核物理目录、生产构建／运行边界及精确 Actions；真实 V5 会话未验证、部分观测数据缺失或截断等方面三限制继续保留。远端分支、推送、PR、合并 main、标签或发布需要相应授权。本方面没有进行这些操作，方面六仍未开始。
+方面六以方面五提交为唯一父提交基线，在原 V5 工作区实施。独立检查点为 D:\codex\CC4C_v2\temp\v6-backup\20260909-aspect6-6c734fc2；固定 HEAD 的完整历史 bundle、严格自包含 PACK、356 项 ZIP blob 和 SHA-256 全部验证通过后才改源码。没有读取旧检查点或本机配置正文。
+
+唯一源码修复是在 CourseView.vue 增加 goToLogin：提示“登录后即可收藏课程和参与评论”，再进入 /login。既有模板事件绑定保持；现有 Vue/JS 解析器确认原脚本 AST 和非脚本块不变，仅新增批准的函数与注释。纯内存提取实际处理器验证一次固定提示和一次跳转。未登录访问 /course 原本也会由会话检查重定向，因此页面跳转不能单独替代该事件处理器的合成证据。
+
+方面一登记的九组候选及其批准后代合计 30 个目录，已重新检查普通路径、隐藏项和单层内容，再从最深层逐个非递归删除。包括 database、deploy、scripts、backend/docker、frontend/docker、frontend/tests、observability/grafana、observability/prometheus、infrastructure/observability；逐目录结果保存在检查点。受控六目录、本机依赖、产物、temp 和秘密目录保留。
+
+| 本轮验证 | 当前结果与边界 |
+| --- | --- |
+| 静态质量 | 通过：Java 936 单元、PowerShell 18 脚本、Spotless 167 文件、两端 lint/format、六份文档链接、源码和观测契约 |
+| 后端离线生产打包、两端生产构建 | 通过；临时 Java 21、PowerShell 7、MAVEN_ARGS=-o，没有安装依赖 |
+| 三种 JAR 与两端 dist | 通过：入口、独立密码工具、七份 Flyway、catalog、管理上下文导入与 Git 来源一致；产物 SHA-256 已保存 |
+| 产物限制检查 | 没有旧业务包、测试/Gatling/.env.local 条目；浏览器后端专属标识检查通过，不等于完整秘密扫描 |
+| 兼容资产与布局 | 十三张截图及 OpenAPI 原 blob 一致，356 文件、三份 docs、全仓六份 Markdown 保持 |
+| 本轮运行回归 | 用户前台启动本轮 JAR 和两端开发服务；四端口齐全，health/liveness/readiness 为 200/UP，两端 HTTP 200；首页、课程列表/详情、公开博客读取及未登录跳转通过 |
+| Prometheus 只读验证 | 公开模板与 20 条规则通过，外部实例 3.13.2 就绪，后端抓取 up=1；未读取或修改私有配置 |
+| 身份与重启回归 | 用户明确批准精简范围：复用方面三历史证据，本轮 USER 刷新、USER/ADMIN 切换、管理员查询、业务/观测退出隔离、登录后观测页面和 JAR 重启会话恢复未重跑 |
+| 三端停止 | 通过：用户确认停止；本次三个 PID 均退出，4080、4081、5173、5174 无监听；外部中间件保留 |
+| 本地提交与远端 | 本地验收完成，按白名单形成一个本地提交；实际 SHA、唯一父提交与 tree 写入检查点。远端结果由后续 PR、Actions 与检查点记录确认，不预先声称推送或合并成功 |
+
+产物辅助首次错误地假定管理导入位于 BOOT-INF/classes/META-INF，并写错预期类名。只读定位确认主 JAR 与管理员 JAR 均保留根部 META-INF/spring 导入，指向受控 ObservabilitySecurityConfiguration。保留失败记录后，改为核对实际条目与已验证 Git ZIP 中的资源，验证通过；没有改动项目打包配置或降低检查。
+
+用户确认按精简范围继续，避免重复方面三的整套登录和角色切换。本轮历史证据仅引用，不改写为新产物的动态通过结果；没有输入或读取凭据、Cookie、Storage 或真实 Session。现有头像映射与登录后观测内容本轮未重新验证。
+
+正常读取现有公开博客使其阅读数由 4 增至 5；未回滚这一正常副作用，未新增收藏、上传、博客、评论、审核或重试消息。后端进程的可执行路径在 Get-Process 和 Win32_Process 中均返回空值，记录 PID、创建时间、端口、用户启动报告和磁盘 JAR 哈希，不能独立证明运行进程的 Java 路径或加载的 JAR。两端进程路径可核实为现有 Node。
+
+构建保留 Shade 重复资源/module-info 和前端超过 500 kB chunk 的警告；本方面没有为消除警告调整依赖、拆包或检查阈值。真实 V5 会话未验证、部分观测无数据或截断、方面三上传残留等限制继续保留。本轮不重复数据写入闭环，不操作中间件；启动、登录与正常读取仍可能产生既有 Session、消息和阅读计数副作用。
 
 任何基线偏差、目标碰撞、链接路径／reparse point、未知文件、白名单外差异或检查失败，都保留现场并停止报告；不用覆盖、reset、clean、stash、递归删除或降低门禁取得干净状态。秘密配置、数据库、Redis、Cookie／Token、上传、日志与历史备份不属于文档整理输入。
 

@@ -215,6 +215,12 @@ const {
   resetComments,
 } = commentThread;
 
+/** 提示收藏和评论需要登录，并进入用户登录页。 */
+function goToLogin() {
+  ElMessage.warning('登录后即可收藏课程和参与评论');
+  router.push('/login');
+}
+
 /** 查找当前语言选项，未匹配时使用第一项 Java。 */
 function selectedLanguage() {
   return langs.find((lang) => lang.name === mainLang.value) || langs[0];
