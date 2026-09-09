@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-/** BlogView 博客页面，协调社区数据、会话状态和用户交互。 */
+/** 博客广场在确认 USER 会话后分页读取语言编号 1 的公开博客，并提供写博客入口。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -66,7 +66,7 @@ import { getSession } from '@/api/auth';
 import { incrementBlogClick, listPublicBlogs } from '@/api/community';
 import { ElMessage } from 'element-plus';
 import { View } from '@element-plus/icons-vue';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
@@ -77,12 +77,12 @@ const currentPage = ref(1);
 const pageSize = 12;
 const total = ref(0);
 
-/** blogSummary 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 依次读取摘要候选字段，均为空时不显示摘要。 */
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
 }
 
-/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 确认 USER 会话；未登录或查询失败时提示并进入登录页。 */
 async function verifyUser() {
   try {
     const resp = await getSession();
@@ -99,7 +99,7 @@ async function verifyUser() {
   }
 }
 
-/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 尝试更新阅读计数后进入博客详情，计数失败不阻断导航。 */
 async function openBlog(blogId) {
   try {
     await incrementBlogClick(blogId);
@@ -109,7 +109,7 @@ async function openBlog(blogId) {
   router.push({ path: '/blogDetail', query: { blogId } });
 }
 
-/** 读取 loadBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 分页读取固定语言编号 1 的公开博客，维护列表、总数和加载错误。 */
 async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
@@ -127,7 +127,7 @@ async function loadBlogs() {
   }
 }
 
-/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 更新当前页码并重新查询公开博客。 */
 function changePage(page) {
   currentPage.value = page;
   return loadBlogs();

@@ -3,7 +3,7 @@
 # 外部依赖：调用本机 Java 21、Maven、Node、npm、Git 与 PowerShell 7，不连接业务外部服务。
 # 破坏性边界：本脚本只执行检查命令，不读取本机秘密、不启动服务、不修改源文件。
 # 失败恢复：任一步返回非零码即停止，保留检查输出；调用方应保留现场并先解决失败原因。
-# 退出码：所有检查成功返回 0，任一步失败返回该检查的非零码。
+# 退出码：所有检查成功返回 0；任一步失败抛出异常，外层捕获后统一返回 1。
 
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path

@@ -6,7 +6,7 @@ import StatusBadge from './StatusBadge.vue';
 
 const props = defineProps({ metric: { type: Object, required: true } });
 
-/** 从现有响应式状态派生 formattedValue，不发起请求或写入外部数据。 */
+/** 缺失或非有限值显示占位符；比例转百分数，字节按 1024 进制换算，状态值转在线说明。 */
 const formattedValue = computed(() => {
   const value = props.metric.value;
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';

@@ -78,7 +78,7 @@ function Assert-Cc4cRabbit {
     }
 }
 
-# SMTP 预检不发送邮件；TLS 和认证参数已由共享加载器校验，真实投递在人工 smoke 中确认。
+# SMTP 只检查 TCP 可连接性，不发送邮件或验证 TLS 握手；共享加载器检查参数形状，真实认证和投递另行确认。
 function Assert-Cc4cSmtp {
     param([System.Collections.IDictionary] $Values)
     if (-not (Test-Cc4cTcpPort $Values.CC4C_MAIL_HOST ([int] $Values.CC4C_MAIL_PORT))) {

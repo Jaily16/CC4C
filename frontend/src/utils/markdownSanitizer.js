@@ -4,7 +4,7 @@ const HEADING_ID_PATTERN = /^cc4c-md-\d+-[a-z0-9-]{1,64}$/;
 
 const allowedTags = [...sanitizeHtml.defaults.allowedTags, 'img', 'input', 'del', 'details', 'summary'];
 
-/** headingTransform 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 只保留符合站内标题规则的 id，避免任意 Markdown 标题占用其他 DOM 标识。 */
 const headingTransform = (tagName, attribs) => {
   const nextAttributes = { ...attribs };
   if (!HEADING_ID_PATTERN.test(nextAttributes.id || '')) {
@@ -63,7 +63,7 @@ const markdownSanitizeOptions = {
   },
 };
 
-/** markdownHeadingId 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 从标题生成受限英文 slug，结合正整数序号构造站内标题 id。 */
 export const markdownHeadingId = (text, _level, index) => {
   const slug =
     String(text ?? '')
@@ -77,5 +77,5 @@ export const markdownHeadingId = (text, _level, index) => {
   return `cc4c-md-${Number.isInteger(index) && index > 0 ? index : 1}-${slug}`;
 };
 
-/** sanitizeMarkdownHtml 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 按固定标签、属性和协议白名单净化 Markdown HTML，并限制嵌套深度。 */
 export const sanitizeMarkdownHtml = (html) => sanitizeHtml(String(html ?? ''), markdownSanitizeOptions);

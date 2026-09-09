@@ -14,19 +14,6 @@ $started = $null
 $identity = $null
 $snapshot = $null
 
-# 按 backend 工作目录解析上传根；只检查自身和父路径元数据，不枚举、不创建、不读取文件。
-function Resolve-Cc4cHostUploadRoot {
-    param([System.Collections.IDictionary] $Values, [string] $Name, [string] $BackendRoot)
-    try {
-        $configured = [string] $Values[$Name]
-        if ([string]::IsNullOrWhiteSpace($configured)) { throw 'missing upload root' }
-        $absolute = if ([IO.Path]::IsPathRooted($configured)) { [IO.Path]::GetFullPath($configured) }
-        else { [IO.Path]::GetFullPath((Join-Path $BackendRoot $configured)) }
-        if ($absolute -eq [IO.Path]::GetPathRoot($absolute)) { throw 'drive root not allowed' }
-        return Assert-Cc4cOrdinaryPath $absolute.TrimEnd('\') -Kind Directory -AllowMissing
-    }
-    catch { throw "Upload path '$Name' must resolve to ordinary local directories." }
-}
 
 try {
     $workspaceRoot = Get-Cc4cHostWorkspaceRoot

@@ -116,14 +116,14 @@
 </template>
 
 <script setup>
-/** HomeView 页面组件，协调当前路由的展示状态和用户事件。 */
+/** 首页分别加载课程与博客推荐列表，维护两组加载状态并提供详情导航。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { incrementBlogClick, listHomeBlogs } from '@/api/community';
 import { listHomeCourses } from '@/api/catalog';
 import { assets } from '@/assets';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const router = useRouter();
@@ -135,7 +135,7 @@ const blogsLoading = ref(false);
 const coursesError = ref('');
 const blogsError = ref('');
 
-/** blogSummary 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 依次读取 summary、abstract 或 description 作为博客摘要。 */
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
 }
@@ -149,7 +149,7 @@ const courseLevelLabels = {
   66: '难度：必须展示',
 };
 
-/** courseDifficulty 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 按难度编号生成说明，缺失或未知时显示系统化学习路径。 */
 function courseDifficulty(course) {
   const level = course.level ?? course.difficulty;
   if (level === null || level === undefined || level === '') {
@@ -158,7 +158,7 @@ function courseDifficulty(course) {
   return courseLevelLabels[String(level)] || '系统化学习路径';
 }
 
-/** 读取 loadCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 读取首页前八门课程，失败时清空课程并显示可重试提示。 */
 async function loadCourses() {
   coursesLoading.value = true;
   coursesError.value = '';
@@ -174,7 +174,7 @@ async function loadCourses() {
   }
 }
 
-/** 读取 loadBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 读取首页前六篇博客，失败时清空博客并显示可重试提示。 */
 async function loadBlogs() {
   blogsLoading.value = true;
   blogsError.value = '';
@@ -190,12 +190,12 @@ async function loadBlogs() {
   }
 }
 
-/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 携带课程名称进入课程详情。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
-/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 尝试记录阅读点击后进入博客详情；计数失败不阻止导航。 */
 async function openBlog(blogId) {
   try {
     await incrementBlogClick(blogId);

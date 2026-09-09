@@ -23,9 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * PasswordMigrationRunner 负责离线维护工具的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 验证目标数据库与备份哈希后，分批迁移用户和管理员密码；每批独立提交。 */
 @Component
 final class PasswordMigrationRunner implements ApplicationRunner {
     private static final Pattern DATABASE_NAME =
@@ -38,12 +36,12 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     private final ConfigurableApplicationContext context;
 
     /**
-     * 创建 PasswordMigrationRunner 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存密码表访问、事务、迁移设置及结束时关闭的工具上下文。
      *
-     * @param jdbc 调用方提供的 {@code jdbc} 值
-     * @param transactionTemplate 调用方提供的 {@code transactionTemplate} 值
-     * @param environment 调用方提供的 {@code environment} 值
-     * @param context 调用方提供的 {@code context} 值
+     * @param jdbc 密码或管理员表的 JDBC 访问器
+     * @param transactionTemplate 控制单批迁移或引导写入的事务模板
+     * @param environment 读取显式维护设置的 Spring 环境
+     * @param context 维护工具的 Spring 上下文
      */
     PasswordMigrationRunner(
             JdbcTemplate jdbc,
@@ -57,9 +55,9 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件约定的单次任务，并按既有失败语义向调用方报告结果。
+     * 先验证数据库和备份，再迁移两张表并检查编码前缀；全部成功后输出计数并关闭上下文。
      *
-     * @param args 调用方提供的 {@code args} 值
+     * @param args 命令行参数；本入口不自行解析
      */
     @Override
     public void run(ApplicationArguments args) {
@@ -78,10 +76,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 按递增用户 ID 每批读取 100 行，在批次事务中迁移非 BCrypt 密码。
      *
-     * @param encoder 调用方提供的 {@code encoder} 值
-     * @return 按当前规则计算或读取的数值
+     * @param encoder 写入 BCrypt 摘要的密码编码器
+     * @return 本次迁移的用户密码数量
      */
     private long migrateNumericTable(PasswordEncoder encoder) {
         long migrated = 0;
@@ -111,10 +109,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 按递增管理员 ID 每批读取 100 行，在批次事务中迁移非 BCrypt 密码。
      *
-     * @param encoder 调用方提供的 {@code encoder} 值
-     * @return 按当前规则计算或读取的数值
+     * @param encoder 写入 BCrypt 摘要的密码编码器
+     * @return 本次迁移的管理员密码数量
      */
     private long migrateAdministratorTable(PasswordEncoder encoder) {
         long migrated = 0;
@@ -147,9 +145,7 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
-    /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 统计两张表中空密码或没有 BCrypt 前缀的记录；仍有记录时终止验收。 */
     private void verifyAllPasswordsMigrated() {
         Long userPlaintext = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM user WHERE password IS NULL OR password NOT LIKE '{bcrypt}%'", Long.class);
@@ -165,9 +161,7 @@ final class PasswordMigrationRunner implements ApplicationRunner {
         }
     }
 
-    /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 忽略大小写比较 URL 中的数据库名与确认值，并流式计算指定备份的 SHA-256 验证一致性。 */
     private void validateBackupAndDatabase() {
         String jdbcUrl = required("spring.datasource.url");
         Matcher matcher = DATABASE_NAME.matcher(jdbcUrl);
@@ -195,11 +189,11 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 编码或保护当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 拒绝超过 72 个 UTF-8 字节的历史密码，再用指定编码器生成摘要。
      *
-     * @param encoder 调用方提供的 {@code encoder} 值
-     * @param password 仅用于当前安全校验的密码或密码摘要
-     * @return 按当前协议生成或读取的字符串值
+     * @param encoder 写入 BCrypt 摘要的密码编码器
+     * @param password 待校验或编码的明文密码
+     * @return 带编码标识的密码摘要
      */
     private String encode(PasswordEncoder encoder, String password) {
         if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
@@ -209,9 +203,9 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 拒绝以左花括号开头的未知编码标识，避免把已有摘要当作明文再次编码。
      *
-     * @param password 仅用于当前安全校验的密码或密码摘要
+     * @param password 待校验或编码的明文密码
      */
     private void rejectUnknownEncoding(String password) {
         if (password.startsWith("{")) {
@@ -220,10 +214,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 要求密码非 null 且非空字符串，保留原值内容。
      *
-     * @param value 待处理或存储的值
-     * @return 按当前协议生成或读取的字符串值
+     * @param value 数据库中读取的密码字段
+     * @return 原密码值的字符串表示
      */
     private String requiredPassword(Object value) {
         if (value == null || value.toString().isEmpty()) {
@@ -233,10 +227,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 读取必需迁移设置，缺失或空白时抛出异常。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param name 必需迁移设置的名称
+     * @return 非空白的迁移设置值
      */
     private String required(String name) {
         String value = environment.getProperty(name);
@@ -247,10 +241,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 构造仅支持 BCrypt、写入时附加编码前缀的密码编码器。
      *
-     * @param strength 调用方提供的 {@code strength} 值
-     * @return 当前操作产生的 PasswordEncoder 结果
+     * @param strength BCrypt 工作因子，运行入口限定为 4–16
+     * @return 使用指定工作因子的委托编码器
      */
     private PasswordEncoder passwordEncoder(int strength) {
         Map<String, PasswordEncoder> encoders = Map.of("bcrypt", new BCryptPasswordEncoder(strength));
@@ -258,10 +252,10 @@ final class PasswordMigrationRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 流式读取指定数据库备份并计算 SHA-256；读取或算法错误阻止迁移。
      *
-     * @param file 待校验或保存的上传文件
-     * @return 按当前协议生成或读取的字符串值
+     * @param file 用于校验的数据库备份文件路径
+     * @return 小写十六进制 SHA-256
      */
     private String sha256(Path file) {
         try (InputStream input = Files.newInputStream(file)) {

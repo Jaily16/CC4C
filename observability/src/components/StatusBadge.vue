@@ -6,9 +6,9 @@ const props = defineProps({
   status: { type: String, default: 'UNKNOWN' },
 });
 
-/** 从现有响应式状态派生 normalized，不发起请求或写入外部数据。 */
+/** 将输入状态转为大写，统一后续标签与颜色匹配。 */
 const normalized = computed(() => props.status.toUpperCase());
-/** 从现有响应式状态派生 label，不发起请求或写入外部数据。 */
+/** 将已知运行和消息状态映射为中文标签；未识别状态显示未知。 */
 const label = computed(() => {
   const labels = {
     AVAILABLE: '可用',
@@ -30,7 +30,7 @@ const label = computed(() => {
   return labels[normalized.value] ?? '未知';
 });
 
-/** 从现有响应式状态派生 tone，不发起请求或写入外部数据。 */
+/** 正常状态使用成功色，部分可用或等待状态使用警示色，其余状态使用危险色。 */
 const tone = computed(() => {
   if (['AVAILABLE', 'UP', 'INACTIVE', 'OK'].includes(normalized.value)) return 'success';
   if (['PARTIAL', 'EMPTY', 'DEGRADED', 'PENDING', 'UNKNOWN', 'MISSING'].includes(normalized.value)) return 'warning';

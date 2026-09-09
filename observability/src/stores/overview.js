@@ -3,10 +3,11 @@ import { defineStore } from 'pinia';
 import { safeMessage } from '@/api/client.js';
 import { fetchOverview } from '@/api/observability.js';
 
-/** useOverviewStore 集中维护本领域的加载、成功、失败和会话状态，供页面共享。 */
+/** 保存八项总览指标及加载错误，供总览页面和轮询流程共享。 */
 export const useOverviewStore = defineStore('observability-overview', {
   state: () => ({ data: null, loading: false, error: null }),
   actions: {
+    /** 刷新总览指标；取消不显示错误，失败保留上次数据并记录受控提示。 */
     async load(signal) {
       this.loading = true;
       this.error = null;

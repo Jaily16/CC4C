@@ -8,21 +8,17 @@ import java.nio.file.Path;
 import java.util.List;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-/**
- * ObservabilityPasswordHashApplication 负责独立观测门户的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 独立生成观测门户 BCrypt 摘要，不启动 Spring 上下文或业务服务。 */
 public final class ObservabilityPasswordHashApplication {
     private static final String PASSWORD_FILE_ENVIRONMENT = "CC4C_OBSERVABILITY_PASSWORD_FILE";
 
-    /**
-     * 创建 ObservabilityPasswordHashApplication 实例，不触发外部 I/O。
-     */
+    /** 禁止实例化观测密码摘要工具。 */
     private ObservabilityPasswordHashApplication() {}
 
     /**
-     * 启动对应命令行或 Spring Boot 进程，并把退出状态交给调用环境。
+     * 从指定受保护文件生成摘要并输出；失败只输出固定提示并以 1 退出。
      *
-     * @param args 调用方提供的 {@code args} 值
+     * @param args 命令行参数；本入口不自行解析
      */
     public static void main(String[] args) {
         try {
@@ -34,10 +30,10 @@ public final class ObservabilityPasswordHashApplication {
     }
 
     /**
-     * 判断观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 校验密码文件为规范普通文件且只有一行，要求 12–64 个码点及最多 72 个 UTF-8 字节，再以工作因子 12 编码。
      *
-     * @return 按当前协议生成或读取的字符串值
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @return BCrypt 密码摘要
+     * @throws IOException 密码文件读取失败时抛出
      */
     private static String hashPassword() throws IOException {
         String configured = System.getenv(PASSWORD_FILE_ENVIRONMENT);

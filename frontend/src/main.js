@@ -15,7 +15,7 @@ app.use(router);
 app.use(store);
 app.use(ElementPlus);
 
-/** 登记页面可见性监听，以便隐藏时暂停轮询并在恢复后安全刷新。 */
+/** 监听业务客户端的 401 事件，清空 Vuex 身份并按当前路由进入用户或管理员登录页。 */
 window.addEventListener('cc4c:unauthorized', async () => {
   const wasAdminRoute = router.currentRoute.value.path.startsWith('/admin');
   store.commit('RESET_STATE');

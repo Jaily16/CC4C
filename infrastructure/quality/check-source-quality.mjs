@@ -83,7 +83,7 @@ function isExcluded(relativePath) {
     || normalized === 'database/legacy/cc4c.sql'
     || normalized === 'infrastructure/database/legacy/cc4c.sql'
     || normalized.endsWith('package-lock.json')
-    || normalized.startsWith('docs/reference/openapi.json');
+    || normalized.startsWith('backend/openapi.json');
 }
 
 function isQualityPath(relativePath) {
@@ -182,6 +182,23 @@ function validateBrowserConsole(errors, relativePath, source) {
   }
 }
 
+// Javadoc 与声明之间只允许空白和完整注解；括号和字符串按词法边界处理，不把前一个声明的说明借给当前类型。
+function onlyJavaAnnotations(source) {
+  const tokens = source.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|@[A-Za-z_$][\w$.]*|[^\s]/g) || [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!tokens[index].startsWith('@')) return false;
+    if (tokens[index + 1] !== '(') continue;
+    let depth = 0;
+    do {
+      index += 1;
+      if (tokens[index] === '(') depth += 1;
+      if (tokens[index] === ')') depth -= 1;
+    } while (depth > 0 && index + 1 < tokens.length);
+    if (depth !== 0) return false;
+  }
+  return true;
+}
+
 function validatePublicJavaDocs(errors, relativePath, source) {
   if (!isUnder(relativePath, 'backend/src/main/java') || !relativePath.endsWith('.java')) return;
   const lines = source.split('\n');
@@ -189,8 +206,14 @@ function validatePublicJavaDocs(errors, relativePath, source) {
   for (let index = 0; index < lines.length; index += 1) {
     const match = lines[index].match(declaration);
     if (!match) continue;
-    const preceding = lines.slice(Math.max(0, index - 16), index).join('\n');
-    const javadoc = preceding.match(/\/\*\*[\s\S]*?\*\//g)?.at(-1);
+    // 按完整注释边界查找，不截断包含大量 @param 的 record 文档。
+    const preceding = lines.slice(0, index).join('\n');
+    const end = preceding.lastIndexOf('*/');
+    const start = end < 0 ? -1 : preceding.lastIndexOf('/**', end);
+    const javadoc = start >= 0 && preceding.indexOf('*/', start) === end
+      && onlyJavaAnnotations(preceding.slice(end + 2))
+      ? preceding.slice(start, end + 2)
+      : null;
     if (!javadoc || !/[\u3400-\u9FFF]/u.test(javadoc)) {
       addError(errors, relativePath, 'java-public-type-javadoc', 'Chinese Javadoc before public type', match[2]);
     }

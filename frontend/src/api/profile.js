@@ -1,6 +1,6 @@
 import api from './client.js';
 
-/** 只读查询 getCurrentUser 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 读取当前 USER 会话对应的个人资料。 */
 export function getCurrentUser(http = api) {
   return http.get('/users/me');
 }
@@ -12,12 +12,12 @@ export function uploadAvatar(formData, http = api) {
   });
 }
 
-/** 提交 updateProfile 对应的业务写入；统一客户端负责凭据与 CSRF，调用方负责刷新受影响状态。 */
+/** 提交当前用户资料修改，页面在成功后刷新 Vuex 中的用户信息。 */
 export function updateProfile(payload, http = api) {
   return http.put('/users/me', payload);
 }
 
-/** 提交 changePassword 对应的业务写入；统一客户端负责凭据与 CSRF，调用方负责刷新受影响状态。 */
+/** 提交当前用户密码修改；成功后后端撤销既有会话，前端按结果重新登录。 */
 export function changePassword(payload, http = api) {
   return http.put('/users/me/password', payload);
 }

@@ -233,14 +233,14 @@ function Assert-Cc4cRuntimeEnvironment {
     return $values
 }
 
-# 注入本次启动所需变量；前端清除已知后端运行变量，只注入公开地址和两个上传根变量。
+# 保存待调整变量后注入所选应用环境；两端清除已知后端变量，只有业务前端重新注入两个上传根变量。
 function Set-Cc4cProcessEnvironment {
     param([System.Collections.IDictionary] $Values, [switch] $Backend, [switch] $Frontend, [switch] $Observability)
     $selectedApplications = @($Backend, $Frontend, $Observability)
     if (@($selectedApplications | Where-Object { $_ }).Count -ne 1) { throw 'Choose one application environment.' }
     $names = @($Values.Keys)
     if ($Backend -or $Frontend -or $Observability) { $names += @('SPRING_CONFIG_NAME', 'SPRING_APPLICATION_NAME', 'SPRING_CONFIG_LOCATION', 'SPRING_CONFIG_ADDITIONAL_LOCATION', 'SPRING_CONFIG_IMPORT') }
-    if ($Frontend -or $Observability) { $names += $script:Cc4cRuntimeAllowedNames }
+    if ($Frontend -or $Observability) { $names += $script:Cc4cRuntimeAllowedNames; $names += @('CC4C_HOST_BLOG_IMG_ROOT', 'CC4C_HOST_AVATAR_ROOT') }
     $names = @($names | Sort-Object -Unique)
     $original = [ordered]@{}
     foreach ($name in $names) { $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
@@ -268,6 +268,20 @@ function Set-Cc4cProcessEnvironment {
 function Restore-Cc4cProcessEnvironment {
     param([Parameter(Mandatory = $true)] $Snapshot)
     foreach ($name in $Snapshot.Names) { [Environment]::SetEnvironmentVariable($name, $Snapshot.Values[$name], 'Process') }
+}
+
+# 按 backend 工作目录解析上传根；只检查自身和父路径元数据，不枚举、不创建、不读取文件。
+function Resolve-Cc4cHostUploadRoot {
+    param([System.Collections.IDictionary] $Values, [string] $Name, [string] $BackendRoot)
+    try {
+        $configured = [string] $Values[$Name]
+        if ([string]::IsNullOrWhiteSpace($configured)) { throw 'missing upload root' }
+        $absolute = if ([IO.Path]::IsPathRooted($configured)) { [IO.Path]::GetFullPath($configured) }
+        else { [IO.Path]::GetFullPath((Join-Path $BackendRoot $configured)) }
+        if ($absolute -eq [IO.Path]::GetPathRoot($absolute)) { throw 'drive root not allowed' }
+        return Assert-Cc4cOrdinaryPath $absolute.TrimEnd('\') -Kind Directory -AllowMissing
+    }
+    catch { throw "Upload path '$Name' must resolve to ordinary local directories." }
 }
 
 # 状态根固定在当前工作区；读取时不创建目录，避免只读健康查询产生文件。
@@ -351,7 +365,7 @@ function Get-Cc4cRecordedProcess {
         -not [IO.Path]::IsPathFullyQualified([string] $State.marker) -or
         $null -eq $State.processCreatedAtUtc) { throw 'Incomplete process identity; preserve the record for inspection.' }
     $relativeMarker = switch ($State.component) {
-        'backend' { 'backend\target\cc4c-5.0.0-SNAPSHOT.jar' }
+        'backend' { 'backend\target\cc4c-6.0.0-SNAPSHOT.jar' }
         'frontend' { 'frontend\node_modules\vite\bin\vite.js' }
         'observability' { 'observability\node_modules\vite\bin\vite.js' }
     }
@@ -421,7 +435,7 @@ function Stop-Cc4cOwnedComponent {
     Write-Cc4cHostState $State.component $updated
 }
 
-# 只查询外部 Prometheus 的公开状态接口；不读取私有配置，不修改服务或存储。
+# 检查外部 Prometheus 就绪和精确版本 3.13.2；可选要求全部 backend up 序列为 1，不读取私有配置或修改存储。
 function Assert-Cc4cPrometheusEndpoint {
     param([string] $BaseUrl = 'http://127.0.0.1:9090', [switch] $RequireBackendScrape)
     $uri = Get-Cc4cEndpointUri $BaseUrl @('http', 'https') 'Prometheus'

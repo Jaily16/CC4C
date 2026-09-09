@@ -10,7 +10,7 @@ import { useOperationsStore } from '@/stores/operations.js';
 const store = useOperationsStore();
 const polling = usePolling((signal) => store.load(signal));
 
-/** 把现有数据转换为 formatTime 所需展示结构，不产生外部副作用。 */
+/** 将存在的检查时间按本地中文格式展示，缺失时显示未提供。 */
 function formatTime(value) {
   return value ? new Date(value).toLocaleString('zh-CN') : '未提供';
 }

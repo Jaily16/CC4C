@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-/** Register 身份页面，维护输入校验、认证请求和安全错误提示。 */
+/** 用户注册页面，校验资料与邮箱验证码，维护发信倒计时并在注册成功后进入登录页。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -128,12 +128,12 @@ const {
   buildRequest: () => ({ email: user.email, purpose: 'REGISTER' }),
 });
 
-/** 校验 isEmail 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 按页面的基本邮箱格式规则检查输入。 */
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/** 校验 validateField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 检查用户名、邮箱、密码长度及 UTF-8 字节数和六位验证码，更新字段提示。 */
 function validateField(field) {
   if (field === 'userName') {
     fieldErrors.userName = user.userName ? '' : '请输入用户名';
@@ -154,13 +154,13 @@ function validateField(field) {
   }
 }
 
-/** 校验 validateRegisterForm 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 检查全部必填注册字段，任一有错误即返回 false。 */
 function validateRegisterForm() {
   ['userName', 'email', 'password', 'code'].forEach(validateField);
   return Object.values(fieldErrors).every((error) => !error);
 }
 
-/** 读取 getVCode 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 校验邮箱后请求 REGISTER 验证码邮件，倒计时由共享 composable 控制。 */
 async function getVCode() {
   formError.value = '';
   validateField('email');
@@ -182,7 +182,7 @@ async function getVCode() {
   }
 }
 
-/** 处理 register 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 提交资料和邮箱验证码创建账户，成功后进入登录页，不自动建立登录展示状态。 */
 async function register() {
   formError.value = '';
   if (!validateRegisterForm()) {

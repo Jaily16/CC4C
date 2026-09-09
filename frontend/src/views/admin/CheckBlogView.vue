@@ -118,7 +118,7 @@
 </template>
 
 <script setup>
-/** CheckBlogView 管理页面，协调管理员只可访问的查询与操作状态。 */
+/** 管理员博客审核页面，读取待审文章并提交审核结果；审核可能触发作者通知。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { getBlog, listPendingBlogs, reviewBlog } from '@/api/community';
@@ -126,7 +126,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 import { markdownHeadingId, sanitizeMarkdownHtml } from '@/utils/markdownSanitizer';
 
@@ -143,7 +143,7 @@ const currentPage = ref(1);
 const pageSize = 10;
 const total = ref(0);
 
-/** 把现有数据转换为 formatDateTime 所需展示结构，不产生外部副作用。 */
+/** 显示中文年月日和时分，缺失提示未知，非法日期保留原文本。 */
 function formatDateTime(value) {
   if (!value) return '时间未知';
   const date = new Date(value);
@@ -157,7 +157,7 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-/** 读取 loadPendingBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 分页读取待审核博客；当前选择不在新列表中时清空正文选择。 */
 async function loadPendingBlogs() {
   loading.value = true;
   errorMessage.value = '';
@@ -175,7 +175,7 @@ async function loadPendingBlogs() {
   }
 }
 
-/** 响应 selectBlog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 选择审核对象并读取完整正文；正在提交审核时不切换对象。 */
 async function selectBlog(blog) {
   if (operationAction.value) return;
   selectedBlog.value = blog;
@@ -198,14 +198,14 @@ async function selectBlog(blog) {
   }
 }
 
-/** 处理 resetSelection 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 清空审核对象、正文和详情错误。 */
 function resetSelection() {
   selectedBlog.value = null;
   text.value = '';
   detailError.value = '';
 }
 
-/** confirmDecision 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 展示通过或驳回确认，取消时返回；确认后提交当前选择的审核动作。 */
 async function confirmDecision(action) {
   if (!selectedBlog.value || operationAction.value) return;
   const approve = action === 'approve';
@@ -228,7 +228,7 @@ async function confirmDecision(action) {
   await submitDecision(action);
 }
 
-/** 处理 submitDecision 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 提交当前博客的审核并触发后端通知流程；成功后清空选择、调整空页并刷新待审核列表。 */
 async function submitDecision(action) {
   operationAction.value = action;
   try {
@@ -250,7 +250,7 @@ async function submitDecision(action) {
   }
 }
 
-/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 修改审核页码，清空当前选择并加载新页。 */
 function changePage(page) {
   currentPage.value = page;
   resetSelection();

@@ -8,7 +8,7 @@ const api = axios.create({
 
 let csrfPromise = null;
 
-/** 只读查询 ensureCsrfToken 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 合并并发 CSRF 初始化请求，失败时清空 Promise 以允许下一次重新初始化。 */
 async function ensureCsrfToken() {
   if (!csrfPromise) {
     csrfPromise = api.get('/csrf', { cc4cSkipCsrf: true }).catch((error) => {
@@ -19,12 +19,12 @@ async function ensureCsrfToken() {
   await csrfPromise;
 }
 
-/** 只读查询 resetCsrfToken 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 清除已缓存的 CSRF 初始化 Promise，使下一次写请求重新获取令牌。 */
 export function resetCsrfToken() {
   csrfPromise = null;
 }
 
-/** 统一附加业务 CSRF 或处理会话失效，避免页面直接操作安全令牌。 */
+/** 写请求发送前等待 CSRF 初始化；令牌获取请求通过标记跳过自身拦截。 */
 api.interceptors.request.use(async (config) => {
   const method = (config.method || 'get').toLowerCase();
   if (!config.cc4cSkipCsrf && ['post', 'put', 'patch', 'delete'].includes(method)) {
@@ -33,7 +33,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-/** 统一附加业务 CSRF 或处理会话失效，避免页面直接操作安全令牌。 */
+/** 收到 401 时发布业务会话失效事件；所有错误仍拒绝 Promise，由调用方处理。 */
 api.interceptors.response.use(
   (response) => response,
   (error) => {

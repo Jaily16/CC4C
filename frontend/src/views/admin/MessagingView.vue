@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-/** 异步消息页面，固定展示消息链路观测仪表板。 */
+/** 管理员异步消息页面，按状态与事件类型查询摘要，经确认后请求重试或忽略指定事件。 */
 import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -81,7 +81,7 @@ import {
   listMessages,
   retryMessage as retryMessageRequest,
 } from '@/api/messaging';
-import PageFeedback from '@/components/common/PageFeedback.vue';
+import PageFeedback from '@/components/PageFeedback.vue';
 import { apiErrorMessage } from '@/utils/apiError';
 
 const messages = ref([]);
@@ -93,7 +93,7 @@ const page = ref(1);
 const size = 20;
 const total = ref(0);
 
-/** 读取 loadMessages 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 按事件类型、状态和页码读取消息摘要；空的非首页逐页回退后再读。 */
 async function loadMessages() {
   loading.value = true;
   errorMessage.value = '';
@@ -117,7 +117,7 @@ async function loadMessages() {
   }
 }
 
-/** 处理 retryMessage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 确认可能重复发信的风险后请求重试该事件，并刷新消息列表。 */
 async function retryMessage(row) {
   await ElMessageBox.confirm('确认重新投递这条消息？外部邮件服务处于不确定状态时可能收到内容相同的邮件。', '重试消息', {
     type: 'warning',
@@ -131,7 +131,7 @@ async function retryMessage(row) {
   }
 }
 
-/** 处理 ignoreMessage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 确认停止自动投递后请求忽略该事件，并刷新消息列表。 */
 async function ignoreMessage(row) {
   await ElMessageBox.confirm('忽略后不会再自动投递，是否继续？', '忽略消息', { type: 'warning' });
   try {
@@ -143,13 +143,13 @@ async function ignoreMessage(row) {
   }
 }
 
-/** 处理 resetAndLoad 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 筛选条件变化时回到第一页并重新查询消息。 */
 function resetAndLoad() {
   page.value = 1;
   loadMessages();
 }
 
-/** statusType 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 将失败、投递中、已送达和其他状态映射为标签颜色。 */
 function statusType(value) {
   if (value === 'PUBLISH_FAILED' || value === 'DEAD') return 'danger';
   if (value === 'PENDING' || value === 'PUBLISHING' || value === 'PUBLISHED') return 'warning';
@@ -157,7 +157,7 @@ function statusType(value) {
   return 'info';
 }
 
-/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
+/** 显示中文本地日期时间，缺失显示破折号，非法日期保留原文本。 */
 function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
