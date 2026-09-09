@@ -20,17 +20,17 @@
 
 ### 1.2 可追溯来源
 
-仍保留在仓库中的主要文档来源：
+以下原文已归档到固定 V5 提交，链接内容已通过本地 Git 对象逐项核对；本轮没有重新验证历史 Actions 运行：
 
-- [V3 方面六性能与环境证据](../../history/reports/v3/aspect6/performance.md)
-- [V3 方面六故障演练](../../history/reports/v3/aspect6/fault-drills.md)
-- [V3 方面七容器性能证据](../../history/reports/v3/aspect7/performance.md)
-- [V3 方面七验证报告](../../history/reports/v3/aspect7/validation.md)
-- [V3–V4 项目迭代记录](../../history/project-iteration-record.md)
-- [V4 验证与发布准备报告](../../development/v4-validation-report.md)
-- [V5 迭代规划](../../development/v5-iteration-plan.md)
+- [V3 方面六性能与环境证据](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/history/reports/v3/aspect6/performance.md)
+- [V3 方面六故障演练](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/history/reports/v3/aspect6/fault-drills.md)
+- [V3 方面七容器性能证据](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/history/reports/v3/aspect7/performance.md)
+- [V3 方面七验证报告](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/history/reports/v3/aspect7/validation.md)
+- [V3–V4 项目迭代记录](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/history/project-iteration-record.md)
+- [V4 验证与发布准备报告](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/development/v4-validation-report.md)
+- [V5 迭代规划](https://github.com/Jaily16/CC4C/blob/6c62250d2183f19e2b5a8825b892c0eafae792fe/docs/development/v5-iteration-plan.md)
 
-方面三会删除的性能实现使用不可变提交链接，而不是指向工作树文件：
+V5 方面三已删除的性能实现使用不可变提交链接，不指向当前工作树：
 
 - [V3 缓存初测记录（`bc7dcf8`）](https://github.com/Jaily16/CC4C/blob/bc7dcf839d531a5bcef8cb7643f62ccc9db94974/README.md)
 - [V3 方面六 Gatling 入口（`f0f6fa1`）](https://github.com/Jaily16/CC4C/blob/f0f6fa117e180ca1f41fd09f7efb4cc5a502bc9e/back-end/CC4C/run-aspect6-gatling.ps1)
@@ -235,7 +235,7 @@ Session、业务缓存和 RabbitMQ 使用彼此不同的性能 namespace。认�
 
 ## 7. 历史命令
 
-以下命令按运行时期保留。V3 路径来自当时提交；V4 路径来自重构后的仓库。方面三删除对应资产后，这些命令只用于审计，不能再从 V5 当前树直接执行。
+以下命令按运行时期保留。V3 路径来自当时提交；V4 路径来自重构后的仓库。V5 方面三删除对应资产后，这些命令只用于审计，不能从当前 V6 工作树直接执行。
 
 ### 7.1 V3 缓存基准
 

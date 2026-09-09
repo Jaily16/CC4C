@@ -83,7 +83,7 @@ function isExcluded(relativePath) {
     || normalized === 'database/legacy/cc4c.sql'
     || normalized === 'infrastructure/database/legacy/cc4c.sql'
     || normalized.endsWith('package-lock.json')
-    || normalized.startsWith('docs/reference/openapi.json');
+    || normalized.startsWith('backend/openapi.json');
 }
 
 function isQualityPath(relativePath) {
