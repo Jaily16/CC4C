@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-/** Login 身份页面，维护输入校验、认证请求和安全错误提示。 */
+/** 业务用户登录页面，校验登录表单、恢复服务端身份并跳转到原目标页面。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { reactive, ref } from 'vue';
 import { resetCsrfToken } from '@/api/client';
@@ -144,12 +144,12 @@ const {
   buildRequest: () => ({ email: findForm.email, purpose: 'PASSWORD_RESET' }),
 });
 
-/** 校验 isEmail 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 按页面的基本邮箱格式规则检查输入。 */
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/** 校验 validateLoginField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 检查邮箱格式和密码必填项，更新对应提示。 */
 function validateLoginField(field) {
   if (field === 'email') {
     fieldErrors.email = !form.email ? '请输入邮箱' : !isEmail(form.email) ? '请输入正确的邮箱地址' : '';
@@ -159,14 +159,14 @@ function validateLoginField(field) {
   }
 }
 
-/** 校验 validateLoginForm 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 更新两个登录字段的提示并返回表单是否完整。 */
 function validateLoginForm() {
   validateLoginField('email');
   validateLoginField('password');
   return !fieldErrors.email && !fieldErrors.password;
 }
 
-/** login 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 提交用户凭据，成功后强制恢复业务 Session 并进入回跳地址或首页。 */
 async function login() {
   formError.value = '';
   if (!validateLoginForm()) {
@@ -199,13 +199,13 @@ async function login() {
   }
 }
 
-/** 响应 openFindPassword 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 清空恢复流程的总提示并打开找回密码弹窗。 */
 function openFindPassword() {
   recoveryError.value = '';
   findPwdDialog.value = true;
 }
 
-/** 校验 validateRecoveryField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 检查恢复邮箱和新密码的长度、UTF-8 字节上限。 */
 function validateRecoveryField(field) {
   if (field === 'email') {
     recoveryErrors.email = !findForm.email ? '请输入邮箱' : !isEmail(findForm.email) ? '请输入正确的邮箱地址' : '';
@@ -220,7 +220,7 @@ function validateRecoveryField(field) {
   }
 }
 
-/** 读取 getVCode 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 校验邮箱后请求 PASSWORD_RESET 验证码邮件，冷却和重复提交由 composable 控制。 */
 async function getVCode() {
   recoveryError.value = '';
   validateRecoveryField('email');
@@ -242,7 +242,7 @@ async function getVCode() {
   }
 }
 
-/** findPassword 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 校验邮箱、新密码和六位验证码后重置密码；成功时重置 CSRF、清空密码及验证码并关闭弹窗。 */
 async function findPassword() {
   recoveryError.value = '';
   validateRecoveryField('email');

@@ -14,9 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-/**
- * 协调独立观测门户用例及其持久化、安全和外部协作边界。
- */
+/** 使用门户配置中的独立账号认证观测身份，协调限流、审计和自定义 Redis 会话。 */
 @Service
 public final class ObservabilityLoginService {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
@@ -26,12 +24,12 @@ public final class ObservabilityLoginService {
     private final SecurityAuditLogger auditLogger;
 
     /**
-     * 创建 ObservabilityLoginService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入观测账号配置、登录限流、独立会话及安全审计。
      *
-     * @param properties 由容器注入的 ObservabilityPortalProperties 协作组件
-     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
-     * @param sessions 由容器注入的 ObservabilitySessionService 协作组件
-     * @param auditLogger 调用方提供的 {@code auditLogger} 值
+     * @param properties 观测门户独立账号配置
+     * @param rateLimiter 观测登录专用频率限制器
+     * @param sessions 观测独立会话服务
+     * @param auditLogger 安全事件审计服务
      */
     ObservabilityLoginService(
             ObservabilityPortalProperties properties,
@@ -45,13 +43,13 @@ public final class ObservabilityLoginService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 先检查限流再比对用户名及 BCrypt 密码；拒绝超过 72 个 UTF-8 字节的密码，成功后替换观测会话。
      *
-     * @param username 待认证或查询的账户名
-     * @param password 仅用于当前安全校验的密码或密码摘要
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前操作产生的 ObservabilitySessionService.ActiveSession 结果
+     * @param username 本次观测登录用户名
+     * @param password 观测登录明文密码，不得记录
+     * @param request 当前 HTTP 请求，提供关联 ID 或会话和来源上下文
+     * @param response 接收观测会话 Cookie 的 HTTP 响应
+     * @return 新建的观测活动会话
      */
     public ObservabilitySessionService.ActiveSession login(
             String username, String password, HttpServletRequest request, HttpServletResponse response) {
@@ -72,10 +70,10 @@ public final class ObservabilityLoginService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 撤销当前观测会话并清理专属 Cookie，记录观测退出审计。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
+     * @param request 当前 HTTP 请求，提供关联 ID 或会话和来源上下文
+     * @param response 接收观测会话 Cookie 的 HTTP 响应
      */
     public void logout(HttpServletRequest request, HttpServletResponse response) {
         sessions.invalidate(request);

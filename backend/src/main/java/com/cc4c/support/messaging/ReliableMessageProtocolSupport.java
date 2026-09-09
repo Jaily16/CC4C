@@ -16,10 +16,10 @@ public final class ReliableMessageProtocolSupport {
     private static final String RETRY_HEADER = "cc4c-retry-attempt";
 
     /**
-     * 解析 AMQP messageId 中的事件 ID 与代际。
+     * 解析 AMQP messageId 中的事件 ID 与代次，要求规范 UUID 及非负整数代次。
      *
-     * @param message 待处理的消息及其属性
-     * @return 存在时包含目标值，否则为空
+     * @param message 当前 AMQP 消息及其属性
+     * @return 可用幂等引用；格式不合规时为空 Optional
      */
     public Optional<MessageReference> messageReference(Message message) {
         String messageId = message.getMessageProperties().getMessageId();
@@ -44,10 +44,10 @@ public final class ReliableMessageProtocolSupport {
     }
 
     /**
-     * 校验消息信封版本、必需字段和队列事件类型。
+     * 检查信封必需字段、12 字节 nonce、模式版本 1 及与队列期待一致的事件类型。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param expectedEventType 调用方提供的 {@code expectedEventType} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param expectedEventType 当前队列允许的唯一事件类型
      */
     public void validateEnvelope(MessageEnvelope envelope, String expectedEventType) {
         if (envelope == null
@@ -69,11 +69,11 @@ public final class ReliableMessageProtocolSupport {
     }
 
     /**
-     * 读取并限制消息重试次数，非法或缺失头按首次投递处理。
+     * 读取数值重试头并夹在 0 与上限之间；缺失或非数值头按首次投递处理。
      *
-     * @param message 待处理的消息及其属性
-     * @param retryLimit 调用方提供的 {@code retryLimit} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param message 当前 AMQP 消息及其属性
+     * @param retryLimit 允许的最大重试档位
+     * @return 受限的重试档位
      */
     public int retryAttempt(Message message, int retryLimit) {
         Object value = message.getMessageProperties().getHeaders().get(RETRY_HEADER);
@@ -84,12 +84,12 @@ public final class ReliableMessageProtocolSupport {
     }
 
     /**
-     * 构造保留原始正文、关联 ID 和递增重试头的持久消息。
+     * 保留原始正文，重建持久消息的身份、关联 ID 和指定重试次数头，不复制所有原始头。
      *
-     * @param original 调用方提供的 {@code original} 值
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param attempt 调用方提供的 {@code attempt} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param original 保留原始正文的当前投递
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param attempt 新消息携带的重试次数
+     * @return 下一档重试使用的消息
      */
     public Message copyForRetry(Message original, MessageEnvelope envelope, int attempt) {
         return MessageBuilder.withBody(original.getBody())
@@ -104,12 +104,12 @@ public final class ReliableMessageProtocolSupport {
     }
 
     /**
-     * 构造保留原始正文、关联 ID 和错误码的持久死信消息。
+     * 保留原始正文，重建持久消息的身份、关联 ID 及错误码头。
      *
-     * @param original 调用方提供的 {@code original} 值
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param original 保留原始正文的当前投递
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param errorCode 不含敏感正文的失败分类码
+     * @return 转发死信交换机的消息
      */
     public Message copyForDead(Message original, MessageEnvelope envelope, String errorCode) {
         return MessageBuilder.withBody(original.getBody())
@@ -124,10 +124,10 @@ public final class ReliableMessageProtocolSupport {
     }
 
     /**
-     * 可用于幂等持久化的消息引用。
+     * 可用于消费幂等记录的事件 ID 和代次引用。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 事件代次，人工恢复时递增
      */
     public record MessageReference(String eventId, int generation) {}
 }

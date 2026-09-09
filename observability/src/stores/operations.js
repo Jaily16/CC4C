@@ -3,10 +3,11 @@ import { defineStore } from 'pinia';
 import { safeMessage } from '@/api/client.js';
 import { fetchAlerts, fetchDependencies } from '@/api/observability.js';
 
-/** useOperationsStore 集中维护本领域的加载、成功、失败和会话状态，供页面共享。 */
+/** 共同维护告警与依赖响应，以及这组查询的加载和错误状态。 */
 export const useOperationsStore = defineStore('observability-operations', {
   state: () => ({ alerts: null, dependencies: null, loading: false, error: null }),
   actions: {
+    /** 并行查询告警与依赖，两者成功后共同更新；取消静默处理，失败保留原响应并记录提示。 */
     async load(signal) {
       this.loading = true;
       this.error = null;

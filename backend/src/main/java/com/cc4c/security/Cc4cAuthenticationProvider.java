@@ -12,9 +12,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-/**
- * Cc4cAuthenticationProvider 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 按请求角色查询账户并验证编码密码，产生无密码的 Session Token，同时记录认证结果指标。 */
 @Component
 public final class Cc4cAuthenticationProvider implements AuthenticationProvider {
     private final IdentityService identityService;
@@ -22,11 +20,11 @@ public final class Cc4cAuthenticationProvider implements AuthenticationProvider 
     private final Cc4cMetrics metrics;
 
     /**
-     * 创建 Cc4cAuthenticationProvider 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入账户查询、密码比对和认证指标服务。
      *
-     * @param identityService 由容器注入的 IdentityService 协作组件
-     * @param passwordEncoder 仅用于当前安全校验的密码或密码摘要
-     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param identityService 按角色读取认证账户的服务
+     * @param passwordEncoder 编码密码的比对器
+     * @param metrics 认证结果指标记录器
      */
     @Autowired
     Cc4cAuthenticationProvider(IdentityService identityService, PasswordEncoder passwordEncoder, Cc4cMetrics metrics) {
@@ -36,21 +34,21 @@ public final class Cc4cAuthenticationProvider implements AuthenticationProvider 
     }
 
     /**
-     * 创建 Cc4cAuthenticationProvider 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 使用禁用指标的实现委托主构造器，保留账户认证能力。
      *
-     * @param identityService 由容器注入的 IdentityService 协作组件
-     * @param passwordEncoder 仅用于当前安全校验的密码或密码摘要
+     * @param identityService 按角色读取认证账户的服务
+     * @param passwordEncoder 编码密码的比对器
      */
     Cc4cAuthenticationProvider(IdentityService identityService, PasswordEncoder passwordEncoder) {
         this(identityService, passwordEncoder, Cc4cMetrics.disabled());
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 验证角色对应账户及密码，成功返回带单一角色权限的会话认证；认证异常记为失败后原样抛出。
      *
-     * @param authentication 调用方提供的 {@code authentication} 值
-     * @return 当前操作产生的 Authentication 结果
-     * @throws AuthenticationException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param authentication 待处理的认证对象
+     * @return 已认证且不保存明文密码的会话 Token
+     * @throws AuthenticationException 账户不存在或密码比对失败时抛出
      */
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
@@ -79,10 +77,10 @@ public final class Cc4cAuthenticationProvider implements AuthenticationProvider 
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 判断认证类型是否为 CC4C 登录请求 Token 或其可赋值类型。
      *
-     * @param authentication 调用方提供的 {@code authentication} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param authentication 待判断的认证类型
+     * @return 当前提供器支持该类型时为 true
      */
     @Override
     public boolean supports(Class<?> authentication) {

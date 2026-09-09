@@ -35,9 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * CommunityService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 协调博客读取、作者写入和审核；公共查询使用短缓存，提交及审核通知写入事务 Outbox。 */
 @Service
 public class CommunityService implements CommunityLookup, BlogModerationUseCase {
     private static final int DENIED = -1;
@@ -64,17 +62,17 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     private final CommunityResponseMapper responseMapper;
 
     /**
-     * 创建 CommunityService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入博客持久化、身份与目录查询、用户限流、缓存及可靠消息，并创建响应转换器。
      *
-     * @param mapper 调用方提供的 {@code mapper} 值
-     * @param identityLookup 调用方提供的 {@code identityLookup} 值
-     * @param identityNotificationLookup 调用方提供的 {@code identityNotificationLookup} 值
-     * @param catalogLookup 调用方提供的 {@code catalogLookup} 值
-     * @param currentActor 调用方提供的 {@code currentActor} 值
-     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
-     * @param cache 调用方提供的 {@code cache} 值
-     * @param outbox 调用方提供的 {@code outbox} 值
-     * @param messagingProperties 调用方提供的 {@code messagingProperties} 值
+     * @param mapper 博客、草稿及关联数据访问 Mapper
+     * @param identityLookup 用户展示快照查询接口
+     * @param identityNotificationLookup 用户内部通知邮箱查询接口
+     * @param catalogLookup 语言课程存在性及热度缓存失效接口
+     * @param currentActor 当前业务身份读取接口
+     * @param rateLimiter 当前用户发布或评论的频率限制器
+     * @param cache 支持分区及提交后失效的业务缓存
+     * @param outbox 事务内追加加密通知的 Outbox 服务
+     * @param messagingProperties 审核通知收件人配置
      */
     CommunityService(
             BlogMapper mapper,
@@ -99,10 +97,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 home 职责，并保持既有权限、事务与副作用边界。
+     * 缓存审核通过博客的首页分页，按点击数和 ID 倒序排列，省略正文与语言列表。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 热门博客页
      */
     public PageResult<BlogResponse> home(PageQuery query) {
         return cachedPage(HOME_REGION, pageKey(query), () -> {
@@ -116,10 +114,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 all 职责，并保持既有权限、事务与副作用边界。
+     * 缓存审核通过博客的列表分页，按发布时间和 ID 倒序排列。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 最新博客页
      */
     public PageResult<BlogResponse> all(PageQuery query) {
         return cachedPage(ALL_REGION, pageKey(query), () -> {
@@ -133,11 +131,11 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     * 按语言与分页条件缓存已审核博客列表。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageId 语言 ID
+     * @param query 从 1 起算的页码及页大小
+     * @return 指定语言的博客页
      */
     public PageResult<BlogResponse> byLanguage(int languageId, PageQuery query) {
         return cachedPage(
@@ -148,10 +146,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 byCurrentWriter 职责，并保持既有权限、事务与副作用边界。
+     * 要求当前 USER 仍存在，直接查询其全部未删除博客，不筛选审核状态。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 当前作者的博客页
      */
     public PageResult<BlogResponse> byCurrentWriter(PageQuery query) {
         long userId = currentActor.requiredUserId();
@@ -163,11 +161,11 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 search 职责，并保持既有权限、事务与副作用边界。
+     * 直接按标题模糊查询审核通过博客，不缓存任意检索词。
      *
-     * @param text 调用方提供的 {@code text} 值
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param text 博客标题模糊检索词
+     * @param query 从 1 起算的页码及页大小
+     * @return 按发布时间及 ID 倒序排列的搜索结果
      */
     public PageResult<BlogResponse> search(String text, PageQuery query) {
         LambdaQueryWrapper<BlogEntity> wrapper = new LambdaQueryWrapper<BlogEntity>()
@@ -179,10 +177,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 detail 职责，并保持既有权限、事务与副作用边界。
+     * 先读取公共详情缓存；未命中公共数据时仅允许管理员或博客作者读取非公开详情。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param blogId 博客 ID
+     * @return 包含正文和语言 ID 的博客详情
      */
     public BlogResponse detail(long blogId) {
         Optional<BlogResponse> publicDetail = cache.getOrLoad(
@@ -204,10 +202,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 submit 职责，并保持既有权限、事务与副作用边界。
+     * 限流并检查语言不重复且存在；事务内创建待审核博客、关联及审核邮件事件，同时删除作者现有草稿。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 标题、正文及不重复语言列表
+     * @return 已保存的待审核博客详情
      */
     @Transactional
     public BlogResponse submit(BlogSubmitRequest request) {
@@ -246,10 +244,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 删除 CommunityService 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 只允许当前 USER 删除自己博客的持久化记录，提交后失效公共博客缓存；不删除图片文件。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param blogId 博客 ID
+     * @return 删除流程完成后为 true
      */
     @Transactional
     public boolean delete(long blogId) {
@@ -264,10 +262,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 saveDraft 职责，并保持既有权限、事务与副作用边界。
+     * 在事务内按当前 USER 新建或覆盖唯一草稿正文。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 待新建或覆盖的草稿正文
+     * @return 草稿保存后为 true
      */
     @Transactional
     public boolean saveDraft(BlogDraftRequest request) {
@@ -277,18 +275,18 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 draft 职责，并保持既有权限、事务与副作用边界。
+     * 按当前 USER 读取草稿正文。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 草稿正文，不存在时为空
      */
     public String draft() {
         return mapper.selectDraft(currentActor.requiredUserId());
     }
 
     /**
-     * 删除 CommunityService 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 在事务内删除当前 USER 的草稿，不要求必须存在记录。
      *
-     * @return 当前条件是否成立
+     * @return 删除调用完成后为 true
      */
     @Transactional
     public boolean deleteDraft() {
@@ -297,10 +295,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 click 职责，并保持既有权限、事务与副作用边界。
+     * 对未删除博客原子增加点击数；未更新任何记录时抛出 404，不主动失效公共缓存。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param blogId 博客 ID
+     * @return 点击更新成功时为 true
      */
     @Transactional
     public boolean click(long blogId) {
@@ -311,10 +309,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 查询并返回 CommunityService 中与 findBlog 对应的数据，不改变业务状态。
+     * 读取未删除博客并投影作者、标题和审核状态，不在此处执行可见性筛选。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 存在时包含目标值，否则为空
+     * @param blogId 博客 ID
+     * @return 博客快照，不存在时为空 Optional
      */
     @Override
     public Optional<BlogSnapshot> findBlog(long blogId) {
@@ -325,10 +323,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 查询并返回 CommunityService 中与 findPending 对应的数据，不改变业务状态。
+     * 分页查询状态为待审核的博客并返回无正文摘要。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 按发布时间和 ID 倒序排列的待审核页
      */
     @Override
     public PageResult<BlogSummary> findPending(PageQuery query) {
@@ -345,10 +343,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 approve 职责，并保持既有权限、事务与副作用边界。
+     * 在事务内将待审核博客转为通过状态并追加通知。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param blogId 博客 ID
+     * @return 通过审核的博客摘要
      */
     @Override
     @Transactional
@@ -357,10 +355,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 deny 职责，并保持既有权限、事务与副作用边界。
+     * 在事务内将待审核博客转为拒绝状态并追加通知。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param blogId 博客 ID
+     * @return 拒绝审核的博客摘要
      */
     @Override
     @Transactional
@@ -369,11 +367,11 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 moderate 职责，并保持既有权限、事务与副作用边界。
+     * 仅处理待审核博客，通过时更新发布时间；通知收件人缺失则记录永久失败事件，随后安排公共缓存失效。
      *
-     * @param blogId 目标对象的稳定标识
-     * @param state 调用方提供的 {@code state} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param blogId 博客 ID
+     * @param state 目标审核状态，通过为 1、拒绝为 -1
+     * @return 已更新状态的博客摘要
      */
     private BlogSummary moderate(long blogId, int state) {
         BlogEntity blog = requiredBlog(blogId);
@@ -424,10 +422,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 校验 CommunityService 中与 requiredBlog 对应的前置条件，不满足时沿用既有失败语义。
+     * 读取未删除博客，不存在时抛出 404。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param blogId 博客 ID
+     * @return 存在的博客实体
      */
     private BlogEntity requiredBlog(long blogId) {
         BlogEntity blog = mapper.selectById(blogId);
@@ -438,10 +436,10 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 判断 CommunityService 中与 canReadNonPublic 对应的条件是否成立。
+     * 仅允许 ADMIN 或 ID 与作者一致的 USER 读取非公开博客。
      *
-     * @param blog 调用方提供的 {@code blog} 值
-     * @return 当前条件是否成立
+     * @param blog 待转换或校验的博客实体
+     * @return 当前身份具有非公开读取权限时为 true
      */
     private boolean canReadNonPublic(BlogEntity blog) {
         return currentActor
@@ -453,12 +451,12 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 cachedPage 职责，并保持既有权限、事务与副作用边界。
+     * 以显式分页类型读取公共缓存，未命中时加载结果，基础有效期为 15 秒。
      *
-     * @param region 调用方提供的 {@code region} 值
-     * @param key 调用方提供的 {@code key} 值
-     * @param loader 调用方提供的 {@code loader} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param region 缓存分区名称
+     * @param key 分区内的逻辑键
+     * @param loader 缓存未命中时读取数据库的加载器
+     * @return 公共博客分页结果
      */
     private PageResult<BlogResponse> cachedPage(String region, String key, Supplier<PageResult<BlogResponse>> loader) {
         return cache.getOrLoad(region, key, BLOG_PAGE_TYPE, PUBLIC_TTL, NEGATIVE_TTL, () -> Optional.of(loader.get()))
@@ -466,18 +464,16 @@ public class CommunityService implements CommunityLookup, BlogModerationUseCase 
     }
 
     /**
-     * 执行 CommunityService 中的 pageKey 职责，并保持既有权限、事务与副作用边界。
+     * 组合页码和页大小生成分页缓存逻辑键。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param query 从 1 起算的页码及页大小
+     * @return 以冒号分隔的分页键
      */
     private String pageKey(PageQuery query) {
         return query.page() + ":" + query.size();
     }
 
-    /**
-     * 执行 CommunityService 中的 invalidatePublicBlogs 职责，并保持既有权限、事务与副作用边界。
-     */
+    /** 安排提交后失效首页、全部列表、语言列表和详情四个公共博客分区。 */
     private void invalidatePublicBlogs() {
         cache.invalidateAfterCommit(HOME_REGION, ALL_REGION, LANGUAGE_REGION, DETAIL_REGION);
     }

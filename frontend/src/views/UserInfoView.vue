@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-/** UserInfoView 页面组件，协调当前路由的展示状态和用户事件。 */
+/** 个人资料路由页面，读取并展示账户资料；编辑、改密和头像上传由嵌入的 UserInfo 组件协调。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { getCurrentUser } from '@/api/profile';
@@ -87,12 +87,12 @@ const languages = {
   3: 'Python',
   4: 'C',
 };
-/** 从现有响应式状态派生 majorLabel，不发起请求或写入外部数据。 */
+/** 把当前专业编号映射为名称，未知值显示未设置。 */
 const majorLabel = computed(() => majors[String(user.value.major)] || '未设置');
-/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
+/** 把当前语言编号映射为名称，未知值显示未设置。 */
 const languageLabel = computed(() => languages[Number(user.value.language)] || '未设置');
 
-/** syncStore 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 将个人资料响应逐项同步到 Vuex 及其展示缓存。 */
 function syncStore(currentUser) {
   store.commit('SET_ID', currentUser.id);
   store.commit('SET_NAME', currentUser.name);
@@ -102,7 +102,7 @@ function syncStore(currentUser) {
   store.commit('SET_AVATAR', currentUser.avatar);
 }
 
-/** 读取 loadProfile 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 读取当前用户资料，有有效 ID 时同步 Vuex，否则显示加载错误。 */
 async function loadProfile() {
   loading.value = true;
   errorMessage.value = '';

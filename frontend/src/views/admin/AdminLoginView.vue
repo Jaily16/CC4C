@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-/** AdminLoginView 管理页面，协调管理员只可访问的查询与操作状态。 */
+/** 管理员登录页面，校验凭据后恢复管理员身份并进入内容管理。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { reactive, ref } from 'vue';
 import { loginAdmin } from '@/api/auth';
@@ -66,20 +66,20 @@ const fieldErrors = reactive({ id: '', password: '' });
 const formError = ref('');
 const loggingIn = ref(false);
 
-/** 校验 validateField 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 分别检查管理员 ID 和密码是否已填写。 */
 function validateField(field) {
   if (field === 'id') fieldErrors.id = form.id ? '' : '请输入管理员 ID';
   if (field === 'password') fieldErrors.password = form.password ? '' : '请输入密码';
 }
 
-/** 校验 validateForm 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 更新两个必填字段的错误提示并返回是否完整。 */
 function validateForm() {
   validateField('id');
   validateField('password');
   return !fieldErrors.id && !fieldErrors.password;
 }
 
-/** login 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 提交管理员凭据，成功后强制恢复业务 Session，再跳转指定管理路由或内容页。 */
 async function login() {
   formError.value = '';
   if (!validateForm()) {

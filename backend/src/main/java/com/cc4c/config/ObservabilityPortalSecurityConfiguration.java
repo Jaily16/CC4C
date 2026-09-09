@@ -22,19 +22,17 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * 装配独立观测门户运行组件，并集中声明安全或基础设施策略。
- */
+/** 装配观测门户独立会话、CORS 和角色校验链，不复用业务 HttpSession 登录。 */
 @Configuration(proxyBeanMethods = false)
 class ObservabilityPortalSecurityConfiguration {
 
     /**
-     * 创建并配置 ObservabilityPortalSecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 创建启动校验器，拒绝观测会话与业务 Session、安全键或缓存命名空间相同。
      *
-     * @param portal 由容器注入的 ObservabilityPortalProperties 协作组件
-     * @param security 由容器注入的 SecurityProperties 协作组件
-     * @param cache 由容器注入的 BusinessCacheProperties 协作组件
-     * @return 当前操作产生的 InitializingBean 结果
+     * @param portal 观测门户会话配置
+     * @param security 业务安全键配置
+     * @param cache 业务缓存命名空间配置
+     * @return 容器初始化时执行的命名空间校验器
      */
     @Bean
     InitializingBean observabilityNamespaceValidator(
@@ -52,14 +50,14 @@ class ObservabilityPortalSecurityConfiguration {
     }
 
     /**
-     * 创建并配置 ObservabilityPortalSecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 匹配观测路径并使用自定义会话过滤器；只公开登录和会话探测入口，其余已列接口要求观测角色。
      *
-     * @param http 调用方提供的 {@code http} 值
-     * @param properties 由容器注入的 ObservabilityPortalProperties 协作组件
-     * @param sessions 由容器注入的 ObservabilitySessionService 协作组件
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @return 当前操作产生的 SecurityFilterChain 结果
-     * @throws Exception 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param http Spring Security HTTP 安全构建器
+     * @param properties 对应组件的类型化配置
+     * @param sessions 观测会话查询服务
+     * @param objectMapper 响应 JSON 映射器
+     * @return 顺序为 1 的观测门户安全链
+     * @throws Exception 构建 Spring Security 过滤器链失败时抛出
      */
     @Bean
     @Order(1)
@@ -111,14 +109,14 @@ class ObservabilityPortalSecurityConfiguration {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 向观测请求写入指定状态码和 JSON 错误响应，并禁止缓存。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param status 当前对象或流程的有限状态
-     * @param code 调用方提供的 {@code code} 值
-     * @param message 当前处理的消息或用户提示
-     * @throws java.io.IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param response 接收错误状态和正文的 HTTP 响应
+     * @param objectMapper 响应 JSON 映射器
+     * @param status HTTP 响应状态码
+     * @param code 业务错误码
+     * @param message 可向客户端展示的错误提示
+     * @throws java.io.IOException 响应输出流写入失败时抛出
      */
     private static void writeError(
             jakarta.servlet.http.HttpServletResponse response,

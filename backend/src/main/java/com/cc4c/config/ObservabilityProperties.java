@@ -8,14 +8,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * ObservabilityProperties 绑定外部配置，并集中表达运行时约束和安全默认值。
+ * 绑定管理端认证、指标环境标签、消息采样周期及 URI 基数限制。
  *
- * @param enabled 是否启用对应受控能力
- * @param environment 调用方提供的 {@code environment} 值
- * @param managementUsername 调用方提供的 {@code managementUsername} 值
- * @param managementPasswordHash 调用方提供的 {@code managementPasswordHash} 值
- * @param messagingSampleInterval 调用方提供的 {@code messagingSampleInterval} 值
- * @param maxHttpUriTags 调用方提供的 {@code maxHttpUriTags} 值
+ * @param enabled 是否启用该配置对应的能力
+ * @param environment 低基数环境标签
+ * @param managementUsername 管理端 Basic 认证用户名
+ * @param managementPasswordHash 管理端 cost-12 BCrypt 密码摘要
+ * @param messagingSampleInterval 消息状态指标采样间隔
+ * @param maxHttpUriTags 最多接纳的不同 HTTP URI 标签数量
  */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.observability")
@@ -30,14 +30,14 @@ public record ObservabilityProperties(
     private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9._-]{3,64}");
 
     /**
-     * 创建 ObservabilityProperties 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 校验管理账号及 cost-12 BCrypt 摘要、正数采样周期和 10 至 500 的 URI 标签上限。
      *
-     * @param enabled 是否启用对应受控能力
-     * @param environment 调用方提供的 {@code environment} 值
-     * @param managementUsername 调用方提供的 {@code managementUsername} 值
-     * @param managementPasswordHash 调用方提供的 {@code managementPasswordHash} 值
-     * @param messagingSampleInterval 调用方提供的 {@code messagingSampleInterval} 值
-     * @param maxHttpUriTags 调用方提供的 {@code maxHttpUriTags} 值
+     * @param enabled 是否启用该配置对应的能力
+     * @param environment 低基数环境标签
+     * @param managementUsername 管理端 Basic 认证用户名
+     * @param managementPasswordHash 管理端 cost-12 BCrypt 密码摘要
+     * @param messagingSampleInterval 消息状态指标采样间隔
+     * @param maxHttpUriTags 最多接纳的不同 HTTP URI 标签数量
      */
     public ObservabilityProperties {
         if (environment != null && !ENVIRONMENT.matcher(environment).matches()) {

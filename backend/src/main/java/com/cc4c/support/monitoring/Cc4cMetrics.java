@@ -17,9 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.ToDoubleFunction;
 import org.springframework.stereotype.Component;
 
-/**
- * Cc4cMetrics 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 统一注册缓存、数据库、安全及消息指标，校验指标名、标签集合和标签值格式。 */
 @Component
 public final class Cc4cMetrics {
     private static final Duration[] SERVICE_LEVEL_OBJECTIVES = {
@@ -56,10 +54,10 @@ public final class Cc4cMetrics {
     private final Map<GaugeKey, AtomicReference<Double>> gauges = new ConcurrentHashMap<>();
 
     /**
-     * 创建 Cc4cMetrics 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存指标注册表；只有观测开启且注册表存在时才实际记录。
      *
-     * @param registry 调用方提供的 {@code registry} 值
-     * @param properties 调用方提供的 {@code properties} 值
+     * @param registry Micrometer 指标注册表，可为 null 以禁用记录
+     * @param properties 该组件使用的观测或 Prometheus 设置
      */
     public Cc4cMetrics(MeterRegistry registry, ObservabilityProperties properties) {
         this.registry = registry;
@@ -67,28 +65,28 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 disabled 职责，并保持既有权限、事务与副作用边界。
+     * 创建不注册也不记录指标的适配器。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 关闭指标写入的适配器
      */
     public static Cc4cMetrics disabled() {
         return new Cc4cMetrics(null, null);
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 start 职责，并保持既有权限、事务与副作用边界。
+     * 取得单调时钟起点供后续耗时计算。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return System.nanoTime 返回的纳秒值
      */
     public long start() {
         return System.nanoTime();
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 increment 职责，并保持既有权限、事务与副作用边界。
+     * 校验指标与标签后递增计数器；观测关闭时直接返回。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param tags 调用方提供的 {@code tags} 值
+     * @param name 白名单中的指标名称
+     * @param tags 按键、值交替排列的标签序列
      */
     public void increment(String name, String... tags) {
         if (!enabled) {
@@ -98,11 +96,11 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 record 职责，并保持既有权限、事务与副作用边界。
+     * 记录从指定单调时钟起点开始的非负耗时，并发布直方图和既定 SLO 桶。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param startedNanos 调用方提供的 {@code startedNanos} 值
-     * @param tags 调用方提供的 {@code tags} 值
+     * @param name 白名单中的指标名称
+     * @param startedNanos System.nanoTime 取得的开始时间，单位为纳秒
+     * @param tags 按键、值交替排列的标签序列
      */
     public void record(String name, long startedNanos, String... tags) {
         if (!enabled) {
@@ -117,11 +115,11 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 setGauge 职责，并保持既有权限、事务与副作用边界。
+     * 按指标名及标签复用 Gauge 的数值引用，并写入最新值。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param value 调用方提供的 {@code value} 值
-     * @param tags 调用方提供的 {@code tags} 值
+     * @param name 白名单中的指标名称
+     * @param value 待写入的 Gauge 数值
+     * @param tags 按键、值交替排列的标签序列
      */
     public void setGauge(String name, double value, String... tags) {
         if (!enabled) {
@@ -142,13 +140,13 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * 变更 Cc4cMetrics 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 注册从指定对象和取值函数实时读取的 Gauge；观测关闭时不注册。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param name 调用方提供的 {@code name} 值
-     * @param observed 调用方提供的 {@code observed} 值
-     * @param valueFunction 调用方提供的 {@code valueFunction} 值
-     * @param tags 调用方提供的 {@code tags} 值
+     * @param <T> 被观测对象或查询结果的类型
+     * @param name 白名单中的指标名称
+     * @param observed Gauge 读取的对象
+     * @param valueFunction 从被观测对象提取数值的函数
+     * @param tags 按键、值交替排列的标签序列
      */
     public <T> void registerGauge(String name, T observed, ToDoubleFunction<T> valueFunction, String... tags) {
         if (!enabled) {
@@ -158,11 +156,11 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * 执行 Cc4cMetrics 中的 safeTags 职责，并保持既有权限、事务与副作用边界。
+     * 校验标签成对、键不重复、值格式合规，且键集合与该指标白名单完全相同。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param tags 调用方提供的 {@code tags} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param name 白名单中的指标名称
+     * @param tags 按键、值交替排列的标签序列
+     * @return 通过校验的 Micrometer 标签
      */
     private Tags safeTags(String name, String... tags) {
         if (tags.length % 2 != 0) {
@@ -191,17 +189,17 @@ public final class Cc4cMetrics {
     }
 
     /**
-     * GaugeKey 以不可变字段承载共享基础设施数据并保持既有协议语义。
+     * 用指标名和标签序列标识可更新的 Gauge。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param tags 调用方提供的 {@code tags} 值
+     * @param name 白名单中的指标名称
+     * @param tags 已经规范化的标签键值序列
      */
     private record GaugeKey(String name, List<String> tags) {
         /**
-         * 创建 GaugeKey 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+         * 复制标签序列，避免外部修改 Gauge 的索引键。
          *
-         * @param name 调用方提供的 {@code name} 值
-         * @param tags 调用方提供的 {@code tags} 值
+         * @param name 白名单中的指标名称
+         * @param tags 需要复制为不可变列表的标签序列
          */
         private GaugeKey {
             tags = List.copyOf(tags);

@@ -3,11 +3,11 @@ package com.cc4c.support.messaging;
 import java.time.Instant;
 
 /**
- * BlogSubmittedNotificationV1 以不可变结构承载博客社区数据，并保持现有字段语义。
+ * 发给审核收件人的博客提交通知载荷。
  *
- * @param recipientEmail 调用方提供的 {@code recipientEmail} 值
- * @param blogId 目标对象的稳定标识
- * @param title 当前博客或课程的标题
- * @param submittedAt 当前操作使用的时间点
+ * @param recipientEmail 通知收件邮箱，不得记录
+ * @param blogId 博客 ID 的字符串表示
+ * @param title 博客标题
+ * @param submittedAt 博客提交时间
  */
 public record BlogSubmittedNotificationV1(String recipientEmail, String blogId, String title, Instant submittedAt) {}

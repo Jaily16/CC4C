@@ -72,7 +72,7 @@
 </template>
 
 <script setup>
-/** AllBlogsView 博客页面，协调社区数据、会话状态和用户交互。 */
+/** 全部博客页面，分页读取公开博客并进入详情阅读。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -89,12 +89,12 @@ const currentPage = ref(1);
 const pageSize = 12;
 const total = ref(0);
 
-/** blogSummary 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 依次选择 summary、abstract 或 description 作为卡片摘要。 */
 function blogSummary(blog) {
   return blog.summary || blog.abstract || blog.description || '';
 }
 
-/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 尝试增加博客阅读计数后进入详情，计数失败不阻止导航。 */
 async function openBlog(blogId) {
   try {
     await incrementBlogClick(blogId);
@@ -104,7 +104,7 @@ async function openBlog(blogId) {
   router.push({ path: '/blogDetail', query: { blogId } });
 }
 
-/** 读取 loadBlogs 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 分页读取全部已审核博客，失败时清空列表与总数并显示提示。 */
 async function loadBlogs() {
   loading.value = true;
   errorMessage.value = '';
@@ -122,7 +122,7 @@ async function loadBlogs() {
   }
 }
 
-/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 更新页码并重新查询公开博客。 */
 function changePage(page) {
   currentPage.value = page;
   return loadBlogs();

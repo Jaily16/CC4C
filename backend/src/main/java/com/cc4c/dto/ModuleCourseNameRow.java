@@ -2,9 +2,7 @@ package com.cc4c.dto;
 
 import lombok.Data;
 
-/**
- * 承载课程目录查询返回的一行投影数据。
- */
+/** 接收模块序号与课程名称投影，供课程目录按模块归组。 */
 @Data
 public class ModuleCourseNameRow {
     private Integer priority;

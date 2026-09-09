@@ -23,9 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * VerificationCodeService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 以 Outbox 申请验证码邮件，在投递时激活 Redis 摘要，并按邮箱及用途原子消费验证码。 */
 @Service
 public class VerificationCodeService {
     private static final Duration VALIDITY = Duration.ofMinutes(10);
@@ -76,15 +74,15 @@ public class VerificationCodeService {
     private final String keyPrefix;
 
     /**
-     * 创建 VerificationCodeService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入验证码生成、账户查询、Redis 脚本、带秘密的摘要计算、限流及事务 Outbox。
      *
-     * @param generator 调用方提供的 {@code generator} 值
-     * @param userMapper 调用方提供的 {@code userMapper} 值
-     * @param redis 调用方提供的 {@code redis} 值
-     * @param hasher 调用方提供的 {@code hasher} 值
-     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
-     * @param outbox 调用方提供的 {@code outbox} 值
-     * @param properties 调用方提供的 {@code properties} 值
+     * @param generator 六位数字验证码生成器
+     * @param userMapper 用户数据访问 Mapper
+     * @param redis 验证码摘要及状态的 Redis 操作入口
+     * @param hasher 带秘密 pepper 的安全摘要服务
+     * @param rateLimiter 基于 Redis 的业务频率限制器
+     * @param outbox 在业务事务中追加加密事件的 Outbox 服务
+     * @param properties 提供验证码安全键前缀的配置
      */
     VerificationCodeService(
             VerificationCodeGenerator generator,
@@ -104,11 +102,11 @@ public class VerificationCodeService {
     }
 
     /**
-     * 按既有可靠消息或邮件协议发送数据，并保留调用方可观察的失败语义。
+     * 检查邮箱发送频率后按注册或重置用途决定是否追加十分钟有效的邮件事件；不适用的邮箱也返回成功以避免枚举账户。
      *
-     * @param recipient 调用方提供的 {@code recipient} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @return 当前条件是否成立
+     * @param recipient 验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @return 申请处理完成时为 true，不表示邮件已送达
      */
     @Transactional
     public boolean send(String recipient, VerificationPurpose purpose) {
@@ -133,11 +131,11 @@ public class VerificationCodeService {
     }
 
     /**
-     * 处理 VerificationCodeService 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 通过 Redis 脚本比对摘要，成功即删除；错误次数达到五次也删除，失效或不匹配时抛出验证码错误。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @param code 调用方提供的 {@code code} 值
+     * @param email 账户或验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @param code 待签发或比对的明文验证码，不得记录
      */
     public void consume(String email, VerificationPurpose purpose, String code) {
         String normalizedEmail = normalize(email);
@@ -150,15 +148,15 @@ public class VerificationCodeService {
     }
 
     /**
-     * 执行 VerificationCodeService 中的 activateForDelivery 职责，并保持既有权限、事务与副作用边界。
+     * 按剩余有效期激活摘要并清零尝试数；过期事件或早于已激活签发时间的事件不覆盖当前验证码。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @param code 调用方提供的 {@code code} 值
-     * @param eventId 目标对象的稳定标识
-     * @param issuedAt 调用方提供的 {@code issuedAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @return 当前条件是否成立
+     * @param email 账户或验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @param code 待签发或比对的明文验证码，不得记录
+     * @param eventId 验证码邮件事件唯一标识
+     * @param issuedAt 验证码事件签发时间
+     * @param expiresAt 验证码业务有效期截止时间
+     * @return 本次验证码已激活时为 true
      */
     public boolean activateForDelivery(
             String email,
@@ -183,44 +181,44 @@ public class VerificationCodeService {
     }
 
     /**
-     * 执行 VerificationCodeService 中的 discardIfCurrent 职责，并保持既有权限、事务与副作用边界。
+     * 仅当 Redis 中当前事件 ID 与指定事件相同时删除验证码，避免撤销较新的签发。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @param eventId 目标对象的稳定标识
+     * @param email 账户或验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @param eventId 验证码邮件事件唯一标识
      */
     public void discardIfCurrent(String email, VerificationPurpose purpose, String eventId) {
         redis.execute(DISCARD_SCRIPT, List.of(key(normalize(email), purpose)), eventId);
     }
 
     /**
-     * 执行 VerificationCodeService 中的 key 职责，并保持既有权限、事务与副作用边界。
+     * 组合安全前缀、小写用途和邮箱摘要，生成不含明文邮箱的验证码键。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param email 账户或验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @return 用途隔离的 Redis 验证码键
      */
     private String key(String email, VerificationPurpose purpose) {
         return keyPrefix + ":verification:" + purpose.name().toLowerCase(Locale.ROOT) + ":" + hasher.hash(email);
     }
 
     /**
-     * 执行 VerificationCodeService 中的 digest 职责，并保持既有权限、事务与副作用边界。
+     * 对邮箱、用途和验证码的组合计算摘要，使同一码不能跨邮箱或用途使用。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param purpose 调用方提供的 {@code purpose} 值
-     * @param code 调用方提供的 {@code code} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param email 账户或验证码收件邮箱
+     * @param purpose 注册或密码重置用途
+     * @param code 待签发或比对的明文验证码，不得记录
+     * @return 验证码比对摘要
      */
     private String digest(String email, VerificationPurpose purpose, String code) {
         return hasher.hash(email + ":" + purpose.name() + ":" + code);
     }
 
     /**
-     * 按 VerificationCodeService 的既定规则转换输入，不记录凭据或敏感原文。
+     * 去除邮箱首尾空白并使用 Locale.ROOT 转为小写。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param email 账户或验证码收件邮箱
+     * @return 规范化邮箱
      */
     private String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);

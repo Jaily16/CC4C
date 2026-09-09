@@ -14,49 +14,47 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-/**
- * 定义收藏与评论的 MyBatis 持久化及结果映射边界。
- */
+/** 访问课程、博客收藏关系及评论关联，联合用户资料生成评论投影。 */
 @Mapper
 public interface InteractionMapper extends BaseMapper<CommentEntity> {
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 检查指定用户与课程的收藏关系是否存在。
      *
-     * @param userId 目标对象的稳定标识
-     * @param courseId 目标对象的稳定标识
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param userId 用户 ID
+     * @param courseId 课程 ID
+     * @return 存在收藏关系时为 true
      */
     @Select("SELECT COUNT(*) FROM user_favors_course WHERE user_id = #{userId} AND course_id = #{courseId}")
     boolean courseFavoriteExists(@Param("userId") long userId, @Param("courseId") int courseId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 新增课程收藏关系并由数据库记录收藏时间。
      *
-     * @param userId 目标对象的稳定标识
-     * @param courseId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param courseId 课程 ID
+     * @return 插入影响行数
      */
     @Insert(
             "INSERT INTO user_favors_course(user_id, course_id, time) VALUES(#{userId}, #{courseId}, CURRENT_TIMESTAMP)")
     int insertCourseFavorite(@Param("userId") long userId, @Param("courseId") int courseId);
 
     /**
-     * 删除或失效所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 物理删除指定用户与课程的收藏关系。
      *
-     * @param userId 目标对象的稳定标识
-     * @param courseId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param courseId 课程 ID
+     * @return 删除影响行数
      */
     @Delete("DELETE FROM user_favors_course WHERE user_id = #{userId} AND course_id = #{courseId}")
     int deleteCourseFavorite(@Param("userId") long userId, @Param("courseId") int courseId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 分页查询用户收藏的未删除课程，按收藏时间降序、课程 ID 升序排列。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param userId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<CourseFavoriteRow> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param userId 用户 ID
+     * @return 课程收藏分页投影
      */
     @Select(
             """
@@ -69,41 +67,41 @@ public interface InteractionMapper extends BaseMapper<CommentEntity> {
     IPage<CourseFavoriteRow> selectCourseFavorites(Page<CourseFavoriteRow> page, long userId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 检查指定用户与博客的收藏关系是否存在。
      *
-     * @param userId 目标对象的稳定标识
-     * @param blogId 目标对象的稳定标识
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param userId 用户 ID
+     * @param blogId 博客 ID
+     * @return 存在收藏关系时为 true
      */
     @Select("SELECT COUNT(*) FROM user_collects_blog WHERE user_id = #{userId} AND blog_id = #{blogId}")
     boolean blogFavoriteExists(@Param("userId") long userId, @Param("blogId") long blogId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 新增博客收藏关系并由数据库记录收藏时间。
      *
-     * @param userId 目标对象的稳定标识
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param blogId 博客 ID
+     * @return 插入影响行数
      */
     @Insert("INSERT INTO user_collects_blog(user_id, blog_id, time) VALUES(#{userId}, #{blogId}, CURRENT_TIMESTAMP)")
     int insertBlogFavorite(@Param("userId") long userId, @Param("blogId") long blogId);
 
     /**
-     * 删除或失效所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 物理删除指定用户与博客的收藏关系。
      *
-     * @param userId 目标对象的稳定标识
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param blogId 博客 ID
+     * @return 删除影响行数
      */
     @Delete("DELETE FROM user_collects_blog WHERE user_id = #{userId} AND blog_id = #{blogId}")
     int deleteBlogFavorite(@Param("userId") long userId, @Param("blogId") long blogId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 分页查询用户收藏且未删除、审核通过的博客，按收藏时间及博客 ID 倒序排列。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param userId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<BlogFavoriteRow> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param userId 用户 ID
+     * @return 博客收藏分页投影
      */
     @Select(
             """
@@ -116,51 +114,51 @@ public interface InteractionMapper extends BaseMapper<CommentEntity> {
     IPage<BlogFavoriteRow> selectBlogFavorites(Page<BlogFavoriteRow> page, long userId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将已创建评论关联为指定课程的直接评论。
      *
-     * @param commentId 目标对象的稳定标识
-     * @param courseId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param commentId 评论 ID
+     * @param courseId 课程 ID
+     * @return 关联插入影响行数
      */
     @Insert("INSERT INTO course_direct_comment(comment_id, course_id) VALUES(#{commentId}, #{courseId})")
     int insertCourseComment(@Param("commentId") long commentId, @Param("courseId") int courseId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将已创建评论关联为指定博客的直接评论。
      *
-     * @param commentId 目标对象的稳定标识
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param commentId 评论 ID
+     * @param blogId 博客 ID
+     * @return 关联插入影响行数
      */
     @Insert("INSERT INTO blog_direct_comment(comment_id, blog_id) VALUES(#{commentId}, #{blogId})")
     int insertBlogComment(@Param("commentId") long commentId, @Param("blogId") long blogId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 记录评论与父评论的回复关系及层级。
      *
-     * @param commentId 目标对象的稳定标识
-     * @param fatherId 目标对象的稳定标识
-     * @param layer 调用方提供的 {@code layer} 值
-     * @return 按当前规则计算或读取的数值
+     * @param commentId 评论 ID
+     * @param fatherId 父评论 ID
+     * @param layer 回复评论层级
+     * @return 关联插入影响行数
      */
     @Insert("INSERT INTO indirect_comment(comment_id, father_id, layer) VALUES(#{commentId}, #{fatherId}, #{layer})")
     int insertReply(@Param("commentId") long commentId, @Param("fatherId") long fatherId, @Param("layer") int layer);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按评论 ID 读取回复关系中的层级。
      *
-     * @param commentId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param commentId 评论 ID
+     * @return 回复层级，无间接评论关联时为空
      */
     @Select("SELECT layer FROM indirect_comment WHERE comment_id = #{commentId}")
     Integer selectLayer(long commentId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 分页读取课程直接评论及作者资料，排除已删除评论和用户。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param courseId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<CommentRow> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param courseId 课程 ID
+     * @return 按时间和评论 ID 倒序排列的评论投影
      */
     @Select(
             """
@@ -175,11 +173,11 @@ public interface InteractionMapper extends BaseMapper<CommentEntity> {
     IPage<CommentRow> selectCourseComments(Page<CommentRow> page, int courseId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 分页读取博客直接评论及作者资料，排除已删除评论和用户。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param blogId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<CommentRow> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param blogId 博客 ID
+     * @return 按时间和评论 ID 倒序排列的评论投影
      */
     @Select(
             """
@@ -194,10 +192,10 @@ public interface InteractionMapper extends BaseMapper<CommentEntity> {
     IPage<CommentRow> selectBlogComments(Page<CommentRow> page, long blogId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 批量读取指定父评论的直接回复及双方作者信息，排除已删除回复和回复作者。
      *
-     * @param fatherIds 目标对象的稳定标识
-     * @return 按当前方法约定返回结果集合
+     * @param fatherIds 待查询的非空父评论 ID 列表
+     * @return 按时间和评论 ID 升序排列的回复投影
      */
     @Select({
         "<script>",

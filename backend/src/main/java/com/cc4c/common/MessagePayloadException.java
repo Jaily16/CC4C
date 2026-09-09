@@ -1,16 +1,14 @@
 package com.cc4c.common;
 
-/**
- * 表示共享基础设施处理中可分类且可安全映射的失败。
- */
+/** 区分消息载荷校验或编解码失败，向上层提供受控错误码并保留内部原因。 */
 public final class MessagePayloadException extends RuntimeException {
     private final String errorCode;
 
     /**
-     * 创建 MessagePayloadException 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存载荷错误码、内部诊断消息及可选的底层原因。
      *
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @param message 当前处理的消息或用户提示
+     * @param errorCode 不含邮件内容、密文或连接凭据的受控错误码
+     * @param message 由当前异常保存的提示或内部诊断消息
      */
     public MessagePayloadException(String errorCode, String message) {
         super(message);
@@ -18,11 +16,11 @@ public final class MessagePayloadException extends RuntimeException {
     }
 
     /**
-     * 创建 MessagePayloadException 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存载荷错误码、内部诊断消息及可选的底层原因。
      *
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @param message 当前处理的消息或用户提示
-     * @param cause 调用方提供的 {@code cause} 值
+     * @param errorCode 不含邮件内容、密文或连接凭据的受控错误码
+     * @param message 由当前异常保存的提示或内部诊断消息
+     * @param cause 供内部诊断保留的底层原因，不作为管理摘要直接输出
      */
     public MessagePayloadException(String errorCode, String message, Throwable cause) {
         super(message, cause);
@@ -30,9 +28,9 @@ public final class MessagePayloadException extends RuntimeException {
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 返回用于消息失败分类的受控载荷错误码。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return 受控载荷错误码
      */
     public String errorCode() {
         return errorCode;

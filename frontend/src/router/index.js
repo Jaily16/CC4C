@@ -130,7 +130,7 @@ const router = createRouter({
   ],
 });
 
-/** 在路由进入前恢复观测 Session，并按认证状态限制登录页与受保护页面。 */
+/** 恢复业务 Session，按 USER 或 ADMIN 角色限制受保护路由，并让已登录角色离开对应登录页。 */
 router.beforeEach(async (to) => {
   try {
     await store.dispatch('hydrateSession');

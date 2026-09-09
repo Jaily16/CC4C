@@ -11,23 +11,23 @@ export function usePolling(load, intervalMilliseconds = 30000) {
   let activePromise = null;
   let disposed = false;
 
-  /** 从现有响应式状态派生 paused，不发起请求或写入外部数据。 */
+  /** 合并手动暂停与页面隐藏状态，决定是否安排下一次轮询。 */
   const paused = computed(() => manuallyPaused.value || documentHidden.value);
 
-  /** 处理 clearTimer 清理操作，仅影响当前功能明确指向的状态或资源。 */
+  /** 取消尚未触发的轮询计时器并清空句柄，不中止正在执行的请求。 */
   function clearTimer() {
     if (timer !== null) window.clearTimeout(timer);
     timer = null;
   }
 
-  /** schedule 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+  /** 先清除旧计时器；仅在未卸载且未暂停时安排下一轮刷新，避免叠加轮询。 */
   function schedule() {
     clearTimer();
-    /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
+    /** 在轮询间隔结束后请求刷新，计时器由 clearTimer 统一取消。 */
     if (!disposed && !paused.value) timer = window.setTimeout(() => void refresh(), intervalMilliseconds);
   }
 
-  /** 读取 refresh 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+  /** 复用正在执行的刷新；替换刷新先中止并等待旧请求。加载返回且未取消时记录完成时间，最后安排下一轮。 */
   async function refresh(replace = false) {
     if (activePromise) {
       if (!replace) return activePromise;
@@ -55,14 +55,14 @@ export function usePolling(load, intervalMilliseconds = 30000) {
     }
   }
 
-  /** 响应 togglePause 导航或界面事件，更新当前组件的受控展示状态。 */
+  /** 切换手动暂停；暂停只取消下一轮计时，恢复时立即请求刷新。 */
   function togglePause() {
     manuallyPaused.value = !manuallyPaused.value;
     if (manuallyPaused.value) clearTimer();
     else void refresh();
   }
 
-  /** handleVisibility 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+  /** 页面隐藏时取消计时并中止请求；重新可见且未手动暂停时执行替换刷新。 */
   function handleVisibility() {
     documentHidden.value = document.hidden;
     if (documentHidden.value) {
@@ -73,14 +73,14 @@ export function usePolling(load, intervalMilliseconds = 30000) {
     }
   }
 
-  /** 组件挂载后执行首次只读加载并登记当前页面需要的运行资源。 */
+  /** 挂载时登记可见性监听并发起首次刷新。 */
   onMounted(() => {
     disposed = false;
     /** 登记页面可见性监听，以便隐藏时暂停轮询并在恢复后安全刷新。 */
     document.addEventListener('visibilitychange', handleVisibility);
     void refresh();
   });
-  /** 组件卸载前取消计时器、监听或未完成请求，避免资源泄漏和过期写回。 */
+  /** 标记已卸载，清除计时器、中止当前请求并移除可见性监听。 */
   onBeforeUnmount(() => {
     disposed = true;
     clearTimer();

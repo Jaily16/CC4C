@@ -6,26 +6,24 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * SecurityRedisHealthIndicator 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 通过独立 Redis PING 检查认证和 Session 所依赖的 Redis 可达性。 */
 @Component("securityRedisHealthIndicator")
 final class SecurityRedisHealthIndicator implements HealthIndicator {
     private final RedisConnectionFactory connectionFactory;
 
     /**
-     * 创建 SecurityRedisHealthIndicator 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存获取健康探测连接的 Redis 连接工厂。
      *
-     * @param connectionFactory 调用方提供的 {@code connectionFactory} 值
+     * @param connectionFactory 安全 Redis 连接工厂
      */
     SecurityRedisHealthIndicator(RedisConnectionFactory connectionFactory) {
         this.connectionFactory = connectionFactory;
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 打开连接并发送 PING，结束后关闭；异常只映射为 unavailable。
      *
-     * @return 当前操作产生的 Health 结果
+     * @return PONG 对应 UP，异常或其他响应对应 DOWN
      */
     @Override
     public Health health() {

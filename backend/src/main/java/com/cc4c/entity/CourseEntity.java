@@ -7,9 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-/**
- * 映射课程目录数据库记录，字段语义与现有表结构保持一致。
- */
+/** 映射 course 表并使用自增主键；favorsNum 是查询附加值，不映射持久化列。 */
 @Data
 @TableName("course")
 public class CourseEntity {

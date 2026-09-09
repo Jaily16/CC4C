@@ -4,15 +4,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.authentication.session.ConcurrentSessionControlAuthenticationStrategy;
 
-/**
- * RoleAwareConcurrentSessionStrategy 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 按角色限制并发会话；超限时使旧会话过期，不阻止本次新登录。 */
 public final class RoleAwareConcurrentSessionStrategy extends ConcurrentSessionControlAuthenticationStrategy {
 
     /**
-     * 创建 RoleAwareConcurrentSessionStrategy 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入会话注册表，并关闭超限时直接拒绝认证的策略。
      *
-     * @param sessionRegistry 调用方提供的 {@code sessionRegistry} 值
+     * @param sessionRegistry 持久化会话索引注册表
      */
     public RoleAwareConcurrentSessionStrategy(SessionRegistry sessionRegistry) {
         super(sessionRegistry);
@@ -20,10 +18,10 @@ public final class RoleAwareConcurrentSessionStrategy extends ConcurrentSessionC
     }
 
     /**
-     * 读取认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 管理员最多一个并发会话，其他身份使用三个会话上限。
      *
-     * @param authentication 调用方提供的 {@code authentication} 值
-     * @return 按当前规则计算或读取的数值
+     * @param authentication 待处理的认证对象
+     * @return 管理员为 1，其他为 3
      */
     @Override
     protected int getMaximumSessionsForThisUser(Authentication authentication) {

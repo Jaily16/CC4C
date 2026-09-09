@@ -28,9 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * CatalogService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 维护课程、模块和推荐查询，使用分区缓存并在课程写入提交后失效相关分区。 */
 @Service
 public class CatalogService implements CatalogLookup {
     private static final String HOME_REGION = "catalog:home";
@@ -50,10 +48,10 @@ public class CatalogService implements CatalogLookup {
     private final BusinessCache cache;
 
     /**
-     * 创建 CatalogService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入课程 Mapper 和可旁路的业务缓存。
      *
-     * @param mapper 调用方提供的 {@code mapper} 值
-     * @param cache 调用方提供的 {@code cache} 值
+     * @param mapper 课程、模块和语言数据访问 Mapper
+     * @param cache 支持分区及提交后失效的业务缓存
      */
     CatalogService(CatalogMapper mapper, BusinessCache cache) {
         this.mapper = mapper;
@@ -61,10 +59,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 home 职责，并保持既有权限、事务与副作用边界。
+     * 缓存按收藏热度排列的课程分页，基础有效期为 60 秒。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 带收藏数的首页课程页
      */
     public PageResult<CourseResponse> home(PageQuery query) {
         return cachedPage(
@@ -75,11 +73,11 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 search 职责，并保持既有权限、事务与副作用边界。
+     * 直接查询课程名模糊匹配或语言名精确匹配的课程，不缓存任意检索词。
      *
-     * @param searchText 调用方提供的 {@code searchText} 值
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param searchText 课程名检索词或完整语言名
+     * @param query 从 1 起算的页码及页大小
+     * @return 按课程 ID 升序排列的课程页
      */
     public PageResult<CourseResponse> search(String searchText, PageQuery query) {
         LambdaQueryWrapper<CourseEntity> wrapper = new LambdaQueryWrapper<CourseEntity>()
@@ -92,11 +90,11 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     * 按语言名和分页条件缓存课程查询，基础有效期为五分钟。
      *
-     * @param languageName 调用方提供的 {@code languageName} 值
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageName 语言名称
+     * @param query 从 1 起算的页码及页大小
+     * @return 该语言的课程页
      */
     public PageResult<CourseResponse> byLanguage(String languageName, PageQuery query) {
         return cachedPage(LANGUAGE_REGION, languageName + ":" + pageKey(query), DETAIL_TTL, () -> {
@@ -108,10 +106,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 byName 职责，并保持既有权限、事务与副作用边界。
+     * 缓存课程名详情查询，空结果使用短期负缓存；不存在时抛出 404。
      *
-     * @param courseName 调用方提供的 {@code courseName} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param courseName 课程名称
+     * @return 课程详情
      */
     public CourseResponse byName(String courseName) {
         return cache.getOrLoad(
@@ -124,10 +122,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 modules 职责，并保持既有权限、事务与副作用边界。
+     * 缓存指定语言的模块及课程列表，基础有效期为十分钟。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageId 语言 ID
+     * @return 按模块序号排列的模块列表
      */
     public List<CourseModuleResponse> modules(int languageId) {
         return cache.getOrLoad(
@@ -141,11 +139,11 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 recommend 职责，并保持既有权限、事务与副作用边界。
+     * 依据专业分类计算模块和课程级别范围，并按语言与专业组合缓存推荐列表。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param major 调用方提供的 {@code major} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageId 语言 ID
+     * @param major 专业分类（-1、0、1）
+     * @return 符合级别规则的课程模块列表
      */
     public List<CourseModuleResponse> recommend(int languageId, int major) {
         int moduleMinimum = major == -1 ? -1 : 0;
@@ -165,10 +163,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 变更 CatalogService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 事务内校验语言存在和模块序号唯一后创建模块，提交后失效模块与推荐缓存。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 语言、序号、名称和级别的新模块请求
+     * @return 尚无课程的新模块
      */
     @Transactional
     public CourseModuleResponse createModule(CourseModuleCreateRequest request) {
@@ -188,10 +186,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 变更 CatalogService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 事务内校验课程名、语言及模块，插入课程和模块关联后安排五个课程缓存分区失效。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 课程字段及所属语言模块请求
+     * @return 新建课程响应
      */
     @Transactional
     public CourseResponse createCourse(CourseCreateRequest request) {
@@ -220,10 +218,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 languageExists 职责，并保持既有权限、事务与副作用边界。
+     * 以未删除语言名称查询判断语言存在性。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param languageId 语言 ID
+     * @return 存在语言名称时为 true
      */
     @Override
     public boolean languageExists(int languageId) {
@@ -231,29 +229,27 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 courseExists 职责，并保持既有权限、事务与副作用边界。
+     * 按主键读取未删除课程以判断存在性。
      *
-     * @param courseId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param courseId 课程 ID
+     * @return 课程存在时为 true
      */
     @Override
     public boolean courseExists(int courseId) {
         return mapper.selectById(courseId) != null;
     }
 
-    /**
-     * 执行 CatalogService 中的 invalidateCoursePopularity 职责，并保持既有权限、事务与副作用边界。
-     */
+    /** 安排事务提交后失效课程首页分区，使收藏热度重新聚合。 */
     @Override
     public void invalidateCoursePopularity() {
         cache.invalidateAfterCommit(HOME_REGION);
     }
 
     /**
-     * 执行 CatalogService 中的 loadModules 职责，并保持既有权限、事务与副作用边界。
+     * 批量查询语言下的课程名称并按模块序号组装模块列表。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageId 语言 ID
+     * @return 带课程名称列表的模块响应
      */
     private List<CourseModuleResponse> loadModules(int languageId) {
         Map<Integer, List<String>> courseNames = groupCourseNames(mapper.selectCourseNamesByLanguage(languageId));
@@ -263,14 +259,14 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 loadRecommendation 职责，并保持既有权限、事务与副作用边界。
+     * 分别按模块级别与课程级别批量查询，再按模块序号组合推荐结果。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param moduleMinimum 调用方提供的 {@code moduleMinimum} 值
-     * @param moduleMaximum 调用方提供的 {@code moduleMaximum} 值
-     * @param courseMinimum 调用方提供的 {@code courseMinimum} 值
-     * @param courseMaximum 调用方提供的 {@code courseMaximum} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param languageId 语言 ID
+     * @param moduleMinimum 模块级别下限，包含该值
+     * @param moduleMaximum 模块级别上限，包含该值
+     * @param courseMinimum 课程级别下限，包含该值
+     * @param courseMaximum 课程级别上限，包含该值
+     * @return 符合两套级别范围的模块响应
      */
     private List<CourseModuleResponse> loadRecommendation(
             int languageId, int moduleMinimum, int moduleMaximum, int courseMinimum, int courseMaximum) {
@@ -282,10 +278,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 groupCourseNames 职责，并保持既有权限、事务与副作用边界。
+     * 按模块序号归组课程名称，保留查询中模块首次出现的顺序。
      *
-     * @param rows 调用方提供的 {@code rows} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param rows 按模块序号排列的课程名称投影
+     * @return 模块序号到课程名称列表的映射
      */
     private Map<Integer, List<String>> groupCourseNames(List<ModuleCourseNameRow> rows) {
         return rows.stream()
@@ -296,11 +292,11 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 moduleResponse 职责，并保持既有权限、事务与副作用边界。
+     * 合并模块字段与对应课程名称；无关联课程时使用空列表。
      *
-     * @param module 调用方提供的 {@code module} 值
-     * @param courseNames 调用方提供的 {@code courseNames} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param module 模块字段投影
+     * @param courseNames 按模块序号归组的课程名称
+     * @return 单个模块响应
      */
     private CourseModuleResponse moduleResponse(CourseModuleRow module, Map<Integer, List<String>> courseNames) {
         return new CourseModuleResponse(
@@ -312,13 +308,13 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 cachedPage 职责，并保持既有权限、事务与副作用边界。
+     * 使用显式分页类型从缓存读取，未命中时调用加载器并缓存分页结果。
      *
-     * @param region 调用方提供的 {@code region} 值
-     * @param key 调用方提供的 {@code key} 值
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @param loader 调用方提供的 {@code loader} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param region 缓存分区名称
+     * @param key 分区内的逻辑键
+     * @param ttl 正常结果的基础缓存有效期
+     * @param loader 缓存未命中时读取数据库的加载器
+     * @return 缓存或加载器返回的课程页
      */
     private PageResult<CourseResponse> cachedPage(
             String region, String key, Duration ttl, Supplier<PageResult<CourseResponse>> loader) {
@@ -327,20 +323,20 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 pageKey 职责，并保持既有权限、事务与副作用边界。
+     * 组合页码和页大小作为缓存逻辑键。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param query 从 1 起算的页码及页大小
+     * @return 以冒号分隔的分页键
      */
     private String pageKey(PageQuery query) {
         return query.page() + ":" + query.size();
     }
 
     /**
-     * 执行 CatalogService 中的 toPage 职责，并保持既有权限、事务与副作用边界。
+     * 将 MyBatis 分页记录转为课程响应并保留页码、页大小和总数。
      *
-     * @param page 分页查询边界值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param page MyBatis 分页结果，携带记录及分页元数据
+     * @return 服务层课程分页结果
      */
     private PageResult<CourseResponse> toPage(IPage<CourseEntity> page) {
         return new PageResult<>(
@@ -351,10 +347,10 @@ public class CatalogService implements CatalogLookup {
     }
 
     /**
-     * 执行 CatalogService 中的 toResponse 职责，并保持既有权限、事务与副作用边界。
+     * 投影课程字段及查询附带的收藏数。
      *
-     * @param course 调用方提供的 {@code course} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param course 课程实体及查询附带字段
+     * @return 课程展示响应
      */
     private CourseResponse toResponse(CourseEntity course) {
         return new CourseResponse(

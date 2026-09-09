@@ -15,9 +15,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 
-/**
- * MessagePayloadCipher 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 使用 AES-GCM 加密消息 JSON，并将事件版本、代次和时间绑定为附加认证数据。 */
 @Component
 public final class MessagePayloadCipher {
     static final int MAX_PLAINTEXT_BYTES = 64 * 1024;
@@ -30,10 +28,10 @@ public final class MessagePayloadCipher {
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
-     * 创建 MessagePayloadCipher 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 载入活动密钥与已校验密钥环，同时校验审核收件人配置。
      *
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param properties 调用方提供的 {@code properties} 值
+     * @param objectMapper 显式信封或载荷 JSON 映射器
+     * @param properties 消息命名空间、密钥及确认重试配置
      */
     public MessagePayloadCipher(ObjectMapper objectMapper, MessagingProperties properties) {
         this.objectMapper = objectMapper;
@@ -43,16 +41,16 @@ public final class MessagePayloadCipher {
     }
 
     /**
-     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     * 将载荷编码为 JSON，限制为 64 KiB 后交给活动密钥加密。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @param payload 调用方提供的 {@code payload} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventId 异步事件唯一标识
+     * @param eventType 三个 v1 事件类型之一
+     * @param schemaVersion 消息信封模式版本，当前为 1
+     * @param generation 事件代次，人工恢复时递增
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @param payload 待 JSON 编码并加密的业务载荷
+     * @return 包含活动密钥 ID、随机 nonce 和密文的载荷
      */
     public EncryptedMessagePayload encrypt(
             String eventId,
@@ -75,16 +73,16 @@ public final class MessagePayloadCipher {
     }
 
     /**
-     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     * 限制明文为 64 KiB，以活动密钥和新生成的 12 字节 nonce 执行 128 位标签的 AES-GCM 加密。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventId 异步事件唯一标识
+     * @param eventType 三个 v1 事件类型之一
+     * @param schemaVersion 消息信封模式版本，当前为 1
+     * @param generation 事件代次，人工恢复时递增
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @param plaintext 解密后的敏感载荷字节，不得记录
+     * @return 绑定事件元数据的加密载荷
      */
     EncryptedMessagePayload encryptBytes(
             String eventId,
@@ -110,10 +108,10 @@ public final class MessagePayloadCipher {
     }
 
     /**
-     * 按 MessagePayloadCipher 的既定规则转换输入，不记录凭据或敏感原文。
+     * 根据密钥 ID 和信封元数据验证 GCM 标签并解密，拒绝未知密钥、认证失败或超大载荷。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @return 最多 64 KiB 的明文字节
      */
     public byte[] decrypt(MessageEnvelope envelope) {
         if (envelope.ciphertext().length > MAX_PLAINTEXT_BYTES + 32) {
@@ -143,10 +141,10 @@ public final class MessagePayloadCipher {
     }
 
     /**
-     * 执行 MessagePayloadCipher 中的 key 职责，并保持既有权限、事务与副作用边界。
+     * 从密钥环查找密钥 ID，未知 ID 转换为 UNKNOWN_KEY_ID。
      *
-     * @param keyId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param keyId 密钥环中的加密密钥 ID
+     * @return AES 密钥描述
      */
     private SecretKeySpec key(String keyId) {
         byte[] key = keys.get(keyId);
@@ -157,15 +155,15 @@ public final class MessagePayloadCipher {
     }
 
     /**
-     * 执行 MessagePayloadCipher 中的 aad 职责，并保持既有权限、事务与副作用边界。
+     * 按固定换行顺序编码事件 ID、类型、模式版本、代次及毫秒时间，空到期时间使用减号。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventId 异步事件唯一标识
+     * @param eventType 三个 v1 事件类型之一
+     * @param schemaVersion 消息信封模式版本，当前为 1
+     * @param generation 事件代次，人工恢复时递增
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @return 用于 GCM 验证的 UTF-8 附加数据
      */
     private byte[] aad(
             String eventId,

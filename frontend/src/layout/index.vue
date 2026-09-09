@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-/** index 页面组件，协调当前路由的展示状态和用户事件。 */
+/** 业务布局容器，组合顶部栏、侧边导航和当前路由页面。 */
 import Sidebar from './Sidebar.vue';
 import Header from './Header.vue';
 </script>

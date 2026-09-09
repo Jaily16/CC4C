@@ -32,18 +32,16 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-/**
- * GlobalExceptionHandler 表示可被统一错误处理器识别的业务故障。
- */
+/** 将 MVC 异常映射为统一状态和响应体，标记观测错误，并为未知异常记录不含正文的定位摘要。 */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 按业务异常携带的状态、业务码、数据和提示返回响应，并标记本次观测错误。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Object>> handleBusinessException(BusinessException exception) {
@@ -53,10 +51,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 返回 HTTP 429 与 Retry-After 秒数，并标记本次限流错误。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(RateLimitException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleRateLimit(RateLimitException exception) {
@@ -67,10 +65,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将 Redis 连接或系统故障映射为脱敏的 HTTP 503，不返回依赖异常正文。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler({RedisConnectionFailureException.class, RedisSystemException.class})
     public ResponseEntity<ApiResponse<Boolean>> handleRedisUnavailable(Exception exception) {
@@ -80,10 +78,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 汇总请求体字段校验错误，每个字段只保留首条提示，并返回 HTTP 400。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleBodyValidation(
@@ -99,10 +97,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将参数缺失、绑定、类型、约束及 JSON 读取错误统一映射为 HTTP 400。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler({
         ConstraintViolationException.class,
@@ -118,10 +116,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将必需 Cookie 缺失映射为 HTTP 401 和登录提示。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(MissingRequestCookieException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleMissingCookie(MissingRequestCookieException exception) {
@@ -131,10 +129,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将不存在的静态资源请求映射为 HTTP 404。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleMissingResource(NoResourceFoundException exception) {
@@ -144,10 +142,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将不支持的 HTTP 方法映射为 HTTP 405。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleUnsupportedMethod(
@@ -158,10 +156,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将唯一键冲突映射为 HTTP 409，不泄露数据库约束或值。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleDuplicateKey(DuplicateKeyException exception) {
@@ -171,10 +169,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 将数据完整性约束失败映射为 HTTP 422 与受控引用错误提示。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Boolean>> handleDataIntegrity(DataIntegrityViolationException exception) {
@@ -185,10 +183,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理 GlobalExceptionHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 先识别包装后的 Redis 故障；其余异常记录类型、指纹及首帧位置，并返回脱敏 HTTP 500。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 使用对应 HTTP 状态及业务码封装的响应
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Boolean>> handleUnexpectedException(Exception exception) {
@@ -209,9 +207,9 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 执行 GlobalExceptionHandler 中的 markHandled 职责，并保持既有权限、事务与副作用边界。
+     * 存在 Servlet 请求及观测上下文时登记异常，使已处理失败仍进入 HTTP 观测。
      *
-     * @param exception 调用方提供的 {@code exception} 值
+     * @param exception 当前需要分类、响应或登记的异常
      */
     private static void markHandled(Exception exception) {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
@@ -221,10 +219,10 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 执行 GlobalExceptionHandler 中的 fingerprint 职责，并保持既有权限、事务与副作用边界。
+     * 对异常类型及最多八个堆栈位置计算 SHA-256，截取前八字节作为不含异常消息的定位指纹。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param exception 当前需要分类、响应或登记的异常
+     * @return 十六位十六进制指纹；算法不可用时返回固定标记
      */
     private static String fingerprint(Exception exception) {
         StringBuilder source = new StringBuilder(exception.getClass().getName());

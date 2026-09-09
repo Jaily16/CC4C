@@ -11,22 +11,18 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * FileStorage 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 保存上传图片到随机分片目录，并返回磁盘路径与公开访问 URL；不负责内容类型鉴别。 */
 public final class FileStorage {
-    /**
-     * 创建 FileStorage 实例，不触发外部 I/O。
-     */
+    /** 禁止实例化文件存储工具。 */
     private FileStorage() {}
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 去除原文件名中的路径和特殊字符，加上随机标识后写入 img1 至 img5 目录；I/O 失败向上传调用方抛出异常。
      *
-     * @param file 待校验或保存的上传文件
-     * @param storageBase 调用方提供的 {@code storageBase} 值
-     * @param requestBase 调用方提供的 {@code requestBase} 值
-     * @return 当前操作产生的 StoredFile 结果
+     * @param file 待保存的上传文件
+     * @param storageBase 图片写入根目录
+     * @param requestBase 该根目录对应的公开 URL 前缀
+     * @return 已写入文件的磁盘路径与访问 URL
      */
     public static StoredFile storeImage(MultipartFile file, String storageBase, String requestBase) {
         String originalName = file.getOriginalFilename();
@@ -71,10 +67,10 @@ public final class FileStorage {
     }
 
     /**
-     * StoredFile 以不可变结构承载共享基础设施数据，并保持现有字段语义。
+     * 承载一次文件写入的磁盘位置和公开访问地址。
      *
-     * @param path 已验证边界内的文件或请求路径
-     * @param requestUrl 调用方提供的 {@code requestUrl} 值
+     * @param path 已写入文件的绝对路径
+     * @param requestUrl 文件的公开访问 URL
      */
     public record StoredFile(Path path, String requestUrl) {}
 }

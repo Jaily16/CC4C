@@ -2,9 +2,7 @@ package com.cc4c.dto;
 
 import lombok.Data;
 
-/**
- * 承载收藏与评论查询返回的一行投影数据。
- */
+/** 接收用户已收藏课程的标识、名称和语言名称投影。 */
 @Data
 public class CourseFavoriteRow {
     private Integer courseId;

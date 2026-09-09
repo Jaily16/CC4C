@@ -10,19 +10,17 @@ import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
-/**
- * 向外部基础设施发布共享基础设施消息，并保留当前投递失败语义。
- */
+/** 以 mandatory 发布并等待 correlated confirm，将退回、NACK、超时和连接异常归类。 */
 @Component
 final class RabbitMessagePublisher {
     private final RabbitTemplate rabbitTemplate;
     private final MessagingProperties properties;
 
     /**
-     * 创建 RabbitMessagePublisher 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 RabbitTemplate 和确认超时，并启用 mandatory 以识别不可路由消息。
      *
-     * @param rabbitTemplate 调用方提供的 {@code rabbitTemplate} 值
-     * @param properties 由容器注入的 MessagingProperties 协作组件
+     * @param rabbitTemplate AMQP 消息发送模板
+     * @param properties 消息命名空间、密钥及确认重试配置
      */
     RabbitMessagePublisher(RabbitTemplate rabbitTemplate, MessagingProperties properties) {
         this.rabbitTemplate = rabbitTemplate;
@@ -31,13 +29,13 @@ final class RabbitMessagePublisher {
     }
 
     /**
-     * 发布可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 发送后等待配置时限内的确认，优先识别退回消息；中断时恢复线程中断标记。
      *
-     * @param exchange 调用方提供的 {@code exchange} 值
-     * @param routingKey 调用方提供的 {@code routingKey} 值
-     * @param message 当前处理的消息或用户提示
-     * @param correlationId 目标对象的稳定标识
-     * @return 当前操作产生的 PublishOutcome 结果
+     * @param exchange 发布目标交换机，空字符串表示默认交换机
+     * @param routingKey 目标路由键或默认交换机下的队列名
+     * @param message 当前 AMQP 消息及其属性
+     * @param correlationId 本次发布确认使用的关联标识
+     * @return 确认接收或带失败码的发布结果
      */
     PublishOutcome publish(String exchange, String routingKey, Message message, String correlationId) {
         CorrelationData correlationData = new CorrelationData(correlationId);

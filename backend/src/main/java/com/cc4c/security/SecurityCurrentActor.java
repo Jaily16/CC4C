@@ -8,15 +8,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-/**
- * SecurityCurrentActor 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 将 Spring Security 上下文转换为业务身份，拒绝把其他认证体系的 Principal 当作用户。 */
 @Component
 final class SecurityCurrentActor implements CurrentActor {
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 仅接受已认证且 Principal 为 Cc4cPrincipal 的上下文，并投影业务身份字段。
      *
-     * @return 存在时返回目标值，否则返回空的 Optional
+     * @return 可识别的业务身份，否则为空 Optional
      */
     @Override
     public Optional<ActorIdentity> current() {
@@ -30,9 +28,9 @@ final class SecurityCurrentActor implements CurrentActor {
     }
 
     /**
-     * 校验认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 严格要求 USER；身份 ID 不能解析为 long 时按无权限处理。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 当前用户 ID
      */
     @Override
     public long requiredUserId() {
@@ -45,9 +43,9 @@ final class SecurityCurrentActor implements CurrentActor {
     }
 
     /**
-     * 校验认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 严格要求 ADMIN 并返回管理员编号，不进行数字转换。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return 当前管理员 ID
      */
     @Override
     public String requiredAdministratorId() {
@@ -55,10 +53,10 @@ final class SecurityCurrentActor implements CurrentActor {
     }
 
     /**
-     * 校验认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 无业务身份时抛出 401，角色不匹配时抛出 403。
      *
-     * @param role 当前身份的固定角色
-     * @return 当前操作产生的 ActorIdentity 结果
+     * @param role 业务角色 USER 或 ADMIN
+     * @return 满足指定角色的业务身份
      */
     private ActorIdentity required(AccountRole role) {
         ActorIdentity actor = current().orElseThrow(this::unauthorized);
@@ -69,18 +67,18 @@ final class SecurityCurrentActor implements CurrentActor {
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 构造要求重新登录的 401 业务异常。
      *
-     * @return 当前操作产生的 BusinessException 结果
+     * @return 未认证异常
      */
     private BusinessException unauthorized() {
         return new BusinessException(HttpStatus.UNAUTHORIZED, BusinessCode.UNAUTHORIZED, "请先登录");
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 构造拒绝当前操作的 403 业务异常。
      *
-     * @return 当前操作产生的 BusinessException 结果
+     * @return 权限不足异常
      */
     private BusinessException forbidden() {
         return new BusinessException(HttpStatus.FORBIDDEN, BusinessCode.FORBIDDEN, "无权执行此操作");

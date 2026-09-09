@@ -1,19 +1,19 @@
 package com.cc4c.support.messaging;
 
 /**
- * EncryptedMessagePayload 以不可变结构承载共享基础设施数据，并保持现有字段语义。
+ * 保存密钥 ID、nonce 和密文；构造与访问数组时都执行防御性复制。
  *
- * @param keyId 目标对象的稳定标识
- * @param nonce 调用方提供的 {@code nonce} 值
- * @param ciphertext 调用方提供的 {@code ciphertext} 值
+ * @param keyId 密钥环中的加密密钥 ID
+ * @param nonce AES-GCM nonce 字节
+ * @param ciphertext 包含认证标签的加密载荷字节
  */
 public record EncryptedMessagePayload(String keyId, byte[] nonce, byte[] ciphertext) {
     /**
-     * 创建 EncryptedMessagePayload 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 复制传入 nonce 和密文数组，防止调用方修改已封装载荷。
      *
-     * @param keyId 目标对象的稳定标识
-     * @param nonce 调用方提供的 {@code nonce} 值
-     * @param ciphertext 调用方提供的 {@code ciphertext} 值
+     * @param keyId 密钥环中的加密密钥 ID
+     * @param nonce AES-GCM nonce 字节
+     * @param ciphertext 包含认证标签的加密载荷字节
      */
     public EncryptedMessagePayload {
         nonce = nonce.clone();
@@ -21,9 +21,9 @@ public record EncryptedMessagePayload(String keyId, byte[] nonce, byte[] ciphert
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 返回随机 nonce 的副本。
      *
-     * @return 按当前方法约定返回结果集合
+     * @return 不共享内部存储的 nonce 字节
      */
     @Override
     public byte[] nonce() {
@@ -31,9 +31,9 @@ public record EncryptedMessagePayload(String keyId, byte[] nonce, byte[] ciphert
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 返回密文数组的副本。
      *
-     * @return 按当前方法约定返回结果集合
+     * @return 不共享内部存储的密文字节
      */
     @Override
     public byte[] ciphertext() {

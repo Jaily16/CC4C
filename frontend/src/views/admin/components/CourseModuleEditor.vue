@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-/** 课程模块编辑组件，维护模块列表输入并向父级同步更新。 */
+/** 课程模块选择组件，展示父页面提供的模块选项和新增模块表单，转发选择、字段更新与创建事件。 */
 import { Loading, Plus } from '@element-plus/icons-vue';
 
 defineProps({
@@ -121,7 +121,7 @@ const emit = defineEmits([
   'update-module-field',
 ]);
 
-/** 处理 updateModuleField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 向父页面转发模块字段变更，模块名变化时清除名称错误。 */
 function updateModuleField(field, value) {
   emit('update-module-field', field, value);
   if (field === 'moduleName') emit('clear-module-error');

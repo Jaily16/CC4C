@@ -114,7 +114,7 @@
 </template>
 
 <script setup>
-/** FavoriteView 页面组件，协调当前路由的展示状态和用户事件。 */
+/** 个人收藏页面，读取当前用户的课程收藏并支持取消收藏和详情导航。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { getSession } from '@/api/auth';
@@ -138,13 +138,13 @@ const blogPage = ref(1);
 const courseTotal = ref(0);
 const blogTotal = ref(0);
 const pageSize = 8;
-/** 从现有响应式状态派生 tabs，不发起请求或写入外部数据。 */
+/** 用两类收藏总数生成课程和博客标签页信息。 */
 const tabs = computed(() => [
   { key: 'courses', label: '收藏课程', count: courseTotal.value },
   { key: 'blogs', label: '收藏博客', count: blogTotal.value },
 ]);
 
-/** courseImage 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 按语言名称选择课程封面，找不到时使用默认图片。 */
 function courseImage(languageName) {
   return (
     assets.languageCards[languageName] ||
@@ -153,7 +153,7 @@ function courseImage(languageName) {
   );
 }
 
-/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
+/** 按中文年月日格式展示发布时间；缺失时提示未知，非法日期保留原文本。 */
 function formatDate(value) {
   if (!value) return '发布时间未知';
   const date = new Date(value);
@@ -161,7 +161,7 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
-/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 重新查询业务 Session；非 USER 时提示并跳转登录页。 */
 async function verifyUser() {
   const response = await getSession();
   if (response.data.data?.role !== 'USER') {
@@ -172,7 +172,7 @@ async function verifyUser() {
   return true;
 }
 
-/** 读取 loadFavorites 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 确认 USER 身份后并发读取当前课程和博客收藏页，分别更新列表和总数。 */
 async function loadFavorites() {
   loading.value = true;
   errorMessage.value = '';
@@ -194,24 +194,24 @@ async function loadFavorites() {
   }
 }
 
-/** 处理 changeCoursePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 修改课程页码并重新加载两类收藏。 */
 function changeCoursePage(page) {
   coursePage.value = page;
   return loadFavorites();
 }
 
-/** 处理 changeBlogPage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 修改博客页码并重新加载两类收藏。 */
 function changeBlogPage(page) {
   blogPage.value = page;
   return loadFavorites();
 }
 
-/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 携带课程名称进入课程详情。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
-/** 响应 openBlog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 发起阅读计数更新并立即进入博客详情；计数失败只记录开发诊断。 */
 function openBlog(blogId) {
   incrementBlogClick(blogId).catch((error) => reportClientError(error, 'frontend/src/views/FavoriteView.vue'));
   router.push({ path: '/blogDetail', query: { blogId } });

@@ -21,9 +21,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * 向外部基础设施发布共享基础设施消息，并保留当前投递失败语义。
- */
+/** 定时领取 Outbox 发布租约，发送持久消息并按 broker 确认结果推进发布状态或安排退避。 */
 @Component
 @ConditionalOnProperty(prefix = "cc4c.messaging", name = "dispatcher-enabled", havingValue = "true")
 final class OutboxPublisher {
@@ -46,13 +44,13 @@ final class OutboxPublisher {
     private final String workerId = "publisher-" + UUID.randomUUID();
 
     /**
-     * 创建 OutboxPublisher 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Outbox、确认发布器、拓扑及 JSON 映射，并保存发布指标。
      *
-     * @param repository 由容器注入的 OutboxRepository 协作组件
-     * @param publisher 由容器注入的 RabbitMessagePublisher 协作组件
-     * @param topology 调用方提供的 {@code topology} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param repository Outbox 持久化仓库
+     * @param publisher 等待 broker 确认的消息发布器
+     * @param topology 消息队列与交换机名称规则
+     * @param objectMapper 显式信封或载荷 JSON 映射器
+     * @param metrics 发布消费指标记录器
      */
     @Autowired
     OutboxPublisher(
@@ -69,12 +67,12 @@ final class OutboxPublisher {
     }
 
     /**
-     * 创建 OutboxPublisher 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 委托主构造器并使用禁用指标实现。
      *
-     * @param repository 由容器注入的 OutboxRepository 协作组件
-     * @param publisher 由容器注入的 RabbitMessagePublisher 协作组件
-     * @param topology 调用方提供的 {@code topology} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param repository Outbox 持久化仓库
+     * @param publisher 等待 broker 确认的消息发布器
+     * @param topology 消息队列与交换机名称规则
+     * @param objectMapper 显式信封或载荷 JSON 映射器
      */
     OutboxPublisher(
             OutboxRepository repository,
@@ -84,9 +82,7 @@ final class OutboxPublisher {
         this(repository, publisher, topology, objectMapper, Cc4cMetrics.disabled());
     }
 
-    /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
-     */
+    /** 每轮最多领取 50 条、租约 30 秒并逐条发布；领取失败只记录类型并结束本轮。 */
     @Scheduled(fixedDelayString = "${cc4c.messaging.poll-interval:500ms}")
     void dispatch() {
         List<OutboxMessage> messages;
@@ -104,9 +100,9 @@ final class OutboxPublisher {
     }
 
     /**
-     * 发布可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 构造持久 JSON 信封并等待发布确认；不可路由最多三次，其他发布失败最多八次，按固定退避安排重试。
      *
-     * @param outbox 调用方提供的 {@code outbox} 值
+     * @param outbox 已领取发布租约的 Outbox 记录
      */
     private void publish(OutboxMessage outbox) {
         long startedNanos = metrics.start();

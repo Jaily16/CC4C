@@ -4,26 +4,24 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
 import org.springframework.stereotype.Service;
 
-/**
- * 协调身份认证用例及其持久化、安全和外部协作边界。
- */
+/** 按角色隔离的 Principal 名查询并删除该身份的全部持久化会话。 */
 @Service
 public final class SessionRevocationService {
     private final FindByIndexNameSessionRepository<? extends Session> sessions;
 
     /**
-     * 创建 SessionRevocationService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入支持 Principal 索引查询的 Spring Session 仓库。
      *
-     * @param sessions 调用方提供的 {@code sessions} 值
+     * @param sessions 按 Principal 名建立索引的会话仓库
      */
     SessionRevocationService(FindByIndexNameSessionRepository<? extends Session> sessions) {
         this.sessions = sessions;
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 删除当前索引中该身份的所有 Session；仓库异常直接传播，不只撤销当前请求会话。
      *
-     * @param principalName 调用方提供的 {@code principalName} 值
+     * @param principalName 包含 USER: 或 ADMIN: 前缀的完整身份名
      */
     public void revokePrincipal(String principalName) {
         sessions.findByPrincipalName(principalName).keySet().forEach(sessions::deleteById);

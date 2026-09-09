@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-/** Markdown 预览组件，渲染受控正文并转发编辑器图片上传请求。 */
+/** Markdown 编辑器适配组件，传入净化与标题编号函数，转发正文更新、保存和图片上传事件。 */
 import MdEditor from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 
@@ -26,7 +26,7 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue', 'save', 'upload-img']);
 
-/** handleUploadImg 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 将编辑器的文件列表和回调原样转交父页面，由父页面执行上传。 */
 function handleUploadImg(...args) {
   emit('upload-img', ...args);
 }

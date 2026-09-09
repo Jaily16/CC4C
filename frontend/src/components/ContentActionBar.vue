@@ -24,7 +24,7 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-collect', 'toggle-comment', 'require-login']);
 
-/** handleCollect 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 未登录时通知父页面请求登录，否则转发收藏切换事件；组件不直接写入收藏。 */
 function handleCollect() {
   if (!props.loggedIn) {
     emit('require-login');

@@ -140,6 +140,8 @@
 </template>
 
 <script setup>
+/** 按路由加载博客正文，结合 USER 身份提供收藏和共享评论操作。 */
+
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { ArrowLeft, Calendar, CollectionTag, Reading, User, View } from '@element-plus/icons-vue';
@@ -180,7 +182,7 @@ const isCommentOpen = ref(false);
 const catalogOpen = ref(false);
 
 const { isUser: loggedIn } = useCurrentUser();
-/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
+/** 从当前用户名生成评论输入区的头像占位。 */
 const userInitial = computed(() => commentInitial(store.state.user.name));
 const commentThread = useCommentThread({
   subjectId: () => blogData.value?.blogId,
@@ -226,9 +228,9 @@ const {
   changeCommentPage,
   resetComments,
 } = commentThread;
-/** 从现有响应式状态派生 authorLabel，不发起请求或写入外部数据。 */
+/** 优先显示 poster，其次 author，均缺失时显示社区作者。 */
 const authorLabel = computed(() => blogData.value?.poster || blogData.value?.author || '社区作者');
-/** 从现有响应式状态派生 statusInfo，不发起请求或写入外部数据。 */
+/** 将博客审核状态转换为详情标签。 */
 const statusInfo = computed(
   () =>
     ({
@@ -237,7 +239,7 @@ const statusInfo = computed(
       1: { label: '已发布', type: 'success' },
     })[String(blogData.value?.state)] || { label: '状态未知', type: 'info' },
 );
-/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
+/** 将博客语言编号映射为名称并连接为展示文本，未知编号保留原值。 */
 const languageLabel = computed(() => {
   const names = { 1: 'Java', 2: 'C++', 3: 'Python', 4: 'C' };
   const values = blogData.value?.languageList;
@@ -245,7 +247,7 @@ const languageLabel = computed(() => {
   return values.map((value) => names[value] || value).join(' · ');
 });
 
-/** 把现有数据转换为 formatDate 所需展示结构，不产生外部副作用。 */
+/** 按中文年月日和时分展示时间，非法日期保留原文本。 */
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -259,31 +261,31 @@ function formatDate(value) {
   }).format(date);
 }
 
-/** commentInitial 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 取用户名首字符作头像占位，缺失时使用用户二字。 */
 function commentInitial(name) {
   return (name || '用户').trim().slice(0, 1).toUpperCase();
 }
 
-/** 响应 backToBlogs 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 返回全部博客列表。 */
 function backToBlogs() {
   router.push('/allBlogs');
 }
 
-/** 响应 goToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 提示互动需要 USER 身份并进入登录页。 */
 function goToLogin() {
   ElMessage.warning('登录后即可收藏博客和参与评论');
   router.push('/login');
 }
 
-/** 响应 closeCatalogAfterNavigation 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 把目录关闭安排在当前点击事件之后，先让章节导航完成。 */
 function closeCatalogAfterNavigation() {
-  /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
+  /** 在下一次任务中关闭目录浮层；这是一次性延迟，未登记取消句柄。 */
   window.setTimeout(() => {
     catalogOpen.value = false;
   }, 0);
 }
 
-/** 读取 loadBlog 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 重置旧详情和评论后按路由 ID 读取博客；仅已审核博客加载评论，USER 还会查询收藏状态。 */
 async function loadBlog() {
   const blogId = String(route.query.blogId || '');
   blogData.value = null;
@@ -325,7 +327,7 @@ async function loadBlog() {
   }
 }
 
-/** 响应 toggleCollect 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 为已登录用户增加或取消当前博客收藏，后端明确成功后才切换展示状态。 */
 async function toggleCollect() {
   if (!blogData.value?.blogId || !loggedIn.value) return;
   try {
@@ -344,13 +346,13 @@ async function toggleCollect() {
   }
 }
 
-/** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 委托共享评论状态提交回复，成功时提示。 */
 async function reply(fatherId) {
   const succeeded = await commentThread.reply(fatherId);
   if (succeeded) ElMessage.success('回复成功');
 }
 
-/** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 委托共享评论状态提交顶层评论，成功时提示。 */
 async function comment() {
   const succeeded = await commentThread.comment();
   if (succeeded) ElMessage.success('评论成功');
@@ -362,7 +364,7 @@ async function deleteOwnComment(commentItem) {
   if (succeeded) ElMessage.success('评论已删除');
 }
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 首次进入及博客 ID 变化时重新加载博客详情。 */
 watch(() => route.query.blogId, loadBlog, { immediate: true });
 </script>
 

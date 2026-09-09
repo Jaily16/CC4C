@@ -10,9 +10,7 @@ import java.util.Collection;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 
-/**
- * Cc4cSessionAuthenticationToken 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 持久化已认证业务身份、权限和 details；JSON 恢复使用显式构造器，永不保存登录密码。 */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 @JsonIgnoreProperties(ignoreUnknown = true)
 final class Cc4cSessionAuthenticationToken extends AbstractAuthenticationToken {
@@ -22,11 +20,11 @@ final class Cc4cSessionAuthenticationToken extends AbstractAuthenticationToken {
     private final Cc4cPrincipal principal;
 
     /**
-     * 创建 Cc4cSessionAuthenticationToken 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 恢复 Principal、权限及 details，并将会话 Token 标记为已认证。
      *
-     * @param principal 调用方提供的 {@code principal} 值
-     * @param authorities 调用方提供的 {@code authorities} 值
-     * @param details 调用方提供的 {@code details} 值
+     * @param principal 已认证的业务身份快照
+     * @param authorities 认证身份拥有的权限集合
+     * @param details 可空的认证附加信息，不应包含密码
      */
     @JsonCreator
     Cc4cSessionAuthenticationToken(
@@ -40,19 +38,19 @@ final class Cc4cSessionAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     /**
-     * 创建 Cc4cSessionAuthenticationToken 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 使用空 details 创建已认证会话 Token。
      *
-     * @param principal 调用方提供的 {@code principal} 值
-     * @param authorities 调用方提供的 {@code authorities} 值
+     * @param principal 已认证的业务身份快照
+     * @param authorities 认证身份拥有的权限集合
      */
     Cc4cSessionAuthenticationToken(Cc4cPrincipal principal, Collection<? extends GrantedAuthority> authorities) {
         this(principal, authorities, null);
     }
 
     /**
-     * 读取认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 会话 Token 不保存登录凭据。
      *
-     * @return 当前操作产生的 Object 结果
+     * @return 始终为空
      */
     @Override
     @JsonIgnore
@@ -61,9 +59,9 @@ final class Cc4cSessionAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     /**
-     * 读取认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 返回会话中保存的业务身份快照。
      *
-     * @return 当前操作产生的 Cc4cPrincipal 结果
+     * @return 业务 Principal
      */
     @Override
     public Cc4cPrincipal getPrincipal() {

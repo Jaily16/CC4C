@@ -1,27 +1,23 @@
 package com.cc4c.service;
 
-/**
- * 定义课程目录跨模块调用所需的稳定能力边界。
- */
+/** 向其他业务提供语言、课程存在性查询及课程热度缓存失效入口。 */
 public interface CatalogLookup {
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 检查未删除的语言是否存在。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param languageId 语言 ID
+     * @return 语言存在时为 true
      */
     boolean languageExists(int languageId);
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 检查未删除的课程是否存在。
      *
-     * @param courseId 目标对象的稳定标识
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param courseId 课程 ID
+     * @return 课程存在时为 true
      */
     boolean courseExists(int courseId);
 
-    /**
-     * 删除或失效当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 在当前事务提交后使课程首页热度缓存失效。 */
     void invalidateCoursePopularity();
 }

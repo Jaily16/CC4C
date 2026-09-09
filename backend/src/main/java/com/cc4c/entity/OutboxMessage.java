@@ -5,29 +5,29 @@ import com.cc4c.support.messaging.OutboxStatus;
 import java.time.Instant;
 
 /**
- * OutboxMessage 以不可变结构承载共享基础设施数据，并保持现有字段语义。
+ * Outbox 持久化记录的读取快照，包含投递状态、重试计数和加密载荷元数据。
  *
- * @param id 调用方提供的 {@code id} 值
- * @param eventId 异步事件的全局唯一标识
- * @param correlationId 目标对象的稳定标识
- * @param schemaVersion 调用方提供的 {@code schemaVersion} 值
- * @param eventType 带版本的异步事件类型
- * @param aggregateType 调用方提供的 {@code aggregateType} 值
- * @param aggregateId 目标对象的稳定标识
- * @param routingKey 调用方提供的 {@code routingKey} 值
- * @param generation 调用方提供的 {@code generation} 值
- * @param status 当前对象或流程的有限状态
- * @param publishAttempts 调用方提供的 {@code publishAttempts} 值
- * @param consumeAttempts 调用方提供的 {@code consumeAttempts} 值
- * @param payloadKeyId 目标对象的稳定标识
- * @param payloadNonce 调用方提供的 {@code payloadNonce} 值
- * @param payloadCiphertext 调用方提供的 {@code payloadCiphertext} 值
- * @param occurredAt 当前操作使用的时间点
- * @param expiresAt 当前操作使用的时间点
- * @param createdAt 当前操作使用的时间点
- * @param updatedAt 当前操作使用的时间点
- * @param failedAt 当前操作使用的时间点
- * @param errorCode 调用方提供的 {@code errorCode} 值
+ * @param id Outbox 数据库记录主键
+ * @param eventId 异步事件唯一标识
+ * @param correlationId 贯穿请求和消息处理的关联 ID
+ * @param schemaVersion 消息信封模式版本
+ * @param eventType 带版本的事件类型
+ * @param aggregateType 关联业务聚合类型
+ * @param aggregateId 关联业务聚合标识
+ * @param routingKey RabbitMQ 发布路由键
+ * @param generation 人工恢复后递增的消息代次
+ * @param status 消息当前投递状态
+ * @param publishAttempts 已尝试发布次数
+ * @param consumeAttempts 已尝试消费次数
+ * @param payloadKeyId 加密载荷使用的密钥标识
+ * @param payloadNonce 加密载荷的随机 nonce 字节
+ * @param payloadCiphertext 加密后的载荷字节
+ * @param occurredAt 业务事件发生时间
+ * @param expiresAt 消息业务有效期截止时间
+ * @param createdAt 记录创建时间
+ * @param updatedAt 记录最近更新时间
+ * @param failedAt 记录失败时间
+ * @param errorCode 可展示的失败分类码
  */
 public record OutboxMessage(
         long id,
@@ -52,9 +52,9 @@ public record OutboxMessage(
         Instant failedAt,
         String errorCode) {
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 将事件版本、代次和加密载荷装入信封；信封构造器复制载荷字节，不执行解密。
      *
-     * @return 当前操作产生的 MessageEnvelope 结果
+     * @return 用于发布的消息信封
      */
     public MessageEnvelope envelope() {
         return new MessageEnvelope(

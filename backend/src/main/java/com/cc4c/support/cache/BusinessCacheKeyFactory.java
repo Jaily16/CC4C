@@ -15,7 +15,7 @@ public final class BusinessCacheKeyFactory {
     /**
      * 使用配置中的业务缓存命名空间创建键工厂。
      *
-     * @param namespace 调用方提供的 {@code namespace} 值
+     * @param namespace 与业务 Session 隔离的缓存命名空间
      */
     public BusinessCacheKeyFactory(String namespace) {
         this.namespace = namespace;
@@ -24,8 +24,8 @@ public final class BusinessCacheKeyFactory {
     /**
      * 返回指定区域的代际键。
      *
-     * @param region 调用方提供的 {@code region} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param region 已校验格式的缓存分区
+     * @return 由命名空间、v1、分区及 generation 组成的键
      */
     public String generationKey(String region) {
         validateRegion(region);
@@ -35,10 +35,10 @@ public final class BusinessCacheKeyFactory {
     /**
      * 返回带当前代际和逻辑键摘要的数据键。
      *
-     * @param region 调用方提供的 {@code region} 值
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param logicalKey 调用方提供的 {@code logicalKey} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param region 已校验格式的缓存分区
+     * @param generation 分区当前代次字符串
+     * @param logicalKey 分区内的原始逻辑查询键
+     * @return 带 SHA-256 逻辑摘要的数据键
      */
     public String dataKey(String region, String generation, String logicalKey) {
         validateRegion(region);
@@ -48,17 +48,17 @@ public final class BusinessCacheKeyFactory {
     /**
      * 返回分布式互斥锁键。
      *
-     * @param dataKey 调用方提供的 {@code dataKey} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param dataKey 已解析的完整数据键
+     * @return 数据键追加 :lock 后的锁键
      */
     public String lockKey(String dataKey) {
         return dataKey + ":lock";
     }
 
     /**
-     * 校验 BusinessCacheKeyFactory 中与 validateRegion 对应的前置条件，不满足时沿用既有失败语义。
+     * 要求分区为 2 至 80 字符的小写字母、数字、冒号或连字符组合。
      *
-     * @param region 调用方提供的 {@code region} 值
+     * @param region 已校验格式的缓存分区
      */
     private void validateRegion(String region) {
         if (region == null || !region.matches("[a-z0-9:-]{2,80}")) {
@@ -67,10 +67,10 @@ public final class BusinessCacheKeyFactory {
     }
 
     /**
-     * 执行 BusinessCacheKeyFactory 中的 sha256 职责，并保持既有权限、事务与副作用边界。
+     * 对逻辑键 UTF-8 字节计算 SHA-256，避免将原始查询条件放入数据键。
      *
-     * @param value 调用方提供的 {@code value} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param value 待摘要化的非空逻辑键
+     * @return 小写十六进制摘要
      */
     private String sha256(String value) {
         try {

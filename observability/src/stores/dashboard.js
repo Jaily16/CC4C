@@ -3,10 +3,11 @@ import { defineStore } from 'pinia';
 import { safeMessage } from '@/api/client.js';
 import { fetchDashboard } from '@/api/observability.js';
 
-/** useDashboardStore 集中维护本领域的加载、成功、失败和会话状态，供页面共享。 */
+/** 保存当前仪表板响应和加载错误，向页面共享最近一次成功取得的数据。 */
 export const useDashboardStore = defineStore('observability-dashboard', {
   state: () => ({ data: null, loading: false, error: null }),
   actions: {
+    /** 读取指定仪表板和时间范围；取消不显示错误，其他失败保留旧数据并记录受控提示。 */
     async load(dashboardId, range, signal) {
       this.loading = true;
       this.error = null;

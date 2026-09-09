@@ -12,19 +12,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * AsyncMessageOperations 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 查询消息摘要并执行业务约束下的人工恢复或忽略，依靠状态和旧代次条件防止并发覆盖。 */
 @Service
 public class AsyncMessageOperations {
     private final OutboxRepository repository;
     private final MessagePayloadCipher cipher;
 
     /**
-     * 创建 AsyncMessageOperations 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Outbox 仓库及恢复时重新加密的载荷密码器。
      *
-     * @param repository 由容器注入的 OutboxRepository 协作组件
-     * @param cipher 调用方提供的 {@code cipher} 值
+     * @param repository Outbox 持久化仓库
+     * @param cipher AES-GCM 载荷加解密器
      */
     AsyncMessageOperations(OutboxRepository repository, MessagePayloadCipher cipher) {
         this.repository = repository;
@@ -32,12 +30,12 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 查询并返回 AsyncMessageOperations 中与 find 对应的数据，不改变业务状态。
+     * 规范化可选状态并校验事件类型白名单，再分页查询消息摘要。
      *
-     * @param statusValue 调用方提供的 {@code statusValue} 值
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param statusValue 可选的消息状态筛选
+     * @param eventType 三个 v1 事件类型之一
+     * @param query 从 1 起算的页码与页大小
+     * @return 不含载荷的消息摘要页
      */
     public PageResult<AsyncMessageSummary> find(String statusValue, String eventType, PageQuery query) {
         OutboxStatus status = null;
@@ -53,10 +51,10 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 执行 AsyncMessageOperations 中的 retry 职责，并保持既有权限、事务与副作用边界。
+     * 只恢复可恢复状态且收件人可用、验证码未过期的事件；解密旧载荷，递增代次并以活动密钥重新加密后条件更新。
      *
-     * @param eventId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param eventId 异步事件唯一标识
+     * @return 恢复到 PENDING 成功时为 true
      */
     @Transactional
     public boolean retry(String eventId) {
@@ -90,11 +88,11 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 执行 AsyncMessageOperations 中的 ignore 职责，并保持既有权限、事务与副作用边界。
+     * 仅允许忽略可恢复失败状态，按旧代次条件更新并记录管理员 ID。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param actorId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param eventId 异步事件唯一标识
+     * @param actorId 执行人工操作的管理员 ID
+     * @return 忽略成功时为 true
      */
     @Transactional
     public boolean ignore(String eventId, String actorId) {
@@ -110,10 +108,10 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 校验 AsyncMessageOperations 中与 required 对应的前置条件，不满足时沿用既有失败语义。
+     * 按事件 ID 加载 Outbox 记录，不存在时抛出 404。
      *
-     * @param eventId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventId 异步事件唯一标识
+     * @return 存在的 Outbox 记录
      */
     private OutboxMessage required(String eventId) {
         return repository
@@ -123,10 +121,10 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 按 AsyncMessageOperations 的既定规则转换输入，不记录凭据或敏感原文。
+     * 空筛选返回空值；非空值去空白后必须属于三个固定 v1 事件类型。
      *
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventType 三个 v1 事件类型之一
+     * @return 允许的事件类型或空值
      */
     private String normalizeType(String eventType) {
         if (eventType == null || eventType.isBlank()) {
@@ -145,9 +143,9 @@ public class AsyncMessageOperations {
     }
 
     /**
-     * 执行 AsyncMessageOperations 中的 stateChanged 职责，并保持既有权限、事务与副作用边界。
+     * 构造提示刷新后再操作的 409 并发状态冲突异常。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 状态或代次已变化的业务异常
      */
     private BusinessException stateChanged() {
         return new BusinessException(

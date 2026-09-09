@@ -20,16 +20,14 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OpenApiConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
- */
+/** 补充 OpenAPI 的错误响应、创建状态码及业务和观测安全要求；仅生成文档描述。 */
 @Configuration
 public class OpenApiConfiguration {
 
     /**
-     * 执行 OpenApiConfiguration 中的 cc4cOpenApi 职责，并保持既有权限、事务与副作用边界。
+     * 创建接口描述的标题、描述和已有契约版本元数据。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return OpenAPI 基础描述对象
      */
     @Bean
     OpenAPI cc4cOpenApi() {
@@ -38,9 +36,9 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 执行 OpenApiConfiguration 中的 cc4cResponseDocumentation 职责，并保持既有权限、事务与副作用边界。
+     * 按路径补充 201、通用错误、两套 Cookie/CSRF 要求及请求关联响应头。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 接口描述生成时使用的定制器
      */
     @Bean
     OpenApiCustomizer cc4cResponseDocumentation() {
@@ -153,10 +151,10 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 校验 OpenApiConfiguration 中与 requiresCsrf 对应的前置条件，不满足时沿用既有失败语义。
+     * 判断文档中的业务写方法是否需声明 CSRF 请求头。
      *
-     * @param method 调用方提供的 {@code method} 值
-     * @return 当前条件是否成立
+     * @param method OpenAPI 中的 HTTP 方法
+     * @return POST、PUT、DELETE 或 PATCH 时为 true
      */
     private boolean requiresCsrf(io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         return method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST
@@ -166,10 +164,10 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 校验 OpenApiConfiguration 中与 requiresObservabilitySession 对应的前置条件，不满足时沿用既有失败语义。
+     * 排除观测 CSRF、登录和会话探测入口，其余观测路径声明独立会话要求。
      *
-     * @param path 调用方提供的 {@code path} 值
-     * @return 当前条件是否成立
+     * @param path OpenAPI 接口路径
+     * @return 该路径是否需在文档中标记观测会话
      */
     private boolean requiresObservabilitySession(String path) {
         return !Set.of("/observability/auth/csrf", "/observability/auth/login", "/observability/auth/session")
@@ -177,11 +175,11 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 校验 OpenApiConfiguration 中与 requiresObservabilityCsrf 对应的前置条件，不满足时沿用既有失败语义。
+     * 仅为观测登录和退出的 POST 请求声明独立 CSRF 要求。
      *
-     * @param path 调用方提供的 {@code path} 值
-     * @param method 调用方提供的 {@code method} 值
-     * @return 当前条件是否成立
+     * @param path OpenAPI 接口路径
+     * @param method OpenAPI 中的 HTTP 方法
+     * @return 该操作是否需观测 CSRF 请求头
      */
     private boolean requiresObservabilityCsrf(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         return method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST
@@ -190,11 +188,11 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 校验 OpenApiConfiguration 中与 requiresSession 对应的前置条件，不满足时沿用既有失败语义。
+     * 按业务路径及方法判断会话文档要求，排除公开读取和注册、登录、重置等入口。
      *
-     * @param path 调用方提供的 {@code path} 值
-     * @param method 调用方提供的 {@code method} 值
-     * @return 当前条件是否成立
+     * @param path OpenAPI 接口路径
+     * @param method OpenAPI 中的 HTTP 方法
+     * @return 该操作是否需在文档中标记业务会话
      */
     private boolean requiresSession(String path, io.swagger.v3.oas.models.PathItem.HttpMethod method) {
         if (method == io.swagger.v3.oas.models.PathItem.HttpMethod.GET
@@ -227,9 +225,9 @@ public class OpenApiConfiguration {
     }
 
     /**
-     * 执行 OpenApiConfiguration 中的 errorResponseSchema 职责，并保持既有权限、事务与副作用边界。
+     * 声明通用错误响应的 code、data 和 msg 字段结构。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 用于 ApiErrorResponse 组件的对象模式
      */
     private Schema<?> errorResponseSchema() {
         return new ObjectSchema()

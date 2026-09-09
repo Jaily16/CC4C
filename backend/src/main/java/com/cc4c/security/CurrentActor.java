@@ -2,28 +2,26 @@ package com.cc4c.security;
 
 import java.util.Optional;
 
-/**
- * CurrentActor 定义身份认证协作方必须实现的稳定契约。
- */
+/** 向业务服务提供当前身份及严格区分 USER、ADMIN 的必需身份读取。 */
 public interface CurrentActor {
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 读取当前已认证的 CC4C 业务身份。
      *
-     * @return 存在时返回目标值，否则返回空的 Optional
+     * @return 业务身份快照，未认证或非业务身份时为空 Optional
      */
     Optional<ActorIdentity> current();
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 要求当前身份为 USER，并将其 ID 解析为 long。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 当前用户 ID
      */
     long requiredUserId();
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 要求当前身份为 ADMIN。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return 当前管理员编号
      */
     String requiredAdministratorId();
 }

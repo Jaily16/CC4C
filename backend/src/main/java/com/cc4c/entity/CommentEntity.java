@@ -8,9 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.util.Date;
 import lombok.Data;
 
-/**
- * 映射收藏与评论数据库记录，字段语义与现有表结构保持一致。
- */
+/** 映射 comment 表中的评论正文、作者、时间和点赞数；逻辑删除由 MyBatis-Plus 处理。 */
 @Data
 @TableName("comment")
 public class CommentEntity {

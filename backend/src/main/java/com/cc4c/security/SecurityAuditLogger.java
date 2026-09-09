@@ -4,30 +4,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * SecurityAuditLogger 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 记录认证及身份操作审计；登录标识和来源地址使用 HMAC 摘要，操作审计保留业务 actor ID。 */
 @Component
 public final class SecurityAuditLogger {
     private static final Logger log = LoggerFactory.getLogger(SecurityAuditLogger.class);
     private final SecurityKeyHasher hasher;
 
     /**
-     * 创建 SecurityAuditLogger 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入安全标识摘要服务，避免将来源地址与登录标识原文写入日志。
      *
-     * @param hasher 调用方提供的 {@code hasher} 值
+     * @param hasher 带秘密 pepper 的 HMAC 摘要服务
      */
     public SecurityAuditLogger(SecurityKeyHasher hasher) {
         this.hasher = hasher;
     }
 
     /**
-     * 执行 SecurityAuditLogger 中的 authentication 职责，并保持既有权限、事务与副作用边界。
+     * 记录角色、认证结果及登录标识和远端地址的摘要。
      *
-     * @param role 调用方提供的 {@code role} 值
-     * @param identifier 调用方提供的 {@code identifier} 值
-     * @param result 调用方提供的 {@code result} 值
-     * @param remoteAddress 调用方提供的 {@code remoteAddress} 值
+     * @param role 审计所属身份角色
+     * @param identifier 待摘要化的登录标识
+     * @param result 审计结果分类
+     * @param remoteAddress 待摘要化的请求远端地址
      */
     public void authentication(String role, String identifier, String result, String remoteAddress) {
         log.atInfo()
@@ -41,13 +39,13 @@ public final class SecurityAuditLogger {
     }
 
     /**
-     * 执行 SecurityAuditLogger 中的 action 职责，并保持既有权限、事务与副作用边界。
+     * 记录动作、角色、业务身份 ID、结果及远端地址摘要；actor ID 不做哈希转换。
      *
-     * @param action 调用方提供的 {@code action} 值
-     * @param role 调用方提供的 {@code role} 值
-     * @param actorId 目标对象的稳定标识
-     * @param result 调用方提供的 {@code result} 值
-     * @param remoteAddress 调用方提供的 {@code remoteAddress} 值
+     * @param action 身份操作名称
+     * @param role 审计所属身份角色
+     * @param actorId 写入审计的业务身份 ID
+     * @param result 审计结果分类
+     * @param remoteAddress 待摘要化的请求远端地址
      */
     public void action(String action, String role, String actorId, String result, String remoteAddress) {
         log.atInfo()

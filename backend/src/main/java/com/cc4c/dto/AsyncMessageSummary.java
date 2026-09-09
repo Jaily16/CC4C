@@ -6,20 +6,20 @@ import com.cc4c.support.messaging.OutboxStatus;
 import java.time.Instant;
 
 /**
- * 以不可变结构承载共享基础设施计算或查询结果。
+ * 供管理页面查询的异步消息摘要；不包含收件地址或加密载荷。
  *
- * @param eventId 异步事件的全局唯一标识
- * @param eventType 带版本的异步事件类型
- * @param aggregateType 调用方提供的 {@code aggregateType} 值
- * @param aggregateId 目标对象的稳定标识
- * @param status 当前对象或流程的有限状态
- * @param publishAttempts 调用方提供的 {@code publishAttempts} 值
- * @param consumeAttempts 调用方提供的 {@code consumeAttempts} 值
- * @param createdAt 当前操作使用的时间点
- * @param updatedAt 当前操作使用的时间点
- * @param failedAt 当前操作使用的时间点
- * @param errorCode 调用方提供的 {@code errorCode} 值
- * @param recoverable 调用方提供的 {@code recoverable} 值
+ * @param eventId 异步事件唯一标识
+ * @param eventType 带版本的事件类型
+ * @param aggregateType 关联业务聚合类型
+ * @param aggregateId 关联业务聚合标识
+ * @param status 消息当前投递状态
+ * @param publishAttempts 已尝试发布次数
+ * @param consumeAttempts 已尝试消费次数
+ * @param createdAt 记录创建时间
+ * @param updatedAt 记录最近更新时间
+ * @param failedAt 记录失败时间
+ * @param errorCode 可展示的失败分类码
+ * @param recoverable 当前消息是否满足人工恢复条件
  */
 public record AsyncMessageSummary(
         String eventId,
@@ -35,10 +35,10 @@ public record AsyncMessageSummary(
         String errorCode,
         boolean recoverable) {
     /**
-     * 转换可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 从 Outbox 记录生成管理摘要；过期验证码及收件人不可用的消息不允许恢复。
      *
-     * @param message 当前处理的消息或用户提示
-     * @return 当前操作产生的 AsyncMessageSummary 结果
+     * @param message 待展示的 Outbox 记录
+     * @return 不含载荷的消息摘要
      */
     public static AsyncMessageSummary from(OutboxMessage message) {
         boolean expiredVerification = AsyncEventTypes.VERIFICATION_EMAIL_REQUESTED.equals(message.eventType())

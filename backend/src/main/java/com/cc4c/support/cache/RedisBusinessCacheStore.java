@@ -19,9 +19,7 @@ import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
-/**
- * 定义或实现共享基础设施状态的基础设施存取边界。
- */
+/** 使用独立 Lettuce 连接实现缓存原子操作，并记录每类 Redis 操作耗时及结果。 */
 public final class RedisBusinessCacheStore implements BusinessCacheStore, InitializingBean, DisposableBean {
     private static final Duration IO_TIMEOUT = Duration.ofSeconds(2);
     private static final DefaultRedisScript<Long> COMPARE_AND_DELETE = new DefaultRedisScript<>(
@@ -39,28 +37,26 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     private StringRedisTemplate template;
 
     /**
-     * 创建 RedisBusinessCacheStore 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 委托主构造器并使用禁用指标实现。
      *
-     * @param redisUrl 调用方提供的 {@code redisUrl} 值
+     * @param redisUrl 缓存 Redis 地址，可含凭据，不得记录
      */
     RedisBusinessCacheStore(String redisUrl) {
         this(redisUrl, Cc4cMetrics.disabled());
     }
 
     /**
-     * 创建 RedisBusinessCacheStore 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存 Redis 地址及指标，实际连接初始化留给容器生命周期回调。
      *
-     * @param redisUrl 调用方提供的 {@code redisUrl} 值
-     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param redisUrl 缓存 Redis 地址，可含凭据，不得记录
+     * @param metrics 缓存 Redis 操作指标记录器
      */
     public RedisBusinessCacheStore(String redisUrl, Cc4cMetrics metrics) {
         this.redisUrl = redisUrl;
         this.metrics = metrics;
     }
 
-    /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
-     */
+    /** 解析 redis/rediss 地址、凭据和库号，创建两秒连接及命令超时的独立连接工厂。 */
     @Override
     public void afterPropertiesSet() {
         URI uri = URI.create(redisUrl);
@@ -97,10 +93,10 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 读取业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 读取 Redis 字符串键并记录操作结果。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @return 按当前协议生成或读取的字符串值
+     * @param key 完整缓存数据键
+     * @return 键值，不存在时为空
      */
     @Override
     public String get(String key) {
@@ -108,11 +104,11 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 向 Redis 写入字符串及指定 TTL，并记录操作结果。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param value 待处理或存储的值
-     * @param ttl 正向值的有效期
+     * @param key 完整缓存数据键
+     * @param value 待封装或存储的缓存值
+     * @param ttl 本次写入的基础有效期
      */
     @Override
     public void set(String key, String value, Duration ttl) {
@@ -123,12 +119,12 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 以 Redis 原子条件写入值及 TTL，只有键不存在时成功。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param value 待处理或存储的值
-     * @param ttl 正向值的有效期
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param key 完整缓存数据键
+     * @param value 待封装或存储的缓存值
+     * @param ttl 本次写入的基础有效期
+     * @return Redis 明确报告写入成功时为 true
      */
     @Override
     public boolean setIfAbsent(String key, String value, Duration ttl) {
@@ -138,10 +134,10 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 记录业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 原子增加 Redis 整型值，未返回计数时抛出异常。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @return 按当前规则计算或读取的数值
+     * @param key 完整缓存数据键
+     * @return 增加后的计数
      */
     @Override
     public long increment(String key) {
@@ -153,9 +149,9 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 删除指定 Redis 键并记录操作结果。
      *
-     * @param key 当前存取操作使用的稳定键
+     * @param key 完整缓存数据键
      */
     @Override
     public void delete(String key) {
@@ -166,11 +162,11 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 通过 Lua 比较预期令牌并原子删除匹配键。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param expectedValue 调用方提供的 {@code expectedValue} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param key 完整缓存数据键
+     * @param expectedValue 仅允许删除匹配此令牌的键
+     * @return 脚本实际删除键时为 true
      */
     @Override
     public boolean compareAndDelete(String key, String expectedValue) {
@@ -180,10 +176,10 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 以 SCAN 匹配前缀并每 200 个键批量删除；退出时关闭游标和连接，异常记录后传播。
      *
-     * @param prefix 调用方提供的 {@code prefix} 值
-     * @return 按当前规则计算或读取的数值
+     * @param prefix 调用方批准的隔离键前缀
+     * @return 实际删除键数量
      */
     @Override
     public long deleteByPrefix(String prefix) {
@@ -217,9 +213,9 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 获取独立缓存连接执行 PING，退出时关闭本次连接。
      *
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @return 响应为 PONG 时为 true
      */
     @Override
     public boolean ping() {
@@ -230,9 +226,7 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
         });
     }
 
-    /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
-     */
+    /** 销毁已创建的缓存连接工厂；尚未初始化时无需处理。 */
     @Override
     public void destroy() {
         if (connectionFactory != null) {
@@ -241,10 +235,10 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 从 URL 用户信息解析仅密码或用户名:密码形式，并设置独立 Redis 配置。
      *
-     * @param uri 调用方提供的 {@code uri} 值
-     * @param standalone 调用方提供的 {@code standalone} 值
+     * @param uri 已解析的 Redis 连接 URI
+     * @param standalone 待填充的独立 Redis 连接配置
      */
     private void configureCredentials(URI uri, RedisStandaloneConfiguration standalone) {
         String userInfo = uri.getUserInfo();
@@ -265,10 +259,10 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 将 URL 路径解析为 Redis 库号；无路径或根路径保持默认，非数字路径拒绝初始化。
      *
-     * @param uri 调用方提供的 {@code uri} 值
-     * @param standalone 调用方提供的 {@code standalone} 值
+     * @param uri 已解析的 Redis 连接 URI
+     * @param standalone 待填充的独立 Redis 连接配置
      */
     private void configureDatabase(URI uri, RedisStandaloneConfiguration standalone) {
         String path = uri.getPath();
@@ -283,12 +277,12 @@ public final class RedisBusinessCacheStore implements BusinessCacheStore, Initia
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 计时执行 Redis 操作，记录成功或运行异常结果；异常不在存储层旁路。
      *
-     * @param <T> 方法使用的类型参数
-     * @param operation 调用方提供的 {@code operation} 值
-     * @param action 调用方提供的 {@code action} 值
-     * @return 当前操作产生的 T 结果
+     * @param <T> 缓存值的数据类型
+     * @param operation 低基数缓存操作分类
+     * @param action 执行单次 Redis 操作的回调
+     * @return 底层操作返回值
      */
     private <T> T observe(String operation, java.util.function.Supplier<T> action) {
         long startedNanos = metrics.start();

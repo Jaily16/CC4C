@@ -8,18 +8,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 装配共享基础设施运行组件，并集中声明安全或基础设施策略。
- */
+/** 校验业务缓存与 Session 的 Redis 命名空间隔离，并按开关装配缓存连接。 */
 @Configuration(proxyBeanMethods = false)
 class BusinessCacheConfiguration {
 
     // 即使禁用缓存也校验隔离身份，避免下一次启用时复用 Session 命名空间。
     /**
-     * 创建 BusinessCacheConfiguration 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 启动时拒绝缺失、非法或与 Session 相同的缓存命名空间；禁用缓存时仍执行校验。
      *
-     * @param properties 由容器注入的 BusinessCacheProperties 协作组件
-     * @param sessionNamespace 调用方提供的 {@code sessionNamespace} 值
+     * @param properties 对应组件的类型化配置
+     * @param sessionNamespace 业务 Session 的 Redis 命名空间
      */
     BusinessCacheConfiguration(
             BusinessCacheProperties properties, @Value("${spring.session.redis.namespace:}") String sessionNamespace) {
@@ -39,11 +37,11 @@ class BusinessCacheConfiguration {
     }
 
     /**
-     * 创建并配置 BusinessCacheConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 缓存开启时使用指定 Redis 地址创建独立连接的缓存存储。
      *
-     * @param metrics 调用方提供的 {@code metrics} 值
-     * @param redisUrl 调用方提供的 {@code redisUrl} 值
-     * @return 当前操作产生的 BusinessCacheStore 结果
+     * @param metrics 统一指标记录器
+     * @param redisUrl 缓存连接使用的 Redis 地址，不得记录凭据
+     * @return 带缓存指标的 Redis 存储
      */
     @Bean
     @ConditionalOnProperty(prefix = "cc4c.cache", name = "enabled", havingValue = "true")

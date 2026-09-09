@@ -16,9 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
-/**
- * 协调独立观测门户用例及其持久化、安全和外部协作边界。
- */
+/** 为观测登录和退出签发双提交 CSRF 令牌，并校验精确 Origin 与请求头/Cookie 一致性。 */
 @Component
 public final class ObservabilityCsrfService {
     static final String COOKIE_NAME = "CC4C_OBSERVABILITY_XSRF_TOKEN";
@@ -28,19 +26,19 @@ public final class ObservabilityCsrfService {
     private final ObservabilityPortalProperties properties;
 
     /**
-     * 创建 ObservabilityCsrfService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存观测允许来源、Cookie 安全标志和令牌有效期配置。
      *
-     * @param properties 由容器注入的 ObservabilityPortalProperties 协作组件
+     * @param properties 观测身份及 Cookie 配置
      */
     ObservabilityCsrfService(ObservabilityPortalProperties properties) {
         this.properties = properties;
     }
 
     /**
-     * 判断观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 生成 32 字节安全随机令牌，以 URL 安全 Base64 写入观测 CSRF Cookie 并返回正文使用值。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 按当前协议生成或读取的字符串值
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
+     * @return 无填充的 CSRF 令牌
      */
     public String issue(HttpServletResponse response) {
         byte[] bytes = new byte[32];
@@ -51,9 +49,9 @@ public final class ObservabilityCsrfService {
     }
 
     /**
-     * 校验观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 要求 Origin 精确匹配，且专属请求头与 Cookie 都存在并通过常量时间字节比对。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
      */
     public void validate(HttpServletRequest request) {
         String origin = request.getHeader(HttpHeaders.ORIGIN);
@@ -71,19 +69,19 @@ public final class ObservabilityCsrfService {
     }
 
     /**
-     * 删除或失效观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 写入零有效期的观测 CSRF Cookie，使浏览器移除它。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
      */
     public void clear(HttpServletResponse response) {
         writeCookie(response, "", Duration.ZERO);
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 从请求中读取第一个名称匹配的观测 CSRF Cookie。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 按当前协议生成或读取的字符串值
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
+     * @return Cookie 值；不存在时为空
      */
     private String cookieValue(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
@@ -99,11 +97,11 @@ public final class ObservabilityCsrfService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 追加 HttpOnly、SameSite=Strict、路径为 /observability 的专属 CSRF Cookie。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @param value 待处理或存储的值
-     * @param maxAge 调用方提供的 {@code maxAge} 值
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
+     * @param value 待写入 Cookie 的令牌，清除时为空字符串
+     * @param maxAge Cookie 有效时长，清除时为零
      */
     private void writeCookie(HttpServletResponse response, String value, Duration maxAge) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, value)
@@ -117,9 +115,9 @@ public final class ObservabilityCsrfService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 构造不暴露具体失败项的 403 观测安全校验异常。
      *
-     * @return 当前操作产生的 BusinessException 结果
+     * @return 观测请求被拒绝的业务异常
      */
     private BusinessException forbidden() {
         return new BusinessException(HttpStatus.FORBIDDEN, BusinessCode.FORBIDDEN, "观测请求安全校验失败");

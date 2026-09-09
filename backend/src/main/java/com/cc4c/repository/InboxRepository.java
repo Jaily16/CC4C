@@ -10,31 +10,29 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 封装共享基础设施持久化、租约与状态更新操作，集中维护数据库语义。
- */
+/** 通过 JDBC 维护消费端幂等记录、处理租约及完成状态。 */
 @Repository
 public class InboxRepository {
     private final JdbcTemplate jdbc;
 
     /**
-     * 创建 InboxRepository 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入消费幂等记录使用的 JDBC 执行器。
      *
-     * @param jdbc 调用方提供的 {@code jdbc} 值
+     * @param jdbc 使用应用数据源的 JDBC 执行器
      */
     InboxRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 事务内插入或锁定消费者、事件和代次记录；完成记录不再领取，其他工作者的有效租约阻止抢占。
      *
-     * @param consumerName 调用方提供的 {@code consumerName} 值
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param workerId 目标对象的稳定标识
-     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
-     * @return 当前操作产生的 InboxClaim 结果
+     * @param consumerName 幂等记录所属消费者名称
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param workerId 领取租约的工作者标识
+     * @param leaseUntil 租约到期时间
+     * @return 已领取、已完成或其他工作者处理中
      */
     @Transactional
     public InboxClaim claim(String consumerName, String eventId, int generation, String workerId, Instant leaseUntil) {
@@ -93,12 +91,12 @@ public class InboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将指定消费代次置为 RETRY_WAIT，记录错误码并释放租约。
      *
-     * @param consumerName 调用方提供的 {@code consumerName} 值
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param consumerName 幂等记录所属消费者名称
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param errorCode 不含敏感正文的失败分类码
      */
     public void markRetryWaiting(String consumerName, String eventId, int generation, String errorCode) {
         jdbc.update(
@@ -114,11 +112,11 @@ public class InboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 标记消费完成、记录处理时间，清除错误码并释放租约。
      *
-     * @param consumerName 调用方提供的 {@code consumerName} 值
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param consumerName 幂等记录所属消费者名称
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
      */
     public void markDone(String consumerName, String eventId, int generation) {
         jdbc.update(
@@ -134,12 +132,12 @@ public class InboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 标记消费终止、记录处理时间和错误码，并释放租约。
      *
-     * @param consumerName 调用方提供的 {@code consumerName} 值
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param consumerName 幂等记录所属消费者名称
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param errorCode 不含敏感正文的失败分类码
      */
     public void markDead(String consumerName, String eventId, int generation, String errorCode) {
         jdbc.update(
@@ -156,11 +154,11 @@ public class InboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按处理时间删除截止时刻之前的 DONE 记录，最多删除指定条数。
      *
-     * @param before 调用方提供的 {@code before} 值
-     * @param limit 调用方提供的 {@code limit} 值
-     * @return 按当前规则计算或读取的数值
+     * @param before 严格早于此时间的记录才可清理
+     * @param limit 本次最多处理的记录数量
+     * @return 实际删除行数
      */
     public int cleanupDone(Instant before, int limit) {
         return jdbc.update(
@@ -174,9 +172,9 @@ public class InboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按 Inbox 状态统计记录数量。
      *
-     * @return 当前操作产生的 Map<String,Long> 结果
+     * @return 状态与数量的只读映射
      */
     public Map<String, Long> statusCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
@@ -187,11 +185,11 @@ public class InboxRepository {
     }
 
     /**
-     * 承载共享基础设施查询返回的一行投影数据。
+     * 领取时锁定读取的消费状态与租约信息。
      *
-     * @param status 当前对象或流程的有限状态
-     * @param leaseOwner 调用方提供的 {@code leaseOwner} 值
-     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
+     * @param status 消费状态
+     * @param leaseOwner 当前租约持有者标识
+     * @param leaseUntil 租约到期时间
      */
     private record InboxRow(String status, String leaseOwner, Instant leaseUntil) {}
 }

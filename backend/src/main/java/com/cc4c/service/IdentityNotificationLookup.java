@@ -3,15 +3,13 @@ package com.cc4c.service;
 import com.cc4c.dto.NotificationContact;
 import java.util.Optional;
 
-/**
- * 定义身份认证跨模块调用所需的稳定能力边界。
- */
+/** 向消息消费方提供内部通知联系方式查询。 */
 public interface IdentityNotificationLookup {
     /**
-     * 读取当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 按用户 ID 获取可用的通知邮箱。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 存在时返回目标值，否则返回空的 Optional
+     * @param userId 用户 ID
+     * @return 用户及非空邮箱存在时返回联系方式，否则为空 Optional
      */
     Optional<NotificationContact> findNotificationContact(long userId);
 }

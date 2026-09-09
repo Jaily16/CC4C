@@ -12,19 +12,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * TransactionalOutbox 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 要求参与已有业务事务，先绑定数据库毫秒精度元数据并加密，再将事件追加到 Outbox。 */
 @Component
 public class TransactionalOutbox {
     private final OutboxRepository repository;
     private final MessagePayloadCipher cipher;
 
     /**
-     * 创建 TransactionalOutbox 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Outbox 数据访问及消息载荷密码器。
      *
-     * @param repository 由容器注入的 OutboxRepository 协作组件
-     * @param cipher 调用方提供的 {@code cipher} 值
+     * @param repository Outbox 持久化仓库
+     * @param cipher AES-GCM 载荷加解密器
      */
     TransactionalOutbox(OutboxRepository repository, MessagePayloadCipher cipher) {
         this.repository = repository;
@@ -32,15 +30,15 @@ public class TransactionalOutbox {
     }
 
     /**
-     * 执行 TransactionalOutbox 中的 append 职责，并保持既有权限、事务与副作用边界。
+     * 在已有业务事务中追加初始 PENDING 的加密事件，不在当前请求直接发布。
      *
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param aggregateType 调用方提供的 {@code aggregateType} 值
-     * @param aggregateId 目标对象的稳定标识
-     * @param payload 调用方提供的 {@code payload} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventType 三个 v1 事件类型之一
+     * @param aggregateType 关联业务聚合类型
+     * @param aggregateId 关联业务聚合标识
+     * @param payload 待 JSON 编码并加密的业务载荷
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @return 新生成的事件 ID
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public String append(
@@ -55,16 +53,16 @@ public class TransactionalOutbox {
     }
 
     /**
-     * 执行 TransactionalOutbox 中的 appendPermanentFailure 职责，并保持既有权限、事务与副作用边界。
+     * 在已有事务中追加初始 DEAD 事件，保留永久失败原因而不申请发布。
      *
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param aggregateType 调用方提供的 {@code aggregateType} 值
-     * @param aggregateId 目标对象的稳定标识
-     * @param payload 调用方提供的 {@code payload} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventType 三个 v1 事件类型之一
+     * @param aggregateType 关联业务聚合类型
+     * @param aggregateId 关联业务聚合标识
+     * @param payload 待 JSON 编码并加密的业务载荷
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @param errorCode 不含敏感正文的失败分类码
+     * @return 新生成的事件 ID
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public String appendPermanentFailure(
@@ -80,17 +78,17 @@ public class TransactionalOutbox {
     }
 
     /**
-     * 执行 TransactionalOutbox 中的 append 职责，并保持既有权限、事务与副作用边界。
+     * 将时间对齐毫秒精度，生成事件 ID 并加密，插入记录；数据访问失败转为 503。
      *
-     * @param eventType 调用方提供的 {@code eventType} 值
-     * @param aggregateType 调用方提供的 {@code aggregateType} 值
-     * @param aggregateId 目标对象的稳定标识
-     * @param payload 调用方提供的 {@code payload} 值
-     * @param occurredAt 调用方提供的 {@code occurredAt} 值
-     * @param expiresAt 调用方提供的 {@code expiresAt} 值
-     * @param status 调用方提供的 {@code status} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param eventType 三个 v1 事件类型之一
+     * @param aggregateType 关联业务聚合类型
+     * @param aggregateId 关联业务聚合标识
+     * @param payload 待 JSON 编码并加密的业务载荷
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @param status 新记录的初始投递状态
+     * @param errorCode 不含敏感正文的失败分类码
+     * @return 本次追加的事件 ID
      */
     private String append(
             String eventType,
@@ -127,10 +125,10 @@ public class TransactionalOutbox {
     }
 
     /**
-     * 执行 TransactionalOutbox 中的 databaseTimestamp 职责，并保持既有权限、事务与副作用边界。
+     * 将时间截取为数据库使用的毫秒精度，确保加密 AAD 与持久化后读取值一致。
      *
-     * @param value 调用方提供的 {@code value} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param value 可空的待对齐精度时间
+     * @return 毫秒精度时间；输入为空时仍为空
      */
     private static Instant databaseTimestamp(Instant value) {
         return value == null ? null : Instant.ofEpochMilli(value.toEpochMilli());

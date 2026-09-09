@@ -24,9 +24,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.stereotype.Service;
 
-/**
- * AuthenticationService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 协调业务认证、限流审计和 Session 建立与注销，区分 USER 与 ADMIN 的空闲过期时间。 */
 @Service
 public final class AuthenticationService {
     private static final int USER_SESSION_SECONDS = 2 * 60 * 60;
@@ -40,14 +38,14 @@ public final class AuthenticationService {
     private final SecurityAuditLogger auditLogger;
 
     /**
-     * 创建 AuthenticationService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入认证管理器、会话策略及持久化仓库，并接入限流、CSRF 和审计服务。
      *
-     * @param authenticationManager 调用方提供的 {@code authenticationManager} 值
-     * @param sessionAuthenticationStrategy 调用方提供的 {@code sessionAuthenticationStrategy} 值
-     * @param securityContextRepository 由容器注入的 SecurityContextRepository 协作组件
-     * @param csrfTokenRepository 由容器注入的 CsrfTokenRepository 协作组件
-     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
-     * @param auditLogger 调用方提供的 {@code auditLogger} 值
+     * @param authenticationManager 业务认证管理器
+     * @param sessionAuthenticationStrategy 角色并发、会话固定攻击防护及注册策略
+     * @param securityContextRepository 业务会话安全上下文仓库
+     * @param csrfTokenRepository 业务 CSRF 令牌仓库
+     * @param rateLimiter 基于 Redis 的业务频率限制器
+     * @param auditLogger 不记录明文凭据的安全审计服务
      */
     AuthenticationService(
             AuthenticationManager authenticationManager,
@@ -65,26 +63,26 @@ public final class AuthenticationService {
     }
 
     /**
-     * 执行 AuthenticationService 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 以 USER 角色使用邮箱和密码执行登录流程。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @param password 调用方提供的敏感凭据，处理期间不得写入日志
-     * @param request 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前条件是否成立
+     * @param email 账户或验证码收件邮箱
+     * @param password 登录明文密码，不得记录
+     * @param request 当前 HTTP 请求，提供来源地址和会话
+     * @param response 接收会话及 CSRF Cookie 变更的 HTTP 响应
+     * @return 会话建立成功时为 true，失败抛出业务异常
      */
     public boolean loginUser(String email, String password, HttpServletRequest request, HttpServletResponse response) {
         return authenticate(AccountRole.USER, email, password, request, response);
     }
 
     /**
-     * 执行 AuthenticationService 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 以 ADMIN 角色使用管理员编号和密码执行登录流程。
      *
-     * @param adminId 目标对象的稳定标识
-     * @param password 调用方提供的敏感凭据，处理期间不得写入日志
-     * @param request 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前条件是否成立
+     * @param adminId 管理员编号
+     * @param password 登录明文密码，不得记录
+     * @param request 当前 HTTP 请求，提供来源地址和会话
+     * @param response 接收会话及 CSRF Cookie 变更的 HTTP 响应
+     * @return 会话建立成功时为 true，失败抛出业务异常
      */
     public boolean loginAdministrator(
             String adminId, String password, HttpServletRequest request, HttpServletResponse response) {
@@ -92,11 +90,11 @@ public final class AuthenticationService {
     }
 
     /**
-     * 执行 AuthenticationService 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 使现有业务 Session 失效并清除安全上下文和 CSRF Token；可识别身份时记录退出审计。
      *
-     * @param request 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前条件是否成立
+     * @param request 当前 HTTP 请求，提供来源地址和会话
+     * @param response 接收会话及 CSRF Cookie 变更的 HTTP 响应
+     * @return 注销流程完成后为 true
      */
     public boolean logout(HttpServletRequest request, HttpServletResponse response) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -120,14 +118,14 @@ public final class AuthenticationService {
     }
 
     /**
-     * 执行 AuthenticationService 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 先检查限流再认证，成功后废弃旧会话并保存新上下文；用户空闲期限两小时、管理员一小时。认证失败记录审计及限流计数并返回统一错误。
      *
-     * @param role 调用方提供的 {@code role} 值
-     * @param identifier 调用方提供的 {@code identifier} 值
-     * @param password 调用方提供的敏感凭据，处理期间不得写入日志
-     * @param request 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前条件是否成立
+     * @param role 待认证的 USER 或 ADMIN 角色
+     * @param identifier 用户邮箱或管理员编号
+     * @param password 登录明文密码，不得记录
+     * @param request 当前 HTTP 请求，提供来源地址和会话
+     * @param response 接收会话及 CSRF Cookie 变更的 HTTP 响应
+     * @return 认证及会话保存成功时为 true
      */
     private boolean authenticate(
             AccountRole role,

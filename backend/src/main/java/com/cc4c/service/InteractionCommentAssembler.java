@@ -12,26 +12,24 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * InteractionCommentAssembler 负责收藏与评论的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 批量加载最多两级回复并组装评论树，分页元数据只统计顶层评论。 */
 final class InteractionCommentAssembler {
     private final InteractionMapper mapper;
 
     /**
-     * 创建 InteractionCommentAssembler 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入批量回复查询 Mapper。
      *
-     * @param mapper 由容器注入的 InteractionMapper 协作组件
+     * @param mapper 批量评论与回复查询 Mapper
      */
     InteractionCommentAssembler(InteractionMapper mapper) {
         this.mapper = mapper;
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 保留顶层评论顺序，最多执行两轮批量回复查询并挂接父节点；空顶层页不查询回复。
      *
-     * @param topLevelPage 调用方提供的 {@code topLevelPage} 值
-     * @return 包含分页元数据的查询结果
+     * @param topLevelPage 只包含顶层评论的分页投影
+     * @return 带两级回复的顶层评论分页结果
      */
     PageResult<CommentResponse> assemble(IPage<CommentRow> topLevelPage) {
         Map<Long, MutableComment> topLevel = new LinkedHashMap<>();
@@ -66,14 +64,14 @@ final class InteractionCommentAssembler {
     }
 
     /**
-     * 转换当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 将新评论、作者及父评论信息合并为响应，子评论列表初始化为空。
      *
-     * @param comment 调用方提供的 {@code comment} 值
-     * @param user 调用方提供的 {@code user} 值
-     * @param fatherId 目标对象的稳定标识
-     * @param layer 调用方提供的 {@code layer} 值
-     * @param fatherName 调用方提供的 {@code fatherName} 值
-     * @return 当前操作产生的 CommentResponse 结果
+     * @param comment 新创建的评论实体
+     * @param user 评论作者的展示快照
+     * @param fatherId 父评论 ID；直接评论时为空
+     * @param layer 评论层级，顶层为 0、回复为 1 或 2
+     * @param fatherName 父评论作者昵称，可为空
+     * @return 新创建评论的展示响应
      */
     CommentResponse toCreatedResponse(
             CommentEntity comment, UserSnapshot user, Long fatherId, int layer, String fatherName) {
@@ -91,36 +89,34 @@ final class InteractionCommentAssembler {
                 List.of());
     }
 
-    /**
-     * MutableComment 负责收藏与评论的一项明确运行职责，并保持现有外部行为不变。
-     */
+    /** 组装阶段保存评论投影和可追加回复列表的内部节点。 */
     private static final class MutableComment {
         private final CommentRow row;
         private final List<MutableComment> replies = new ArrayList<>();
 
         /**
-         * 创建 MutableComment 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+         * 保存评论投影，回复列表由字段初始化为空。
          *
-         * @param row 调用方提供的 {@code row} 值
+         * @param row 当前评论的查询投影
          */
         private MutableComment(CommentRow row) {
             this.row = row;
         }
 
         /**
-         * 转换当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 由一条评论投影创建尚无子回复的组装节点。
          *
-         * @param row 调用方提供的 {@code row} 值
-         * @return 当前操作产生的 MutableComment 结果
+         * @param row 当前评论的查询投影
+         * @return 可挂接回复的内部节点
          */
         static MutableComment from(CommentRow row) {
             return new MutableComment(row);
         }
 
         /**
-         * 转换当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 递归投影已挂接回复，长整数 ID 转为字符串，缺失层级按顶层 0 表示。
          *
-         * @return 当前操作产生的 CommentResponse 结果
+         * @return 包含子评论的展示响应
          */
         CommentResponse toResponse() {
             return new CommentResponse(

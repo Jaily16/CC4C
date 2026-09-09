@@ -8,16 +8,14 @@ import com.cc4c.support.monitoring.MybatisMetricsInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * PersistenceConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
- */
+/** 装配 MySQL 分页限制及 MyBatis 指标拦截器。 */
 @Configuration
 public class PersistenceConfiguration {
 
     /**
-     * 执行 PersistenceConfiguration 中的 mybatisPlusInterceptor 职责，并保持既有权限、事务与副作用边界。
+     * 启用 MySQL 分页插件，限制每页最多 100 条并关闭越界页自动回到首页。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 包含分页插件的 MyBatis-Plus 拦截器
      */
     @Bean
     MybatisPlusInterceptor mybatisPlusInterceptor() {
@@ -31,10 +29,10 @@ public class PersistenceConfiguration {
     }
 
     /**
-     * 执行 PersistenceConfiguration 中的 mybatisMetricsInterceptor 职责，并保持既有权限、事务与副作用边界。
+     * 将统一指标记录器注入 MyBatis 查询拦截器。
      *
-     * @param metrics 调用方提供的 {@code metrics} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param metrics 统一指标记录器
+     * @return 记录 Mapper 耗时及结果的拦截器
      */
     @Bean
     MybatisMetricsInterceptor mybatisMetricsInterceptor(Cc4cMetrics metrics) {

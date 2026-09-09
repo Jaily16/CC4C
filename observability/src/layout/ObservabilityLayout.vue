@@ -18,10 +18,10 @@ const navigation = [
   { path: '/operations', label: '告警与依赖' },
 ];
 
-/** 从现有响应式状态派生 currentPath，不发起请求或写入外部数据。 */
+/** 取当前路由路径作为观测导航的选中项。 */
 const currentPath = computed(() => route.path);
 
-/** 处理 signOut 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 请求注销观测身份；无论请求成功与否均跳转登录页，Store 负责清空身份视图。 */
 async function signOut() {
   try {
     await auth.logout();

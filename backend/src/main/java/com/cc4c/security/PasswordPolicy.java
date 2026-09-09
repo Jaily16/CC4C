@@ -5,19 +5,15 @@ import com.cc4c.common.BusinessException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 
-/**
- * PasswordPolicy 负责身份认证的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 校验新写入密码的 Unicode 字符数和 BCrypt 可接受的 UTF-8 字节上限。 */
 public final class PasswordPolicy {
-    /**
-     * 创建 PasswordPolicy 实例，不触发外部 I/O。
-     */
+    /** 禁止实例化静态密码规则工具。 */
     private PasswordPolicy() {}
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 要求密码为 8 至 64 个 Unicode 码点且不超过 72 个 UTF-8 字节，不满足时抛出 400。
      *
-     * @param password 仅用于当前安全校验的密码或密码摘要
+     * @param password 待写入的非空明文密码，不得记录
      */
     public static void requireWritable(String password) {
         int characters = password.codePointCount(0, password.length());

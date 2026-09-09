@@ -7,28 +7,24 @@ import java.time.temporal.ChronoUnit;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * AsyncMessageCleanup 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 定时分批清理超过保留期限的已完成消息和消费幂等记录。 */
 @Component
 final class AsyncMessageCleanup {
     private final OutboxRepository outbox;
     private final InboxRepository inbox;
 
     /**
-     * 创建 AsyncMessageCleanup 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Outbox 终态清理及 Inbox 完成记录清理仓库。
      *
-     * @param outbox 由容器注入的 OutboxRepository 协作组件
-     * @param inbox 由容器注入的 InboxRepository 协作组件
+     * @param outbox Outbox 持久化仓库
+     * @param inbox 消费幂等与租约仓库
      */
     AsyncMessageCleanup(OutboxRepository outbox, InboxRepository inbox) {
         this.outbox = outbox;
         this.inbox = inbox;
     }
 
-    /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
-     */
+    /** 每日 03:15 清理超过 31 天的记录，每轮各表最多 500 条、最多 20 轮；两表均不足一批时结束。 */
     @Scheduled(cron = "0 15 3 * * *")
     void cleanup() {
         Instant before = Instant.now().minus(31, ChronoUnit.DAYS);

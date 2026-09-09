@@ -16,7 +16,7 @@ const rules = {
   password: [{ required: true, message: '请输入观测密码', trigger: 'blur' }],
 };
 
-/** 处理 submit 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 校验凭据表单后登录观测门户；仅接受站内绝对路径跳转，失败时清空密码输入。 */
 async function submit() {
   const valid = await formRef.value.validate().catch(() => false);
   if (!valid) return;

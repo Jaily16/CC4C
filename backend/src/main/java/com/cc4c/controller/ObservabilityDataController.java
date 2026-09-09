@@ -18,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 提供独立观测门户 HTTP 接口，完成输入校验、权限边界和统一响应封装。
- */
+/** 向 OBSERVABILITY 角色提供固定总览、Dashboard、告警和依赖检查。 */
 @Validated
 @RestController
 @RequestMapping("/observability/api")
@@ -30,10 +28,10 @@ public class ObservabilityDataController {
     private final ObservabilityDependencyService dependencyService;
 
     /**
-     * 创建 ObservabilityDataController 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入固定指标查询和依赖健康检查服务。
      *
-     * @param queryService 由容器注入的 ObservabilityQueryService 协作组件
-     * @param dependencyService 由容器注入的 ObservabilityDependencyService 协作组件
+     * @param queryService 固定观测查询服务
+     * @param dependencyService 依赖健康快照服务
      */
     ObservabilityDataController(
             ObservabilityQueryService queryService, ObservabilityDependencyService dependencyService) {
@@ -42,9 +40,9 @@ public class ObservabilityDataController {
     }
 
     /**
-     * 处理 {@code overview} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 查询固定八项总览指标及数据源状态。
      *
-     * @return 统一封装且可安全返回客户端的响应
+     * @return 总览指标响应
      */
     @GetMapping("/overview")
     @Operation(summary = "读取八项固定观测总览")
@@ -53,11 +51,11 @@ public class ObservabilityDataController {
     }
 
     /**
-     * 处理 {@code dashboard} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 限制 Dashboard ID 和时间范围后执行固定查询。
      *
-     * @param dashboardId 目标对象的稳定标识
-     * @param range 调用方提供的 {@code range} 值
-     * @return 统一封装且可安全返回客户端的响应
+     * @param dashboardId api-jvm、data-cache-security 或 messaging
+     * @param range 15m、1h、6h 或 24h，默认 1h
+     * @return 指定 Dashboard 的面板结果
      */
     @GetMapping("/dashboard/{dashboardId}")
     @Operation(summary = "读取固定观测 Dashboard")
@@ -68,9 +66,9 @@ public class ObservabilityDataController {
     }
 
     /**
-     * 处理 {@code alerts} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 读取固定二十条告警的加载和评估状态。
      *
-     * @return 统一封装且可安全返回客户端的响应
+     * @return 告警规则汇总响应
      */
     @GetMapping("/alerts")
     @Operation(summary = "读取二十条固定 Prometheus 告警")
@@ -79,10 +77,10 @@ public class ObservabilityDataController {
     }
 
     /**
-     * 处理 {@code dependencies} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 根据当前请求生成带关联 ID 的依赖健康快照。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 统一封装且可安全返回客户端的响应
+     * @param request 当前 HTTP 请求，提供会话和安全校验上下文
+     * @return 脱敏依赖及应用可用性响应
      */
     @GetMapping("/dependencies")
     @Operation(summary = "读取脱敏依赖及应用可用性")

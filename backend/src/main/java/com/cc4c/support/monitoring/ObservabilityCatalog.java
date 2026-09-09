@@ -11,27 +11,25 @@ import java.util.Set;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
-/**
- * ObservabilityCatalog 负责独立观测门户的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 启动时加载受控观测目录，校验数量与标识约束，供查询服务选择固定 PromQL。 */
 @Component
 public final class ObservabilityCatalog {
     private final ObjectMapper objectMapper;
     private Catalog document;
 
     /**
-     * 创建 ObservabilityCatalog 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存读取观测目录 JSON 的映射器。
      *
-     * @param objectMapper 应用统一配置的 JSON 映射器
+     * @param objectMapper 解析受控 JSON 的映射器
      */
     ObservabilityCatalog(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     /**
-     * 读取观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 从类路径读取 observability/catalog.json，并校验完整目录。
      *
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @throws IOException 类路径目录无法读取或 JSON 解析失败时抛出
      */
     @PostConstruct
     void load() throws IOException {
@@ -42,19 +40,19 @@ public final class ObservabilityCatalog {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取目录中配置的八项总览查询。
      *
-     * @return 按当前方法约定返回结果集合
+     * @return 目录中的总览查询定义
      */
     public List<QueryDefinition> overview() {
         return document.overview();
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按完整 Dashboard ID 查找受控定义。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @return 存在时返回目标值，否则返回空的 Optional
+     * @param id 目录中稳定且唯一的标识
+     * @return 匹配的 Dashboard；不存在时为空
      */
     public Optional<DashboardDefinition> dashboard(String id) {
         return document.dashboards().stream()
@@ -63,18 +61,18 @@ public final class ObservabilityCatalog {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取目录中的二十条告警说明。
      *
-     * @return 按当前方法约定返回结果集合
+     * @return 目录中的告警定义
      */
     public List<AlertDefinition> alerts() {
         return document.alerts();
     }
 
     /**
-     * 校验观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 验证 8 项总览、3 个 Dashboard、20 个面板、39 条面板查询及 20 条告警，并限制标识和查询数量。
      *
-     * @param catalog 调用方提供的 {@code catalog} 值
+     * @param catalog 待验证的完整观测目录
      */
     private static void validate(Catalog catalog) {
         if (catalog == null
@@ -126,10 +124,10 @@ public final class ObservabilityCatalog {
     }
 
     /**
-     * 校验观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 校验查询必填内容、唯一 ID、非空表达式和最多八个允许标签；将 ID 加入已见集合。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @param queryIds 目标对象的稳定标识
+     * @param query 待验证的查询定义
+     * @param queryIds 已经登记的查询 ID 集合
      */
     private static void validateQuery(QueryDefinition query, Set<String> queryIds) {
         if (query == null
@@ -145,54 +143,54 @@ public final class ObservabilityCatalog {
     }
 
     /**
-     * Catalog 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载类路径观测目录的总览、Dashboard 与告警定义。
      *
-     * @param overview 调用方提供的 {@code overview} 值
-     * @param dashboards 调用方提供的 {@code dashboards} 值
-     * @param alerts 调用方提供的 {@code alerts} 值
+     * @param overview 八项总览查询定义
+     * @param dashboards 三个 Dashboard 定义
+     * @param alerts 二十条告警定义
      */
     public record Catalog(
             List<QueryDefinition> overview, List<DashboardDefinition> dashboards, List<AlertDefinition> alerts) {}
 
     /**
-     * DashboardDefinition 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载一个 Dashboard 的标识、标题和面板列表。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param title 当前博客或课程的标题
-     * @param panels 调用方提供的 {@code panels} 值
+     * @param id 目录中稳定且唯一的标识
+     * @param title 门户展示标题
+     * @param panels Dashboard 中的面板定义
      */
     public record DashboardDefinition(String id, String title, List<PanelDefinition> panels) {}
 
     /**
-     * PanelDefinition 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载面板的展示信息及一至四条受控查询。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param title 当前博客或课程的标题
-     * @param unit 调用方提供的 {@code unit} 值
-     * @param queries 调用方提供的 {@code queries} 值
+     * @param id 目录中稳定且唯一的标识
+     * @param title 门户展示标题
+     * @param unit 图表数值展示单位
+     * @param queries 面板的固定查询定义
      */
     public record PanelDefinition(String id, String title, String unit, List<QueryDefinition> queries) {}
 
     /**
-     * QueryDefinition 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 定义固定 PromQL、图例模板及可返回给门户的标签白名单。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param title 当前博客或课程的标题
-     * @param unit 调用方提供的 {@code unit} 值
-     * @param expression 调用方提供的 {@code expression} 值
-     * @param legend 调用方提供的 {@code legend} 值
-     * @param allowedLabels 调用方提供的 {@code allowedLabels} 值
+     * @param id 目录中稳定且唯一的标识
+     * @param title 门户展示标题
+     * @param unit 图表数值展示单位
+     * @param expression 受控 PromQL 表达式
+     * @param legend 使用允许标签填充的图例模板
+     * @param allowedLabels 可以返回门户的标签名称白名单
      */
     public record QueryDefinition(
             String id, String title, String unit, String expression, String legend, List<String> allowedLabels) {}
 
     /**
-     * AlertDefinition 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载告警标识、展示说明和严重级别。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param title 当前博客或课程的标题
-     * @param description 面向用户展示的说明文本
-     * @param severity 调用方提供的 {@code severity} 值
+     * @param id 目录中稳定且唯一的标识
+     * @param title 门户展示标题
+     * @param description 告警展示说明
+     * @param severity 告警严重级别
      */
     public record AlertDefinition(String id, String title, String description, String severity) {}
 }

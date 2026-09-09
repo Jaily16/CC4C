@@ -45,12 +45,12 @@ public final class BusinessCache {
     private volatile long bypassUntilNanos;
 
     /**
-     * 创建 BusinessCache 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入可选缓存存储并创建指标、键工厂及信封编解码器。
      *
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param properties 调用方提供的 {@code properties} 值
-     * @param storeProvider 调用方提供的 {@code storeProvider} 值
-     * @param micrometer 调用方提供的 {@code micrometer} 值
+     * @param objectMapper 应用 JSON 映射器
+     * @param properties 缓存开关及命名空间配置
+     * @param storeProvider 按配置可选提供的缓存存储
+     * @param micrometer 底层统一指标记录器
      */
     @Autowired
     public BusinessCache(
@@ -67,11 +67,11 @@ public final class BusinessCache {
     }
 
     /**
-     * 创建 BusinessCache 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 委托主构造器，使用禁用指标实现。
      *
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param properties 调用方提供的 {@code properties} 值
-     * @param storeProvider 调用方提供的 {@code storeProvider} 值
+     * @param objectMapper 应用 JSON 映射器
+     * @param properties 缓存开关及命名空间配置
+     * @param storeProvider 按配置可选提供的缓存存储
      */
     public BusinessCache(
             ObjectMapper objectMapper,
@@ -81,16 +81,16 @@ public final class BusinessCache {
     }
 
     /**
-     * 查询并返回 BusinessCache 中与 getOrLoad 对应的数据，不改变业务状态。
+     * 按分区代次读取显式类型缓存，区分值与负缓存；禁用、熔断或代次读取失败时直接调用加载器。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param region 调用方提供的 {@code region} 值
-     * @param logicalKey 调用方提供的 {@code logicalKey} 值
-     * @param type 调用方提供的 {@code type} 值
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
-     * @param loader 调用方提供的 {@code loader} 值
-     * @return 存在时包含目标值，否则为空
+     * @param <T> 缓存值的数据类型
+     * @param region 已校验格式的缓存分区
+     * @param logicalKey 分区内的原始逻辑查询键
+     * @param type 保留泛型信息的目标缓存类型
+     * @param ttl 本次写入的基础有效期
+     * @param negativeTtl 业务对象不存在时的负缓存有效期
+     * @param loader 返回非空 Optional 的业务加载器
+     * @return 缓存命中或加载得到的值，空 Optional 表示业务对象不存在
      */
     public <T> Optional<T> getOrLoad(
             String region,
@@ -124,9 +124,9 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 invalidateAfterCommit 职责，并保持既有权限、事务与副作用边界。
+     * 事务同步及实际事务均启用时登记提交后回调，否则立即逐分区失效。
      *
-     * @param regions 调用方提供的 {@code regions} 值
+     * @param regions 需要推进代次的缓存分区
      */
     public void invalidateAfterCommit(String... regions) {
         Runnable invalidation = () -> {
@@ -137,9 +137,7 @@ public final class BusinessCache {
         if (TransactionSynchronizationManager.isSynchronizationActive()
                 && TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                /**
-                 * 执行 BusinessCache 中的 afterCommit 职责，并保持既有权限、事务与副作用边界。
-                 */
+                /** 事务提交成功后依次执行本次登记的分区失效。 */
                 @Override
                 public void afterCommit() {
                     invalidation.run();
@@ -151,18 +149,18 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 metrics 职责，并保持既有权限、事务与副作用边界。
+     * 返回当前缓存实例使用的统计记录器。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 缓存命中、加载及错误指标入口
      */
     public BusinessCacheMetrics metrics() {
         return metrics;
     }
 
     /**
-     * 执行 BusinessCache 中的 healthSnapshot 职责，并保持既有权限、事务与副作用边界。
+     * 缓存启用时执行存储 PING 并更新成功或失败计数；禁用时不访问存储。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 缓存开关、连通性和旁路状态
      */
     public HealthSnapshot healthSnapshot() {
         if (!properties.enabled()) {
@@ -184,16 +182,16 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 singleFlight 职责，并保持既有权限、事务与副作用边界。
+     * 合并进程内同一数据键的并发加载，共享结果或异常，并在结束时移除本次任务。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param key 调用方提供的 {@code key} 值
-     * @param region 调用方提供的 {@code region} 值
-     * @param javaType 调用方提供的 {@code javaType} 值
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
-     * @param loader 调用方提供的 {@code loader} 值
-     * @return 存在时包含目标值，否则为空
+     * @param <T> 缓存值的数据类型
+     * @param key 含分区代次的数据键封装
+     * @param region 已校验格式的缓存分区
+     * @param javaType 明确指定的解码目标类型
+     * @param ttl 本次写入的基础有效期
+     * @param negativeTtl 业务对象不存在时的负缓存有效期
+     * @param loader 返回非空 Optional 的业务加载器
+     * @return 当前加载或已在执行任务的结果
      */
     private <T> Optional<T> singleFlight(
             ResolvedKey key,
@@ -224,16 +222,16 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 loadWithDistributedLock 职责，并保持既有权限、事务与副作用边界。
+     * 尝试获取三秒锁并二次读取，持锁者加载及回填后按令牌解锁；未获锁最多等 200 毫秒后旁路加载，不回填。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param key 调用方提供的 {@code key} 值
-     * @param region 调用方提供的 {@code region} 值
-     * @param javaType 调用方提供的 {@code javaType} 值
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @param negativeTtl 调用方提供的 {@code negativeTtl} 值
-     * @param loader 调用方提供的 {@code loader} 值
-     * @return 存在时包含目标值，否则为空
+     * @param <T> 缓存值的数据类型
+     * @param key 含分区代次的数据键封装
+     * @param region 已校验格式的缓存分区
+     * @param javaType 明确指定的解码目标类型
+     * @param ttl 本次写入的基础有效期
+     * @param negativeTtl 业务对象不存在时的负缓存有效期
+     * @param loader 返回非空 Optional 的业务加载器
+     * @return 缓存或加载器提供的业务结果
      */
     private <T> Optional<T> loadWithDistributedLock(
             ResolvedKey key,
@@ -305,11 +303,11 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 resolveKey 职责，并保持既有权限、事务与副作用边界。
+     * 读取分区当前代次，缺失代次按 0 处理；存储失败记录错误并返回空。
      *
-     * @param region 调用方提供的 {@code region} 值
-     * @param logicalKey 调用方提供的 {@code logicalKey} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param region 已校验格式的缓存分区
+     * @param logicalKey 分区内的原始逻辑查询键
+     * @return 带代次的数据键，无法解析存储代次时为空
      */
     private ResolvedKey resolveKey(String region, String logicalKey) {
         String generationKey = keyFactory.generationKey(region);
@@ -327,9 +325,9 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 invalidateNow 职责，并保持既有权限、事务与副作用边界。
+     * 缓存可用时递增分区代次，使旧代次键不再被读取；异常记录后吞掉，不扫描删除旧数据。
      *
-     * @param region 调用方提供的 {@code region} 值
+     * @param region 已校验格式的缓存分区
      */
     private void invalidateNow(String region) {
         if (!properties.enabled() || store == null || circuitOpen()) {
@@ -345,13 +343,13 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 read 职责，并保持既有权限、事务与副作用边界。
+     * 读取并解码缓存信封；存储错误返回 ERROR，无效信封尝试删除后按 MISS 处理。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param key 调用方提供的 {@code key} 值
-     * @param javaType 调用方提供的 {@code javaType} 值
-     * @param region 调用方提供的 {@code region} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param <T> 缓存值的数据类型
+     * @param key 完整缓存数据键
+     * @param javaType 明确指定的解码目标类型
+     * @param region 已校验格式的缓存分区
+     * @return 普通值、负缓存、未命中或存储错误
      */
     private <T> ReadResult<T> read(String key, JavaType javaType, String region) {
         String json;
@@ -389,13 +387,13 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 write 职责，并保持既有权限、事务与副作用边界。
+     * 编码值或负缓存，超过 1 MiB 时不写入；写入使用抖动 TTL，编码和存储异常只记录不外抛。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param key 调用方提供的 {@code key} 值
-     * @param value 调用方提供的 {@code value} 值
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @param region 调用方提供的 {@code region} 值
+     * @param <T> 缓存值的数据类型
+     * @param key 完整缓存数据键
+     * @param value 业务结果；空 Optional 表示对象不存在
+     * @param ttl 本次写入的基础有效期
+     * @param region 已校验格式的缓存分区
      */
     private <T> void write(String key, Optional<T> value, Duration ttl, String region) {
         try {
@@ -418,12 +416,12 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 load 职责，并保持既有权限、事务与副作用边界。
+     * 调用业务加载器并记录耗时及结果；禁止返回 null Optional，业务运行异常继续传播。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param loader 调用方提供的 {@code loader} 值
-     * @param region 调用方提供的 {@code region} 值
-     * @return 存在时包含目标值，否则为空
+     * @param <T> 缓存值的数据类型
+     * @param loader 返回非空 Optional 的业务加载器
+     * @param region 已校验格式的缓存分区
+     * @return 加载器返回的非空 Optional
      */
     private <T> Optional<T> load(Supplier<Optional<T>> loader, String region) {
         long startedNanos = System.nanoTime();
@@ -441,10 +439,10 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 jitter 职责，并保持既有权限、事务与副作用边界。
+     * 将基础 TTL 乘以约 0.85 至 1.15 的随机因子，最短保留一毫秒。
      *
-     * @param ttl 调用方提供的 {@code ttl} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param ttl 本次写入的基础有效期
+     * @return 加入抖动后的有效期
      */
     private Duration jitter(Duration ttl) {
         double factor = ThreadLocalRandom.current().nextDouble(0.85, 1.1500001);
@@ -452,17 +450,15 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 circuitOpen 职责，并保持既有权限、事务与副作用边界。
+     * 以单调时钟判断当前是否仍处于故障旁路窗口。
      *
-     * @return 当前条件是否成立
+     * @return 旁路截止时间尚未到达时为 true
      */
     private boolean circuitOpen() {
         return System.nanoTime() < bypassUntilNanos;
     }
 
-    /**
-     * 执行 BusinessCache 中的 markSuccess 职责，并保持既有权限、事务与副作用边界。
-     */
+    /** 清零连续失败计数；只有旁路期限已结束时才清除旁路截止标记。 */
     private void markSuccess() {
         consecutiveFailures.set(0);
         if (System.nanoTime() >= bypassUntilNanos) {
@@ -471,11 +467,11 @@ public final class BusinessCache {
     }
 
     /**
-     * 执行 BusinessCache 中的 markFailure 职责，并保持既有权限、事务与副作用边界。
+     * 累计连续缓存失败，达到三次后设置三十秒旁路；日志只记录操作、分区和异常类型。
      *
-     * @param operation 调用方提供的 {@code operation} 值
-     * @param region 调用方提供的 {@code region} 值
-     * @param exception 调用方提供的 {@code exception} 值
+     * @param operation 低基数缓存操作分类
+     * @param region 已校验格式的缓存分区
+     * @param exception 本次缓存运行异常，仅记录其类型
      */
     private void markFailure(String operation, String region, RuntimeException exception) {
         metrics.error(region);
@@ -491,15 +487,13 @@ public final class BusinessCache {
     }
 
     /**
-     * ResolvedKey 以不可变字段承载共享基础设施数据并保持既有协议语义。
+     * 保存已包含命名空间、代次及逻辑摘要的数据键。
      *
-     * @param dataKey 调用方提供的 {@code dataKey} 值
+     * @param dataKey 已解析的完整数据键
      */
     private record ResolvedKey(String dataKey) {}
 
-    /**
-     * ReadState 枚举共享基础设施允许出现的有限状态或协议取值。
-     */
+    /** 区分普通命中、负缓存命中、未命中和存储故障。 */
     private enum ReadState {
         VALUE,
         NEGATIVE,
@@ -508,49 +502,49 @@ public final class BusinessCache {
     }
 
     /**
-     * ReadResult 以不可变字段承载共享基础设施数据并保持既有协议语义。
+     * 携带读取状态及可选值，避免把缓存故障或负缓存混同为普通值。
      *
-     * @param <T> 该声明处理的数据或结果类型
-     * @param state 调用方提供的 {@code state} 值
-     * @param value 调用方提供的 {@code value} 值
+     * @param <T> 缓存值的数据类型
+     * @param state 读取或解码状态
+     * @param value 待封装或存储的缓存值
      */
     private record ReadResult<T>(ReadState state, T value) {
         /**
-         * 执行 ReadResult 中的 value 职责，并保持既有权限、事务与副作用边界。
+         * 创建普通缓存命中结果。
          *
-         * @param <T> 该声明处理的数据或结果类型
-         * @param value 调用方提供的 {@code value} 值
-         * @return 按当前声明计算、查询或转换得到的结果
+         * @param <T> 缓存值的数据类型
+         * @param value 待封装或存储的缓存值
+         * @return 带 VALUE 状态的读取结果
          */
         static <T> ReadResult<T> value(T value) {
             return new ReadResult<>(ReadState.VALUE, value);
         }
 
         /**
-         * 执行 ReadResult 中的 negative 职责，并保持既有权限、事务与副作用边界。
+         * 创建业务对象不存在的负缓存命中结果。
          *
-         * @param <T> 该声明处理的数据或结果类型
-         * @return 按当前声明计算、查询或转换得到的结果
+         * @param <T> 缓存值的数据类型
+         * @return 带 NEGATIVE 状态且值为空的结果
          */
         static <T> ReadResult<T> negative() {
             return new ReadResult<>(ReadState.NEGATIVE, null);
         }
 
         /**
-         * 执行 ReadResult 中的 miss 职责，并保持既有权限、事务与副作用边界。
+         * 创建缓存未命中结果。
          *
-         * @param <T> 该声明处理的数据或结果类型
-         * @return 按当前声明计算、查询或转换得到的结果
+         * @param <T> 缓存值的数据类型
+         * @return 带 MISS 状态且值为空的结果
          */
         static <T> ReadResult<T> miss() {
             return new ReadResult<>(ReadState.MISS, null);
         }
 
         /**
-         * 执行 ReadResult 中的 error 职责，并保持既有权限、事务与副作用边界。
+         * 创建存储读取失败结果。
          *
-         * @param <T> 该声明处理的数据或结果类型
-         * @return 按当前声明计算、查询或转换得到的结果
+         * @param <T> 缓存值的数据类型
+         * @return 带 ERROR 状态且值为空的结果
          */
         static <T> ReadResult<T> error() {
             return new ReadResult<>(ReadState.ERROR, null);
@@ -560,9 +554,9 @@ public final class BusinessCache {
     /**
      * 描述缓存开关、后端连通性和故障旁路状态。
      *
-     * @param enabled 是否启用对应受控能力
-     * @param reachable 调用方提供的 {@code reachable} 值
-     * @param bypassing 调用方提供的 {@code bypassing} 值
+     * @param enabled 是否启用业务缓存
+     * @param reachable 缓存存储是否可达；禁用缓存时为 true
+     * @param bypassing 是否处于故障旁路窗口
      */
     public record HealthSnapshot(boolean enabled, boolean reachable, boolean bypassing) {}
 }

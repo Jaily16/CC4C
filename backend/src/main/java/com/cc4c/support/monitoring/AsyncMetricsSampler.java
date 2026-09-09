@@ -13,9 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * 采集共享基础设施脱敏运行指标，不改变业务处理结果。
- */
+/** 定时查询 Outbox 与 Inbox 状态计数，为消息指标和健康检查提供共享快照。 */
 @Component
 final class AsyncMetricsSampler {
     private static final String[] OUTBOX_STATUSES =
@@ -29,12 +27,12 @@ final class AsyncMetricsSampler {
     private final AtomicReference<Snapshot> snapshot = new AtomicReference<>(Snapshot.initial());
 
     /**
-     * 创建 AsyncMetricsSampler 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存消息仓储及观测设置，并注册从当前快照取值的 Gauge。
      *
-     * @param outbox 由容器注入的 OutboxRepository 协作组件
-     * @param inbox 由容器注入的 InboxRepository 协作组件
-     * @param properties 由容器注入的 ObservabilityProperties 协作组件
-     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param outbox Outbox 状态查询仓储
+     * @param inbox Inbox 状态查询仓储
+     * @param properties 该组件使用的观测或 Prometheus 设置
+     * @param metrics 受控指标适配器
      */
     AsyncMetricsSampler(
             OutboxRepository outbox, InboxRepository inbox, ObservabilityProperties properties, Cc4cMetrics metrics) {
@@ -45,9 +43,7 @@ final class AsyncMetricsSampler {
         registerGauges();
     }
 
-    /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 观测开启时更新消息状态和最老待发送年龄；查询失败保留上次成功快照，并记录失败类型与计数。 */
     @Scheduled(fixedDelayString = "${cc4c.observability.messaging-sample-interval:15s}")
     void sample() {
         if (!properties.enabled()) {
@@ -70,18 +66,18 @@ final class AsyncMetricsSampler {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 读取最近一次采样状态。
      *
-     * @return 当前操作产生的 Snapshot 结果
+     * @return 当前原子引用中的采样快照
      */
     Snapshot snapshot() {
         return snapshot.get();
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 计算距最近成功采样的秒数；关闭观测返回 0，从未成功返回十亿秒以标记陈旧。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 不小于 0 的快照年龄秒数
      */
     double ageSeconds() {
         Instant lastSuccess = snapshot.get().lastSuccess();
@@ -94,9 +90,7 @@ final class AsyncMetricsSampler {
         return Math.max(0.0, Duration.between(lastSuccess, Instant.now()).toMillis() / 1000.0);
     }
 
-    /**
-     * 创建当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 按消息状态注册数量指标，并注册最老待发送年龄和采样年龄指标。 */
     private void registerGauges() {
         for (String status : OUTBOX_STATUSES) {
             metrics.registerGauge(
@@ -120,11 +114,11 @@ final class AsyncMetricsSampler {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 只保留已声明的状态，并将没有记录的状态补为 0。
      *
-     * @param statuses 调用方提供的 {@code statuses} 值
-     * @param values 调用方提供的 {@code values} 值
-     * @return 当前操作产生的 Map<String,Long> 结果
+     * @param statuses 需要输出的状态名称集合
+     * @param values 仓储返回的状态计数
+     * @return 包含完整已声明状态集合的不可变计数映射
      */
     private Map<String, Long> withZeroValues(String[] statuses, Map<String, Long> values) {
         Map<String, Long> normalized = new LinkedHashMap<>();
@@ -135,13 +129,13 @@ final class AsyncMetricsSampler {
     }
 
     /**
-     * 以不可变结构承载共享基础设施计算或查询结果。
+     * 同时保存最后成功的消息数量、积压年龄与本轮采样失败类型。
      *
-     * @param outboxCounts 调用方提供的 {@code outboxCounts} 值
-     * @param inboxCounts 调用方提供的 {@code inboxCounts} 值
-     * @param oldestPendingSeconds 调用方提供的 {@code oldestPendingSeconds} 值
-     * @param lastSuccess 调用方提供的 {@code lastSuccess} 值
-     * @param lastFailureType 调用方提供的 {@code lastFailureType} 值
+     * @param outboxCounts 各 Outbox 状态的记录数
+     * @param inboxCounts 各 Inbox 状态的记录数
+     * @param oldestPendingSeconds 最老待发送消息的等待秒数
+     * @param lastSuccess 最后成功采样时间；未成功时为 null
+     * @param lastFailureType 本轮失败类型名；成功时为 null
      */
     record Snapshot(
             Map<String, Long> outboxCounts,
@@ -150,9 +144,9 @@ final class AsyncMetricsSampler {
             Instant lastSuccess,
             String lastFailureType) {
         /**
-         * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 构造尚未成功采样的空状态。
          *
-         * @return 当前操作产生的 Snapshot 结果
+         * @return 计数为空、无成功时间和失败类型的初始快照
          */
         static Snapshot initial() {
             return new Snapshot(Map.of(), Map.of(), 0.0, null, null);

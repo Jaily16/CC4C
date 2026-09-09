@@ -3,25 +3,25 @@ package com.cc4c.dto;
 import java.util.List;
 
 /**
- * 承载共享基础设施接口的脱敏响应字段，不暴露内部凭据或异常。
+ * 分页接口响应，携带结果列表、总数和前后页标志。
  *
- * @param <T> 类型参数
- * @param items 调用方提供的 {@code items} 值
- * @param page 从零或接口约定起算的页码
- * @param size 受接口上限约束的每页数量
- * @param total 调用方提供的 {@code total} 值
- * @param totalPages 调用方提供的 {@code totalPages} 值
- * @param hasNext 调用方提供的 {@code hasNext} 值
- * @param hasPrevious 调用方提供的 {@code hasPrevious} 值
+ * @param <T> 数据元素类型
+ * @param items 当前页的数据列表
+ * @param page 从 1 起算的页码
+ * @param size 每页记录数量
+ * @param total 匹配条件的记录总数
+ * @param totalPages 按总数和页大小计算的页数
+ * @param hasNext 页码是否小于总页数
+ * @param hasPrevious 页码是否大于 1
  */
 public record PageResponse<T>(
         List<T> items, int page, int size, long total, int totalPages, boolean hasNext, boolean hasPrevious) {
     /**
-     * 转换当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 将服务层分页结果转换为响应，并按页码与总页数计算前后页标志。
      *
-     * @param <T> 方法使用的类型参数
-     * @param result 调用方提供的 {@code result} 值
-     * @return 包含分页元数据的查询结果
+     * @param <T> 数据元素类型
+     * @param result 服务层返回的分页结果
+     * @return 带前后页标志的分页响应
      */
     public static <T> PageResponse<T> from(PageResult<T> result) {
         int totalPages = result.totalPages();

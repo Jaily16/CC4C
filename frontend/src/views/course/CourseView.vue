@@ -134,7 +134,7 @@
 </template>
 
 <script setup>
-/** CourseView 课程页面，协调课程目录、阅读状态和用户交互。 */
+/** 课程学习页面，加载推荐目录和选中课程正文，协调收藏、评论与回复状态。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -181,7 +181,7 @@ const langs = [
   { no: '4', name: 'c', icon: assets.languageIcons.c },
 ];
 const { user: currentUser, isUser: loggedIn } = useCurrentUser();
-/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
+/** 从当前用户名生成评论头像占位。 */
 const userInitial = computed(() => (currentUser.value.name || '用户').trim().slice(0, 1).toUpperCase());
 const commentThread = useCommentThread({
   subjectId: () => courseData.value?.courseId,
@@ -215,12 +215,12 @@ const {
   resetComments,
 } = commentThread;
 
-/** 响应 selectedLanguage 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 查找当前语言选项，未匹配时使用第一项 Java。 */
 function selectedLanguage() {
   return langs.find((lang) => lang.name === mainLang.value) || langs[0];
 }
 
-/** 校验 verifyUser 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 重新确认 USER 会话，非用户或请求失败时提示并进入登录页。 */
 async function verifyUser() {
   try {
     const resp = await getSession();
@@ -237,7 +237,7 @@ async function verifyUser() {
   }
 }
 
-/** 读取 loadCourseModules 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 按当前语言及用户专业读取推荐模块和课程目录。 */
 async function loadCourseModules() {
   const language = selectedLanguage();
   modulesLoading.value = true;
@@ -254,7 +254,7 @@ async function loadCourseModules() {
   }
 }
 
-/** 响应 selectLang 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 清空已选课程、正文、收藏和评论，再加载所选语言目录。 */
 function selectLang() {
   courseData.value = null;
   text.value = '';
@@ -263,7 +263,7 @@ function selectLang() {
   return loadCourseModules();
 }
 
-/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 读取选中课程正文，随后并发查询收藏状态与第一页评论。 */
 async function openCourse(courseName) {
   courseLoading.value = true;
   courseError.value = '';
@@ -292,12 +292,12 @@ async function openCourse(courseName) {
   }
 }
 
-/** 处理 retryCourse 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 已有课程名称时重新加载该课程。 */
 function retryCourse() {
   if (courseData.value?.courseName) return openCourse(courseData.value.courseName);
 }
 
-/** starCourse 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 按当前收藏状态发送新增或取消请求，成功后切换收藏展示。 */
 async function starCourse() {
   if (!courseData.value?.courseId) return;
   try {
@@ -316,12 +316,12 @@ async function starCourse() {
   }
 }
 
-/** 处理 submitComment 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 委托共享评论状态提交顶层评论，成功后提示。 */
 async function submitComment() {
   if (await submitCommentState()) ElMessage.success('评论成功');
 }
 
-/** 处理 submitReply 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 委托共享评论状态提交指定父评论的回复，成功后提示。 */
 async function submitReply(fatherId) {
   if (await submitReplyState(fatherId)) ElMessage.success('回复成功');
 }

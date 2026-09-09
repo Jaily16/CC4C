@@ -1,9 +1,9 @@
 package com.cc4c.dto;
 
 /**
- * NotificationContact 以不可变结构承载身份认证数据，并保持现有字段语义。
+ * 内部通知投递使用的用户 ID 与邮箱地址，不作为公开用户资料响应。
  *
- * @param userId 目标对象的稳定标识
- * @param email 用于账户或通知流程的邮箱地址
+ * @param userId 用户 ID
+ * @param email 账户邮箱地址
  */
 public record NotificationContact(long userId, String email) {}

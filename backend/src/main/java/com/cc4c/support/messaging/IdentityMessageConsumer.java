@@ -11,9 +11,7 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-/**
- * 消费并处理身份认证消息，遵循既有幂等与重试边界。
- */
+/** 消费验证码邮件事件，将解密、幂等和 ACK/NACK 交给可靠消息处理器。 */
 @Component
 class IdentityMessageConsumer {
     private static final String CONSUMER = "identity-verification-mail-v1";
@@ -24,12 +22,12 @@ class IdentityMessageConsumer {
     private final OutboundMailSender mailSender;
 
     /**
-     * 创建 IdentityMessageConsumer 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入可靠处理器、载荷 JSON 映射、验证码激活和邮件发送服务。
      *
-     * @param processor 调用方提供的 {@code processor} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param verificationCodes 由容器注入的 VerificationCodeService 协作组件
-     * @param mailSender 调用方提供的 {@code mailSender} 值
+     * @param processor 负责解密、幂等、重试及确认的处理器
+     * @param objectMapper 显式信封或载荷 JSON 映射器
+     * @param verificationCodes 验证码激活和条件撤销服务
+     * @param mailSender 带失败分类的文本邮件发送器
      */
     IdentityMessageConsumer(
             ReliableMessageProcessor processor,
@@ -43,12 +41,12 @@ class IdentityMessageConsumer {
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 将验证码队列投递交给固定消费者身份和验证码处理回调。
      *
-     * @param message 当前处理的消息或用户提示
-     * @param channel 调用方提供的 {@code channel} 值
-     * @param deliveryTag 调用方提供的 {@code deliveryTag} 值
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param message 当前 AMQP 消息及其属性
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag 当前通道中的投递确认标识
+     * @throws IOException AMQP 确认、拒绝或相关 I/O 操作无法完成时抛出
      */
     @RabbitListener(
             queues = "#{@messagingTopology.verificationQueue()}",
@@ -64,15 +62,13 @@ class IdentityMessageConsumer {
                 new VerificationHandler());
     }
 
-    /**
-     * 消费并处理身份认证消息，遵循既有幂等与重试边界。
-     */
+    /** 在实际发信前激活验证码，并在过期或死信时仅撤销对应当前签发。 */
     private final class VerificationHandler implements ReliableMessageHandler {
         /**
-         * 处理当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 解析验证码载荷并尝试激活；未激活则不发信，激活后通过邮件服务发送验证码。
          *
-         * @param envelope 调用方提供的 {@code envelope} 值
-         * @param plaintext 调用方提供的 {@code plaintext} 值
+         * @param envelope 包含事件元数据和加密载荷的信封
+         * @param plaintext 解密后的敏感载荷字节，不得记录
          */
         @Override
         public void handle(MessageEnvelope envelope, byte[] plaintext) {
@@ -95,10 +91,10 @@ class IdentityMessageConsumer {
         }
 
         /**
-         * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 解析过期载荷，仅当其事件仍为当前签发时删除 Redis 验证码。
          *
-         * @param envelope 调用方提供的 {@code envelope} 值
-         * @param plaintext 调用方提供的 {@code plaintext} 值
+         * @param envelope 包含事件元数据和加密载荷的信封
+         * @param plaintext 解密后的敏感载荷字节，不得记录
          */
         @Override
         public void expired(MessageEnvelope envelope, byte[] plaintext) {
@@ -107,11 +103,11 @@ class IdentityMessageConsumer {
         }
 
         /**
-         * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 解析终止载荷并有条件撤销当前验证码，不覆盖较新的签发。
          *
-         * @param envelope 调用方提供的 {@code envelope} 值
-         * @param plaintext 调用方提供的 {@code plaintext} 值
-         * @param errorCode 调用方提供的 {@code errorCode} 值
+         * @param envelope 包含事件元数据和加密载荷的信封
+         * @param plaintext 解密后的敏感载荷字节，不得记录
+         * @param errorCode 不含敏感正文的失败分类码
          */
         @Override
         public void dead(MessageEnvelope envelope, byte[] plaintext, String errorCode) {
@@ -120,10 +116,10 @@ class IdentityMessageConsumer {
         }
 
         /**
-         * 读取当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 按固定验证码载荷类型读取明文 JSON，解析失败转换为 INVALID_PAYLOAD。
          *
-         * @param plaintext 调用方提供的 {@code plaintext} 值
-         * @return 当前操作产生的 VerificationEmailRequestedV1 结果
+         * @param plaintext 解密后的敏感载荷字节，不得记录
+         * @return 验证码邮件载荷
          */
         private VerificationEmailRequestedV1 read(byte[] plaintext) {
             try {

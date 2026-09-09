@@ -8,28 +8,26 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
 
-/**
- * SecurityKeyHasher 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 使用配置 pepper 对安全键材料和审计标识计算 HMAC-SHA256。 */
 @Component
 public final class SecurityKeyHasher {
     private static final String ALGORITHM = "HmacSHA256";
     private final byte[] secret;
 
     /**
-     * 创建 SecurityKeyHasher 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 将配置 pepper 的 UTF-8 字节保存在内存中用于摘要计算。
      *
-     * @param properties 调用方提供的 {@code properties} 值
+     * @param properties 业务安全配置
      */
     public SecurityKeyHasher(SecurityProperties properties) {
         this.secret = properties.pepper().getBytes(StandardCharsets.UTF_8);
     }
 
     /**
-     * 判断 SecurityKeyHasher 中与 hash 对应的条件是否成立。
+     * 为本次调用创建 HMAC 实例，返回无填充的 URL 安全 Base64 摘要。
      *
-     * @param value 调用方提供的 {@code value} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param value 非空的待摘要化字符串
+     * @return 输入字符串的带秘密摘要
      */
     public String hash(String value) {
         try {

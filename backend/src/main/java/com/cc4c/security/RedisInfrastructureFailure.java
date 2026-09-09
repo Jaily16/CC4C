@@ -6,23 +6,19 @@ import java.util.Set;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.RedisSystemException;
 
-/**
- * RedisInfrastructureFailure 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 沿有限深度的异常原因链识别 Redis 连接、系统或 Lettuce 故障。 */
 public final class RedisInfrastructureFailure {
     private static final int MAX_CAUSE_DEPTH = 32;
     private static final String LETTUCE_PACKAGE_PREFIX = "io.lettuce.core.";
 
-    /**
-     * 创建 RedisInfrastructureFailure 实例，不触发外部 I/O。
-     */
+    /** 禁止实例化异常分类工具。 */
     private RedisInfrastructureFailure() {}
 
     /**
-     * 判断当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 最多检查 32 层原因，并按对象身份检测循环；命中 Spring Redis 或 Lettuce 异常即返回 true。
      *
-     * @param failure 调用方提供的 {@code failure} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param failure 待检查的异常，可以为空
+     * @return 原因链中存在已知 Redis 基础设施异常时为 true
      */
     public static boolean isUnavailable(Throwable failure) {
         Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());

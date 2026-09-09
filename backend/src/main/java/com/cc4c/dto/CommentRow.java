@@ -3,9 +3,7 @@ package com.cc4c.dto;
 import java.util.Date;
 import lombok.Data;
 
-/**
- * 承载收藏与评论查询返回的一行投影数据。
- */
+/** 接收评论与作者、父评论作者的联合查询投影，供评论树组装。 */
 @Data
 public class CommentRow {
     private Long commentId;

@@ -25,9 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * InteractionService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 协调当前用户的收藏和评论写入，检查归属与目标状态，并批量组装评论查询结果。 */
 @Service
 public class InteractionService {
     private final InteractionMapper mapper;
@@ -39,14 +37,14 @@ public class InteractionService {
     private final InteractionCommentAssembler commentAssembler;
 
     /**
-     * 创建 InteractionService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入交互 Mapper、身份与课程博客查询、当前用户及限流，并创建评论组装器。
      *
-     * @param mapper 调用方提供的 {@code mapper} 值
-     * @param identityLookup 调用方提供的 {@code identityLookup} 值
-     * @param catalogLookup 调用方提供的 {@code catalogLookup} 值
-     * @param communityLookup 调用方提供的 {@code communityLookup} 值
-     * @param currentActor 调用方提供的 {@code currentActor} 值
-     * @param rateLimiter 调用方提供的 {@code rateLimiter} 值
+     * @param mapper 收藏和评论数据访问 Mapper
+     * @param identityLookup 用户展示快照查询接口
+     * @param catalogLookup 语言课程存在性及热度缓存失效接口
+     * @param communityLookup 博客存在性及审核状态查询接口
+     * @param currentActor 当前业务身份读取接口
+     * @param rateLimiter 当前用户发布或评论的频率限制器
      */
     InteractionService(
             InteractionMapper mapper,
@@ -65,10 +63,10 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 favoriteCourse 职责，并保持既有权限、事务与副作用边界。
+     * 事务内验证用户和课程存在，拒绝重复收藏，插入后安排课程热度缓存失效。
      *
-     * @param courseId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param courseId 课程 ID
+     * @return 收藏插入成功时为 true
      */
     @Transactional
     public boolean favoriteCourse(int courseId) {
@@ -86,10 +84,10 @@ public class InteractionService {
     }
 
     /**
-     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 删除当前用户的课程收藏；关系不存在时抛出 404，成功后安排热度缓存失效。
      *
-     * @param courseId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param courseId 课程 ID
+     * @return 收藏删除成功时为 true
      */
     @Transactional
     public boolean removeCourseFavorite(int courseId) {
@@ -102,20 +100,20 @@ public class InteractionService {
     }
 
     /**
-     * 判断 InteractionService 中与 isCourseFavorite 对应的条件是否成立。
+     * 读取当前 USER 与指定课程的收藏关系。
      *
-     * @param courseId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param courseId 课程 ID
+     * @return 已收藏时为 true
      */
     public boolean isCourseFavorite(int courseId) {
         return mapper.courseFavoriteExists(currentActor.requiredUserId(), courseId);
     }
 
     /**
-     * 执行 InteractionService 中的 courseFavorites 职责，并保持既有权限、事务与副作用边界。
+     * 确认当前用户存在后分页查询收藏课程，并转换为课程摘要。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 当前用户的课程收藏页
      */
     public PageResult<CourseFavoriteSummary> courseFavorites(PageQuery query) {
         long userId = currentActor.requiredUserId();
@@ -132,10 +130,10 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 favoriteBlog 职责，并保持既有权限、事务与副作用边界。
+     * 事务内确认用户和已发布博客存在，拒绝重复收藏并插入关系。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param blogId 博客 ID
+     * @return 博客收藏成功时为 true
      */
     @Transactional
     public boolean favoriteBlog(long blogId) {
@@ -157,10 +155,10 @@ public class InteractionService {
     }
 
     /**
-     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 删除当前用户的博客收藏，不存在关系时抛出 404。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param blogId 博客 ID
+     * @return 收藏删除成功时为 true
      */
     @Transactional
     public boolean removeBlogFavorite(long blogId) {
@@ -172,20 +170,20 @@ public class InteractionService {
     }
 
     /**
-     * 判断 InteractionService 中与 isBlogFavorite 对应的条件是否成立。
+     * 读取当前 USER 与指定博客的收藏关系。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param blogId 博客 ID
+     * @return 已收藏时为 true
      */
     public boolean isBlogFavorite(long blogId) {
         return mapper.blogFavoriteExists(currentActor.requiredUserId(), blogId);
     }
 
     /**
-     * 执行 InteractionService 中的 blogFavorites 职责，并保持既有权限、事务与副作用边界。
+     * 确认当前用户存在后分页查询已审核博客收藏，长整数 ID 转为字符串。
      *
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param query 从 1 起算的页码及页大小
+     * @return 当前用户的博客收藏页
      */
     public PageResult<BlogSummary> blogFavorites(PageQuery query) {
         long userId = currentActor.requiredUserId();
@@ -207,10 +205,10 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 commentCourse 职责，并保持既有权限、事务与副作用边界。
+     * 检查用户评论频率及课程存在性，在同一事务内插入评论和课程直接关联。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 课程 ID 及评论正文
+     * @return 层级为 0 的新评论响应
      */
     @Transactional
     public CommentResponse commentCourse(CourseCommentRequest request) {
@@ -226,10 +224,10 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 commentBlog 职责，并保持既有权限、事务与副作用边界。
+     * 检查评论频率、用户及博客已发布状态，在同一事务内插入评论和博客直接关联。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 博客 ID 及评论正文
+     * @return 层级为 0 的新评论响应
      */
     @Transactional
     public CommentResponse commentBlog(BlogCommentRequest request) {
@@ -247,10 +245,10 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 reply 职责，并保持既有权限、事务与副作用边界。
+     * 检查评论频率、用户和父评论，限制最多两级回复；事务内插入回复并补充父作者昵称。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param request 父评论 ID 及回复正文
+     * @return 带父评论信息的新回复响应
      */
     @Transactional
     public CommentResponse reply(ReplyCommentRequest request) {
@@ -276,10 +274,10 @@ public class InteractionService {
     }
 
     /**
-     * 删除 InteractionService 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 只允许当前 USER 逻辑删除自己发表的评论，不递归删除其回复。
      *
-     * @param commentId 目标对象的稳定标识
-     * @return 当前条件是否成立
+     * @param commentId 评论 ID
+     * @return 删除成功时为 true
      */
     @Transactional
     public boolean deleteComment(long commentId) {
@@ -296,11 +294,11 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 courseComments 职责，并保持既有权限、事务与副作用边界。
+     * 检查课程存在后分页读取直接评论并批量组装回复。
      *
-     * @param courseId 目标对象的稳定标识
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param courseId 课程 ID
+     * @param query 从 1 起算的页码及页大小
+     * @return 课程顶层评论及回复页
      */
     public PageResult<CommentResponse> courseComments(int courseId, PageQuery query) {
         if (!catalogLookup.courseExists(courseId)) {
@@ -310,11 +308,11 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 blogComments 职责，并保持既有权限、事务与副作用边界。
+     * 只检查博客存在性，再分页读取直接评论并组装回复；此方法不检查博客审核状态。
      *
-     * @param blogId 目标对象的稳定标识
-     * @param query 调用方提供的 {@code query} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param blogId 博客 ID
+     * @param query 从 1 起算的页码及页大小
+     * @return 博客顶层评论及回复页
      */
     public PageResult<CommentResponse> blogComments(long blogId, PageQuery query) {
         if (communityLookup.findBlog(blogId).isEmpty()) {
@@ -324,11 +322,11 @@ public class InteractionService {
     }
 
     /**
-     * 执行 InteractionService 中的 insertComment 职责，并保持既有权限、事务与副作用边界。
+     * 插入评论正文、作者和当前时间，初始点赞数为零。
      *
-     * @param userId 目标对象的稳定标识
-     * @param content 调用方提供的 {@code content} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param userId 用户 ID
+     * @param content 评论正文
+     * @return 带已分配主键的新评论实体
      */
     private CommentEntity insertComment(long userId, String content) {
         CommentEntity comment = new CommentEntity();
@@ -341,20 +339,20 @@ public class InteractionService {
     }
 
     /**
-     * 校验 InteractionService 中与 requireUser 对应的前置条件，不满足时沿用既有失败语义。
+     * 查询用户快照，用户不存在时抛出 422。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param userId 用户 ID
+     * @return 存在的用户展示快照
      */
     private UserSnapshot requireUser(long userId) {
         return identityLookup.findUser(userId).orElseThrow(() -> unprocessable("User does not exist"));
     }
 
     /**
-     * 执行 InteractionService 中的 unprocessable 职责，并保持既有权限、事务与副作用边界。
+     * 以指定可展示提示构造 422 业务异常。
      *
-     * @param message 待处理的消息及其属性
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param message 可向客户端展示的业务提示
+     * @return 不可处理实体异常
      */
     private BusinessException unprocessable(String message) {
         return new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, BusinessCode.UNPROCESSABLE_ENTITY, message);

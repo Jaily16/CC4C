@@ -233,7 +233,7 @@ function Assert-Cc4cRuntimeEnvironment {
     return $values
 }
 
-# 注入本次启动所需变量；前端清除已知后端运行变量，只注入公开地址和两个上传根变量。
+# 保存待调整变量后注入所选应用环境；两端清除已知后端变量，只有业务前端重新注入两个上传根变量。
 function Set-Cc4cProcessEnvironment {
     param([System.Collections.IDictionary] $Values, [switch] $Backend, [switch] $Frontend, [switch] $Observability)
     $selectedApplications = @($Backend, $Frontend, $Observability)
@@ -435,7 +435,7 @@ function Stop-Cc4cOwnedComponent {
     Write-Cc4cHostState $State.component $updated
 }
 
-# 只查询外部 Prometheus 的公开状态接口；不读取私有配置，不修改服务或存储。
+# 检查外部 Prometheus 就绪和精确版本 3.13.2；可选要求全部 backend up 序列为 1，不读取私有配置或修改存储。
 function Assert-Cc4cPrometheusEndpoint {
     param([string] $BaseUrl = 'http://127.0.0.1:9090', [switch] $RequireBackendScrape)
     $uri = Get-Cc4cEndpointUri $BaseUrl @('http', 'https') 'Prometheus'

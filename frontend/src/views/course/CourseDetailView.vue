@@ -125,6 +125,8 @@
 </template>
 
 <script setup>
+/** 按课程名读取正文，协调收藏状态、章节目录与共享评论操作。 */
+
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { ArrowLeft, Reading } from '@element-plus/icons-vue';
@@ -165,7 +167,7 @@ const isCommentOpen = ref(false);
 const catalogOpen = ref(false);
 
 const { isUser: loggedIn } = useCurrentUser();
-/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
+/** 从当前用户名生成评论输入区头像占位。 */
 const userInitial = computed(() => commentInitial(store.state.user.name));
 const commentThread = useCommentThread({
   subjectId: () => courseData.value?.courseId,
@@ -212,36 +214,36 @@ const {
   resetComments,
 } = commentThread;
 
-/** commentInitial 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 取用户名首字符作头像占位，缺失时使用用户二字。 */
 function commentInitial(name) {
   return (name || '用户').trim().slice(0, 1).toUpperCase();
 }
 
-/** 把现有数据转换为 normalizeCourseMarkdown 所需展示结构，不产生外部副作用。 */
+/** 将正文转成字符串，并把星号表情短码替换为星形字符。 */
 function normalizeCourseMarkdown(content) {
   return String(content || '').replace(/:star:/gi, '⭐');
 }
 
-/** 响应 backToCourses 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 返回全部课程列表。 */
 function backToCourses() {
   router.push('/allCourses');
 }
 
-/** 响应 goToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 提示收藏和评论需要登录，并进入用户登录页。 */
 function goToLogin() {
   ElMessage.warning('登录后即可收藏课程和参与评论');
   router.push('/login');
 }
 
-/** 响应 closeCatalogAfterNavigation 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 延后关闭目录，让本次章节导航点击先完成。 */
 function closeCatalogAfterNavigation() {
-  /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
+  /** 在下一次任务中关闭目录浮层；这是一次性延迟，未登记取消句柄。 */
   window.setTimeout(() => {
     catalogOpen.value = false;
   }, 0);
 }
 
-/** 读取 loadCourse 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 清空旧详情和评论后按路由课程名读取正文，加载评论，USER 另查询收藏状态。 */
 async function loadCourse() {
   const courseName = String(route.query.courseName || '');
   courseData.value = null;
@@ -284,7 +286,7 @@ async function loadCourse() {
   }
 }
 
-/** 响应 toggleCollect 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 为当前 USER 增加或取消课程收藏，只有后端明确成功才切换状态。 */
 async function toggleCollect() {
   if (!courseData.value?.courseId || !loggedIn.value) return;
   try {
@@ -303,13 +305,13 @@ async function toggleCollect() {
   }
 }
 
-/** reply 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 委托共享评论状态提交回复，成功时提示。 */
 async function reply(fatherId) {
   const succeeded = await commentThread.reply(fatherId);
   if (succeeded) ElMessage.success('回复成功');
 }
 
-/** comment 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 委托共享评论状态提交顶层评论，成功时提示。 */
 async function comment() {
   const succeeded = await commentThread.comment();
   if (succeeded) ElMessage.success('评论成功');
@@ -321,7 +323,7 @@ async function deleteOwnComment(commentItem) {
   if (succeeded) ElMessage.success('评论已删除');
 }
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 首次进入及课程名变化时重新加载详情。 */
 watch(() => route.query.courseName, loadCourse, { immediate: true });
 </script>
 

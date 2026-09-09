@@ -30,9 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * IdentityService 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 维护用户注册、资料和密码，并提供认证账户、公开快照及内部通知联系方式查询。 */
 @Service
 public class IdentityService implements IdentityLookup, IdentityNotificationLookup {
     private final UserMapper userMapper;
@@ -43,14 +41,14 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     private final SessionRevocationService sessionRevocationService;
 
     /**
-     * 创建 IdentityService 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入用户与管理员 Mapper、密码编码、验证码、当前身份及会话撤销服务。
      *
-     * @param userMapper 调用方提供的 {@code userMapper} 值
-     * @param administratorMapper 调用方提供的 {@code administratorMapper} 值
-     * @param passwordEncoder 调用方提供的 {@code passwordEncoder} 值
-     * @param verificationCodeService 由容器注入的 VerificationCodeService 协作组件
-     * @param currentActor 调用方提供的 {@code currentActor} 值
-     * @param sessionRevocationService 由容器注入的 SessionRevocationService 协作组件
+     * @param userMapper 用户数据访问 Mapper
+     * @param administratorMapper 管理员数据访问 Mapper
+     * @param passwordEncoder 业务密码编码与比对器
+     * @param verificationCodeService 按邮箱及用途消费验证码的服务
+     * @param currentActor 当前业务身份读取接口
+     * @param sessionRevocationService 按身份名撤销全部会话的服务
      */
     IdentityService(
             UserMapper userMapper,
@@ -68,10 +66,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 变更 IdentityService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 校验密码并消费注册验证码后检查用户名和邮箱唯一性，再插入编码后的用户资料；Redis 验证码消费不随数据库事务回滚。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 包含新用户资料及注册验证码的请求
+     * @return 用户插入成功后为 true
      */
     @Transactional
     public boolean register(RegisterRequest request) {
@@ -107,11 +105,11 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 执行 IdentityService 中的 authenticationAccount 职责，并保持既有权限、事务与副作用边界。
+     * 用户按规范化邮箱和启用状态查询，管理员按编号查询，仅返回认证所需字段。
      *
-     * @param role 调用方提供的 {@code role} 值
-     * @param identifier 调用方提供的 {@code identifier} 值
-     * @return 存在时包含目标值，否则为空
+     * @param role 待认证的 USER 或 ADMIN 角色
+     * @param identifier 用户邮箱或管理员编号
+     * @return 存在时返回包含编码密码的内部认证账户
      */
     public Optional<AuthenticationAccount> authenticationAccount(AccountRole role, String identifier) {
         if (role == AccountRole.USER) {
@@ -129,19 +127,19 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 执行 IdentityService 中的 currentUser 职责，并保持既有权限、事务与副作用边界。
+     * 要求当前身份为 USER 并加载用户资料。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 不含密码的当前用户响应
      */
     public UserResponse currentUser() {
         return toResponse(requiredUser(currentActor.requiredUserId()));
     }
 
     /**
-     * 变更 IdentityService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 在事务内更新当前用户的非空资料字段，检查昵称重复并转换唯一键及语言外键错误。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 当前用户的可选资料更新字段
+     * @return 资料更新流程完成后为 true
      */
     @Transactional
     public boolean update(UserUpdateRequest request) {
@@ -177,10 +175,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 变更 IdentityService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 验证当前 USER 的旧密码，拒绝重复新密码，更新编码密码后请求撤销该用户的全部会话。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 当前密码与新密码请求
+     * @return 密码更新和会话撤销调用完成后为 true
      */
     @Transactional
     public boolean changePassword(ChangePasswordRequest request) {
@@ -199,10 +197,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 变更 IdentityService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 消费重置验证码后查找启用用户，更新新密码并请求撤销全部用户会话；验证码消费不随数据库回滚恢复。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 邮箱、重置验证码及新密码请求
+     * @return 密码更新和会话撤销调用完成后为 true
      */
     @Transactional
     public boolean resetPassword(ResetPasswordRequest request) {
@@ -223,10 +221,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 变更 IdentityService 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 验证当前 ADMIN 的旧密码，拒绝相同新密码，保存新编码密码并请求撤销该管理员的全部会话。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 当前条件是否成立
+     * @param request 管理员当前密码与新密码请求
+     * @return 密码更新和会话撤销调用完成后为 true
      */
     @Transactional
     public boolean changeAdministratorPassword(AdministratorPasswordRequest request) {
@@ -246,10 +244,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 查询并返回 IdentityService 中与 findUser 对应的数据，不改变业务状态。
+     * 按 ID 读取用户，并只投影 ID、昵称和头像。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 存在时包含目标值，否则为空
+     * @param userId 用户 ID
+     * @return 用户资料快照；不存在时为空 Optional
      */
     @Override
     public Optional<UserSnapshot> findUser(long userId) {
@@ -259,10 +257,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 查询并返回 IdentityService 中与 findNotificationContact 对应的数据，不改变业务状态。
+     * 按 ID 读取用户，仅在邮箱非空时生成通知联系方式。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 存在时包含目标值，否则为空
+     * @param userId 用户 ID
+     * @return 可用通知联系方式，否则为空 Optional
      */
     @Override
     public Optional<NotificationContact> findNotificationContact(long userId) {
@@ -273,10 +271,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 查询并返回 IdentityService 中与 findByEmail 对应的数据，不改变业务状态。
+     * 将邮箱去空白并小写化，查询状态为 0 的用户。
      *
-     * @param email 调用方提供的 {@code email} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param email 账户或验证码收件邮箱
+     * @return 匹配的启用用户，不存在时为空
      */
     private UserEntity findByEmail(String email) {
         return userMapper.selectOne(new LambdaQueryWrapper<UserEntity>()
@@ -285,19 +283,19 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * AuthenticationAccount 以不可变字段承载身份认证数据并保持既有协议语义。
+     * 供认证提供器使用的账户字段，包含编码密码，不用于接口响应。
      *
-     * @param id 目标对象的稳定标识
-     * @param displayName 调用方提供的 {@code displayName} 值
-     * @param encodedPassword 调用方提供的 {@code encodedPassword} 值
+     * @param id 用户或管理员身份 ID
+     * @param displayName 认证成功后使用的身份展示名
+     * @param encodedPassword 仅供认证比对的编码密码，不得记录
      */
     public record AuthenticationAccount(String id, String displayName, String encodedPassword) {}
 
     /**
-     * 校验 IdentityService 中与 requiredUser 对应的前置条件，不满足时沿用既有失败语义。
+     * 按用户 ID 加载记录，不存在时抛出 404 业务异常。
      *
-     * @param id 目标对象的稳定标识
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param id 用户或管理员身份 ID
+     * @return 存在的用户实体
      */
     private UserEntity requiredUser(long id) {
         UserEntity user = userMapper.selectById(id);
@@ -308,10 +306,10 @@ public class IdentityService implements IdentityLookup, IdentityNotificationLook
     }
 
     /**
-     * 执行 IdentityService 中的 toResponse 职责，并保持既有权限、事务与副作用边界。
+     * 将用户实体投影为无密码响应，并将长整数 ID 转为字符串。
      *
-     * @param user 调用方提供的 {@code user} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param user 待转换的用户实体
+     * @return 用户资料响应
      */
     private UserResponse toResponse(UserEntity user) {
         return new UserResponse(

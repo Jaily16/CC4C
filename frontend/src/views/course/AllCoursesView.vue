@@ -97,7 +97,7 @@
 </template>
 
 <script setup>
-/** AllCoursesView 课程页面，协调课程目录、阅读状态和用户交互。 */
+/** 全部课程页面，分页查询语言课程或关键词搜索结果，并提供详情导航。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, ref } from 'vue';
 import { listCoursesByLanguage, searchCourses as searchCoursesApi } from '@/api/catalog';
@@ -124,7 +124,7 @@ const langs = [
   { name: 'c', icon: assets.languageIcons.c },
 ];
 
-/** 从现有响应式状态派生 resultLabel，不发起请求或写入外部数据。 */
+/** 根据加载、搜索词或当前语言生成结果区标题。 */
 const resultLabel = computed(() => {
   if (loading.value) return '正在加载课程…';
   if (isSearching.value) return `“${searchInfo.value}” 的搜索结果`;
@@ -140,7 +140,7 @@ const courseLevelLabels = {
   66: '难度：必须展示',
 };
 
-/** courseDifficulty 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 按课程难度编号展示说明，缺失或未知时使用默认学习路径提示。 */
 function courseDifficulty(course) {
   const level = course.level ?? course.difficulty;
   if (level === null || level === undefined || level === '') {
@@ -149,12 +149,12 @@ function courseDifficulty(course) {
   return courseLevelLabels[String(level)] || '系统化学习路径';
 }
 
-/** 响应 openCourse 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 携带课程名称进入详情页。 */
 function openCourse(courseName) {
   router.push({ path: '/courseDetail', query: { courseName } });
 }
 
-/** 读取 requestCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 根据当前模式分页执行课程搜索或语言查询，失败时清空结果并显示错误。 */
 async function requestCourses() {
   loading.value = true;
   errorMessage.value = '';
@@ -175,7 +175,7 @@ async function requestCourses() {
   }
 }
 
-/** 读取 loadLanguageCourses 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 退出搜索、清空关键词并回到所选语言第一页。 */
 function loadLanguageCourses() {
   isSearching.value = false;
   searchInfo.value = '';
@@ -183,7 +183,7 @@ function loadLanguageCourses() {
   return requestCourses();
 }
 
-/** searchCourses 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 非空关键词切换为搜索模式并回到第一页；空词恢复语言查询。 */
 function searchCourses() {
   if (!searchInfo.value) return loadLanguageCourses();
   isSearching.value = true;
@@ -191,18 +191,18 @@ function searchCourses() {
   return requestCourses();
 }
 
-/** 处理 clearSearch 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 清空关键词并恢复当前语言的课程列表。 */
 function clearSearch() {
   searchInfo.value = '';
   return loadLanguageCourses();
 }
 
-/** 处理 retryLoad 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 按当前查询模式和页码重新读取课程。 */
 function retryLoad() {
   return requestCourses();
 }
 
-/** 处理 changePage 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 更新页码后重新执行当前查询。 */
 function changePage(page) {
   currentPage.value = page;
   return retryLoad();

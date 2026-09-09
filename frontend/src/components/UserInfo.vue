@@ -117,22 +117,22 @@ const navItems = [
 ];
 
 const { user: currentUser } = useCurrentUser();
-/** 从现有响应式状态派生 activeKey，不发起请求或写入外部数据。 */
+/** 把当前导航项编号转为字符串，供个人中心菜单匹配。 */
 const activeKey = computed(() => String(props.activeIndex));
-/** 从现有响应式状态派生 displayName，不发起请求或写入外部数据。 */
+/** 读取当前用户名，缺失时显示 CC4C 用户。 */
 const displayName = computed(() => currentUser.value.name || 'CC4C 用户');
-/** 从现有响应式状态派生 userInitial，不发起请求或写入外部数据。 */
+/** 取显示名首字符作为头像占位。 */
 const userInitial = computed(() => displayName.value.trim().slice(0, 1).toUpperCase());
-/** 从现有响应式状态派生 majorLabel，不发起请求或写入外部数据。 */
+/** 按专业编号查找展示名称，未知编号显示未设置。 */
 const majorLabel = computed(
   () => majorList.find((item) => item.value === Number(currentUser.value.major))?.label || '未设置',
 );
-/** 从现有响应式状态派生 languageLabel，不发起请求或写入外部数据。 */
+/** 按订阅语言编号查找展示名称，未知编号显示未设置。 */
 const languageLabel = computed(
   () => languageList.find((item) => item.value === Number(currentUser.value.language))?.label || '未设置',
 );
 const avatarLoadFailed = ref(false);
-/** 从现有响应式状态派生 profileAvatar，不发起请求或写入外部数据。 */
+/** 头像加载失败时返回空地址，以显示文字占位。 */
 const profileAvatar = computed(() => (avatarLoadFailed.value ? '' : currentUser.value.avatar || ''));
 
 const editDialogOpen = ref(false);
@@ -145,20 +145,20 @@ const infoForm = reactive({ name: '', major: 0, language: 1, avatar: '' });
 const passwordForm = reactive({ password: '', newPassword: '' });
 const editErrors = reactive({ name: '', avatar: '' });
 const passwordErrors = reactive({ password: '', newPassword: '' });
-/** 从现有响应式状态派生 editAvatarPreview，不发起请求或写入外部数据。 */
+/** 优先预览本次上传地址，否则使用表单中的头像地址。 */
 const editAvatarPreview = computed(() => uploadedAvatar.value || infoForm.avatar || '');
 
-/** 处理 updateInfoFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 只更新资料表单已有字段，不直接保存到服务端。 */
 function updateInfoFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(infoForm, field)) infoForm[field] = value;
 }
 
-/** 处理 updatePasswordFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 只更新密码表单已有字段，不直接提交密码。 */
 function updatePasswordFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(passwordForm, field)) passwordForm[field] = value;
 }
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 头像地址变化时清除加载失败标记，允许新地址重新显示。 */
 watch(
   () => currentUser.value.avatar,
   () => {
@@ -166,13 +166,13 @@ watch(
   },
 );
 
-/** handleAvatarError 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 标记头像加载失败，让展示切换到文字占位。 */
 function handleAvatarError() {
   avatarLoadFailed.value = true;
   return true;
 }
 
-/** fillProfileForm 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 把当前 Vuex 用户资料复制到编辑表单，并将偏好编号转为数值。 */
 function fillProfileForm() {
   infoForm.name = currentUser.value.name || '';
   infoForm.major = Number(currentUser.value.major);
@@ -180,7 +180,7 @@ function fillProfileForm() {
   infoForm.avatar = currentUser.value.avatar || '';
 }
 
-/** 响应 openEditDialog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 复制当前资料，清空上传预览和错误，然后打开资料弹窗。 */
 function openEditDialog() {
   fillProfileForm();
   uploadedAvatar.value = '';
@@ -189,14 +189,14 @@ function openEditDialog() {
   editDialogOpen.value = true;
 }
 
-/** 响应 openPasswordDialog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 清除密码校验提示并打开密码弹窗。 */
 function openPasswordDialog() {
   passwordErrors.password = '';
   passwordErrors.newPassword = '';
   passwordDialogOpen.value = true;
 }
 
-/** 处理 resetEditDialog 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 未在保存时撤销本地资料草稿和上传预览；已上传文件不会在此删除。 */
 function resetEditDialog() {
   if (profileSaving.value) return;
   uploadedAvatar.value = '';
@@ -205,13 +205,13 @@ function resetEditDialog() {
   fillProfileForm();
 }
 
-/** 处理 clearPasswords 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 清空内存中的原密码和新密码。 */
 function clearPasswords() {
   passwordForm.password = '';
   passwordForm.newPassword = '';
 }
 
-/** 处理 resetPasswordDialog 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 密码提交结束后关闭弹窗时，清空密码字段与校验提示。 */
 function resetPasswordDialog() {
   if (passwordSaving.value) return;
   clearPasswords();
@@ -219,7 +219,7 @@ function resetPasswordDialog() {
   passwordErrors.newPassword = '';
 }
 
-/** syncCurrentUser 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 读取最新个人资料并逐项写入 Vuex，随后通知父页面用户资料已更新。 */
 async function syncCurrentUser() {
   const response = await getCurrentUser();
   const user = response.data.data;
@@ -234,7 +234,7 @@ async function syncCurrentUser() {
   return user;
 }
 
-/** 读取 refreshCurrentUser 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 尝试同步最新资料，失败时记录开发诊断并返回 false。 */
 async function refreshCurrentUser() {
   try {
     await syncCurrentUser();
@@ -245,7 +245,7 @@ async function refreshCurrentUser() {
   }
 }
 
-/** 处理 uploadAvatar 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 只接受小于 2 MiB 的 JPEG 或 PNG，上传后保存公开地址供预览；资料保存是后续独立操作。 */
 async function uploadAvatar({ file }) {
   editErrors.avatar = '';
   const isSupported = file.type === 'image/jpeg' || file.type === 'image/png';
@@ -279,7 +279,7 @@ async function uploadAvatar({ file }) {
   }
 }
 
-/** 处理 saveProfile 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 提交非空用户名及偏好、头像地址；刷新失败时用已保存表单更新本地展示并单独提示。 */
 async function saveProfile() {
   editErrors.name = infoForm.name.trim() ? '' : '请输入用户名。';
   if (editErrors.name || profileSaving.value || avatarUploading.value) return;
@@ -314,7 +314,7 @@ async function saveProfile() {
   }
 }
 
-/** 处理 changePassword 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 校验密码输入后提交修改；成功时清空密码、重置 CSRF 和业务身份，再跳转登录页。 */
 async function changePassword() {
   passwordErrors.password = passwordForm.password ? '' : '请输入原密码。';
   const bytes = new TextEncoder().encode(passwordForm.newPassword).length;

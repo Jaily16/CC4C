@@ -20,9 +20,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 封装共享基础设施持久化、租约与状态更新操作，集中维护数据库语义。
- */
+/** 通过 JDBC 存储待发事件及加密载荷，管理发布租约、投递状态和人工恢复。 */
 @Repository
 public class OutboxRepository {
     private static final String COLUMNS =
@@ -38,28 +36,28 @@ public class OutboxRepository {
     private final JdbcTemplate jdbc;
 
     /**
-     * 创建 OutboxRepository 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Outbox 持久化使用的 JDBC 执行器。
      *
-     * @param jdbc 调用方提供的 {@code jdbc} 值
+     * @param jdbc 使用应用数据源的 JDBC 执行器
      */
     OutboxRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 插入模式版本 1、代次 0 的事件及加密载荷；初始 DEAD 状态同时记录失败时间。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param correlationId 目标对象的稳定标识
-     * @param eventType 带版本的异步事件类型
-     * @param aggregateType 调用方提供的 {@code aggregateType} 值
-     * @param aggregateId 目标对象的稳定标识
-     * @param routingKey 调用方提供的 {@code routingKey} 值
-     * @param occurredAt 当前操作使用的时间点
-     * @param expiresAt 当前操作使用的时间点
-     * @param payload 按当前协议处理的业务载荷
-     * @param initialStatus 调用方提供的 {@code initialStatus} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param eventId 异步事件唯一标识
+     * @param correlationId 请求与消息处理关联 ID
+     * @param eventType 带版本的事件类型
+     * @param aggregateType 关联业务聚合类型
+     * @param aggregateId 关联业务聚合标识
+     * @param routingKey RabbitMQ 发布路由键
+     * @param occurredAt 业务事件发生时间
+     * @param expiresAt 可空的业务有效期截止时间
+     * @param payload 已加密载荷及密钥 ID、nonce
+     * @param initialStatus 记录初始投递状态
+     * @param errorCode 不含敏感正文的失败分类码
      */
     public void insert(
             String eventId,
@@ -100,12 +98,12 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 事务内以 SKIP LOCKED 领取到期 PENDING 或租约过期的 PUBLISHING 记录，写入发布租约。
      *
-     * @param workerId 目标对象的稳定标识
-     * @param limit 调用方提供的 {@code limit} 值
-     * @param leaseUntil 调用方提供的 {@code leaseUntil} 值
-     * @return 按当前方法约定返回结果集合
+     * @param workerId 领取租约的工作者标识
+     * @param limit 本次最多处理的记录数量
+     * @param leaseUntil 租约到期时间
+     * @return 按数据库 ID 升序返回的已领取事件
      */
     @Transactional
     public List<OutboxMessage> claimBatch(String workerId, int limit, Instant leaseUntil) {
@@ -141,10 +139,10 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 仅将匹配代次且仍在 PUBLISHING 的事件置为 PUBLISHED，增加发布次数并释放租约。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
      */
     public void markPublished(String eventId, int generation) {
         jdbc.update(
@@ -160,13 +158,13 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 仅更新匹配代次的 PUBLISHING 记录，增加发布次数；可重试时回到 PENDING，否则置为 PUBLISH_FAILED。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
-     * @param nextAttempt 调用方提供的 {@code nextAttempt} 值
-     * @param terminal 调用方提供的 {@code terminal} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param errorCode 不含敏感正文的失败分类码
+     * @param nextAttempt 下一次发布尝试时间
+     * @param terminal 是否结束自动发布重试
      */
     public void markPublishFailure(
             String eventId, int generation, String errorCode, Instant nextAttempt, boolean terminal) {
@@ -187,10 +185,10 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将匹配代次且处于 PUBLISHED 或 PUBLISHING 的事件置为 DELIVERED。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
      */
     public void markDelivered(String eventId, int generation) {
         jdbc.update(
@@ -204,10 +202,10 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 增加指定事件代次的消费尝试次数，不按当前状态筛选。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
      */
     public void incrementConsumeAttempt(String eventId, int generation) {
         jdbc.update(
@@ -220,11 +218,11 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将指定事件代次置为 DEAD，并记录失败时间和错误码。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param errorCode 不含敏感正文的失败分类码
      */
     public void markDead(String eventId, int generation, String errorCode) {
         jdbc.update(
@@ -239,10 +237,10 @@ public class OutboxRepository {
     }
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将指定事件代次置为 EXPIRED，记录 MESSAGE_EXPIRED 及失败时间。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
      */
     public void markExpired(String eventId, int generation) {
         jdbc.update(
@@ -256,10 +254,10 @@ public class OutboxRepository {
     }
 
     /**
-     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按事件唯一标识读取完整 Outbox 记录。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @return 存在时返回目标值，否则返回空的 Optional
+     * @param eventId 异步事件唯一标识
+     * @return 存在时返回记录，否则返回空 Optional
      */
     public Optional<OutboxMessage> findByEventId(String eventId) {
         List<OutboxMessage> rows =
@@ -268,12 +266,12 @@ public class OutboxRepository {
     }
 
     /**
-     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按状态和事件类型分页查询消息摘要；未指定状态时仅列出待处理、发布中及失败状态。
      *
-     * @param status 当前对象或流程的有限状态
-     * @param eventType 带版本的异步事件类型
-     * @param query 调用方提供的 {@code query} 值
-     * @return 包含分页元数据的查询结果
+     * @param status 可空的 Outbox 状态筛选
+     * @param eventType 可空的事件类型筛选
+     * @param query 从 1 起算的分页条件
+     * @return 按创建时间和 ID 倒序排列的消息摘要页
      */
     public PageResult<AsyncMessageSummary> findPage(OutboxStatus status, String eventType, PageQuery query) {
         StringBuilder where = new StringBuilder();
@@ -305,12 +303,12 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 仅对匹配旧代次的 PUBLISH_FAILED 或 DEAD 事件更新代次和密文，重置计数与历史结果并回到 PENDING。
      *
-     * @param message 当前处理的消息或用户提示
-     * @param encrypted 调用方提供的 {@code encrypted} 值
-     * @param nextGeneration 调用方提供的 {@code nextGeneration} 值
-     * @return 按当前规则计算或读取的数值
+     * @param message 包含待恢复事件 ID 和旧代次的记录
+     * @param encrypted 针对新代次生成的加密载荷
+     * @param nextGeneration 人工恢复后使用的新代次
+     * @return 成功更新为 1；状态或代次已变化时为 0
      */
     public int resetForManualRetry(OutboxMessage message, EncryptedMessagePayload encrypted, int nextGeneration) {
         return jdbc.update(
@@ -332,12 +330,12 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 仅将匹配代次的 PUBLISH_FAILED 或 DEAD 事件置为 IGNORED，并记录操作者和忽略时间。
      *
-     * @param eventId 异步事件的全局唯一标识
-     * @param generation 调用方提供的 {@code generation} 值
-     * @param actorId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param eventId 异步事件唯一标识
+     * @param generation 当前处理的事件代次
+     * @param actorId 执行忽略操作的管理员 ID
+     * @return 成功更新为 1；状态或代次已变化时为 0
      */
     public int ignore(String eventId, int generation, String actorId) {
         return jdbc.update(
@@ -353,11 +351,11 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按 ID 限量删除更新时间早于截止时刻的 DELIVERED、EXPIRED 或 IGNORED 记录。
      *
-     * @param before 调用方提供的 {@code before} 值
-     * @param limit 调用方提供的 {@code limit} 值
-     * @return 按当前规则计算或读取的数值
+     * @param before 严格早于此时间的记录才可清理
+     * @param limit 本次最多处理的记录数量
+     * @return 实际删除行数
      */
     public int cleanupCompleted(Instant before, int limit) {
         return jdbc.update(
@@ -371,9 +369,9 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按 Outbox 状态统计记录数量。
      *
-     * @return 当前操作产生的 Map<String,Long> 结果
+     * @return 状态与数量的只读映射
      */
     public Map<String, Long> statusCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
@@ -384,9 +382,9 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 计算 PENDING 或 PUBLISHING 记录中最早创建时间距今的秒数。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 非负等待秒数，无匹配记录时为零
      */
     public double oldestPendingSeconds() {
         Double seconds = jdbc.queryForObject(
@@ -402,12 +400,12 @@ public class OutboxRepository {
     }
 
     /**
-     * 转换所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将 JDBC 行字段转换为 Outbox 快照，读取载荷原始字节并转换可空时间字段。
      *
-     * @param result 调用方提供的 {@code result} 值
-     * @param rowNumber 调用方提供的 {@code rowNumber} 值
-     * @return 当前操作产生的 OutboxMessage 结果
-     * @throws SQLException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param result 已定位到当前行的 JDBC 结果集
+     * @param rowNumber RowMapper 回调行号，本映射不使用该值
+     * @return 完整的 Outbox 记录
+     * @throws SQLException 读取 JDBC 列值失败时抛出
      */
     private static OutboxMessage map(ResultSet result, int rowNumber) throws SQLException {
         return new OutboxMessage(
@@ -435,20 +433,20 @@ public class OutboxRepository {
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将可空 Instant 转换为 JDBC Timestamp。
      *
-     * @param value 待处理或存储的值
-     * @return 当前操作产生的 Timestamp 结果
+     * @param value 可空的待转换时间
+     * @return 对应时间戳；输入为空时仍为空
      */
     private static Timestamp timestamp(Instant value) {
         return value == null ? null : Timestamp.from(value);
     }
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 将可空 JDBC Timestamp 转换为 Instant。
      *
-     * @param value 待处理或存储的值
-     * @return 当前操作产生的 Instant 结果
+     * @param value 可空的待转换时间
+     * @return 对应时间点；输入为空时仍为空
      */
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();

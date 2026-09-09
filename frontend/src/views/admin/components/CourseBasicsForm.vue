@@ -41,7 +41,7 @@ defineProps({
 
 const emit = defineEmits(['clear-error', 'update-field']);
 
-/** 处理 updateField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 将字段变更交给父页面，课程标题变化时同时清除其错误提示。 */
 function updateField(field, value) {
   emit('update-field', field, value);
   if (field === 'courseName') emit('clear-error', field);

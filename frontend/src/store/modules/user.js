@@ -98,7 +98,7 @@
 import { getSession } from '../../api/auth.js';
 import { getCurrentUser } from '../../api/profile.js';
 
-/** 读取 getDefaultState 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 从 sessionStorage 读取展示资料；认证、角色和已恢复标记必须等待服务端 Session 确认。 */
 const getDefaultState = () => {
   return {
     authenticated: false,
@@ -116,6 +116,7 @@ const getDefaultState = () => {
 const state = getDefaultState();
 
 const mutations = {
+  /** 清空缓存的展示资料并重置身份视图，标记本轮 Session 恢复已完成。 */
   RESET_STATE: (state) => {
     sessionStorage.setItem('id', '');
     sessionStorage.setItem('name', '');
@@ -126,9 +127,11 @@ const mutations = {
     Object.assign(state, getDefaultState());
     state.hydrated = true;
   },
+  /** 更新是否已从服务端恢复 Session 的标记。 */
   SET_HYDRATED: (state, hydrated) => {
     state.hydrated = hydrated;
   },
+  /** 采用服务端认证、角色与主体信息，并缓存用于展示的编号和名称。 */
   SET_SESSION: (state, session) => {
     state.authenticated = Boolean(session?.authenticated);
     state.role = session?.role || '';
@@ -137,27 +140,33 @@ const mutations = {
     sessionStorage.setItem('id', state.id);
     sessionStorage.setItem('name', state.name);
   },
+  /** 同步用户编号到 Vuex 和会话内展示缓存。 */
   SET_ID: (state, id) => {
     state.id = id;
     sessionStorage.setItem('id', id);
   },
+  /** 同步显示名称到 Vuex 和会话内展示缓存。 */
   SET_NAME: (state, name) => {
     // state.name = name
     state.name = name;
     sessionStorage.setItem('name', name);
   },
+  /** 同步邮箱到 Vuex 和会话内展示缓存。 */
   SET_EMAIL: (state, email) => {
     state.email = email;
     sessionStorage.setItem('email', email);
   },
+  /** 同步专业编号到 Vuex 和会话内展示缓存。 */
   SET_MAJOR: (state, major) => {
     state.major = major;
     sessionStorage.setItem('major', major);
   },
+  /** 同步学习语言编号到 Vuex 和会话内展示缓存。 */
   SET_LANGUAGE: (state, language) => {
     state.language = language;
     sessionStorage.setItem('language', language);
   },
+  /** 同步头像地址到 Vuex 和会话内展示缓存。 */
   SET_AVATAR: (state, avatar) => {
     state.avatar = avatar;
     sessionStorage.setItem('avatar', avatar);
@@ -165,6 +174,7 @@ const mutations = {
 };
 
 const actions = {
+  /** 恢复服务端 Session；未认证时重置展示状态，USER 身份另取个人资料。已恢复且未强制刷新时复用状态。 */
   async hydrateSession({ state, commit }, { force = false } = {}) {
     if (state.hydrated && !force) return state;
     const response = await getSession();

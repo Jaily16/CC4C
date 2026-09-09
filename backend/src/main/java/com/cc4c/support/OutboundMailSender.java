@@ -15,19 +15,17 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
-/**
- * OutboundMailSender 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 通过 SMTP 发送纯文本通知，并把组装、认证及 SMTP 状态转换为消息重试所需的失败分类。 */
 @Component
 public final class OutboundMailSender {
     private final JavaMailSender mailSender;
     private final String from;
 
     /**
-     * 创建 OutboundMailSender 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存邮件发送器和发件地址；实际 SMTP 发送发生在 sendText。
      *
-     * @param mailSender 调用方提供的 {@code mailSender} 值
-     * @param from 调用方提供的 {@code from} 值
+     * @param mailSender SMTP 邮件发送器
+     * @param from 邮件发件地址
      */
     public OutboundMailSender(JavaMailSender mailSender, @Value("${spring.mail.username}") String from) {
         this.mailSender = mailSender;
@@ -35,12 +33,12 @@ public final class OutboundMailSender {
     }
 
     /**
-     * 按既有可靠消息或邮件协议发送数据，并保留调用方可观察的失败语义。
+     * 创建 UTF-8 纯文本邮件，附加事件标识后发送；永久失败与可重试失败由 MailDeliveryException 区分。
      *
-     * @param eventId 目标对象的稳定标识
-     * @param to 调用方提供的 {@code to} 值
-     * @param subject 调用方提供的 {@code subject} 值
-     * @param body 调用方提供的 {@code body} 值
+     * @param eventId 用于邮件头部关联的事件 ID
+     * @param to 收件人地址
+     * @param subject 邮件主题
+     * @param body 纯文本邮件正文
      */
     public void sendText(String eventId, String to, String subject, String body) {
         try {
@@ -68,10 +66,10 @@ public final class OutboundMailSender {
     }
 
     /**
-     * 执行 OutboundMailSender 中的 smtpStatus 职责，并保持既有权限、事务与副作用边界。
+     * 先检查各邮件发送异常，再沿外层原因链查找 SMTP 状态码。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param exception 用于提取 SMTP 状态的发送异常
+     * @return 找到的首个非零 SMTP 状态码；未找到时为 0
      */
     private int smtpStatus(MailSendException exception) {
         for (Exception nested : exception.getMessageExceptions()) {
@@ -84,10 +82,10 @@ public final class OutboundMailSender {
     }
 
     /**
-     * 执行 OutboundMailSender 中的 smtpStatus 职责，并保持既有权限、事务与副作用边界。
+     * 沿异常原因链读取地址拒绝或发送失败的 SMTP 返回码。
      *
-     * @param exception 调用方提供的 {@code exception} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param exception 用于提取 SMTP 状态的发送异常
+     * @return SMTP 返回码；原因链中没有对应异常时为 0
      */
     private int smtpStatus(Throwable exception) {
         Throwable current = exception;

@@ -18,7 +18,7 @@ const store = useDashboardStore();
 const range = defineModel('range', { type: String, default: '1h' });
 const polling = usePolling((signal) => store.load(props.dashboardId, range.value, signal));
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 时间范围改变时中止并等待旧轮询结束，再按新范围刷新仪表板。 */
 watch(range, () => void polling.refresh(true));
 </script>
 

@@ -16,9 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
-/**
- * 协调独立观测门户用例及其持久化、安全和外部协作边界。
- */
+/** 通过随机 Cookie 和摘要 Redis 键维护观测会话，续期不能越过绝对有效期。 */
 @Service
 public final class ObservabilitySessionService {
     public static final String REQUEST_ATTRIBUTE = ObservabilitySessionService.class.getName() + ".activeSession";
@@ -32,12 +30,12 @@ public final class ObservabilitySessionService {
     private final ObservabilityPortalProperties properties;
 
     /**
-     * 创建 ObservabilitySessionService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入 Redis、Token 摘要、显式 JSON 数据映射及观测会话配置。
      *
-     * @param redis 调用方提供的 {@code redis} 值
-     * @param hasher 调用方提供的 {@code hasher} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param properties 由容器注入的 ObservabilityPortalProperties 协作组件
+     * @param redis 安全状态 Redis 操作入口
+     * @param hasher Token 和身份标识的 HMAC 摘要服务
+     * @param objectMapper 显式会话字段或响应 JSON 映射器
+     * @param properties 观测身份及 Cookie 配置
      */
     ObservabilitySessionService(
             StringRedisTemplate redis,
@@ -51,12 +49,12 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 删除请求携带的旧会话后生成新令牌，保存受空闲和绝对期限限制的 Redis 记录并写 Cookie。
      *
-     * @param username 待认证或查询的账户名
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 当前操作产生的 ActiveSession 结果
+     * @param username 观测登录用户名
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
+     * @return 新会话的身份及两类过期时间
      */
     public ActiveSession replace(String username, HttpServletRequest request, HttpServletResponse response) {
         invalidate(request);
@@ -71,10 +69,10 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 规范化观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 校验令牌格式并读取会话；用户名变化或绝对过期时删除记录，否则延长 Redis TTL 至剩余允许期限。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 当前操作产生的 ActiveSession 结果
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
+     * @return 有效且续期成功的会话；缺失或失效时为空
      */
     ActiveSession resolve(HttpServletRequest request) {
         String token = cookieValue(request);
@@ -101,19 +99,19 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 判断观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 只判断请求是否携带观测会话 Cookie，不验证格式或会话有效性。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
+     * @return 存在专属 Cookie 时为 true
      */
     boolean hasCookie(HttpServletRequest request) {
         return cookieValue(request) != null;
     }
 
     /**
-     * 删除或失效观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 仅对格式合法的观测令牌删除对应 Redis 键，不处理业务 Session。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
      */
     public void invalidate(HttpServletRequest request) {
         String token = cookieValue(request);
@@ -123,19 +121,19 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 删除或失效观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 写入零有效期的观测会话 Cookie；Redis 撤销由调用方单独执行。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
      */
     public void clearCookie(HttpServletResponse response) {
         writeCookie(response, "", Duration.ZERO);
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取请求中的第一个观测会话 Cookie。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 按当前协议生成或读取的字符串值
+     * @param request 当前 HTTP 请求，提供专属 Cookie 和请求头
+     * @return 原始令牌；无 Cookie 时为空
      */
     private String cookieValue(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
@@ -151,19 +149,19 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 以观测命名空间、session 段和 Token 的 HMAC 摘要构造 Redis 键。
      *
-     * @param token 当前协议使用且不得记录的安全令牌
-     * @return 按当前协议生成或读取的字符串值
+     * @param token 观测原始会话令牌，不得记录
+     * @return 不含原始 Token 的会话键
      */
     private String key(String token) {
         return properties.sessionNamespace() + ":session:" + hasher.hash(token);
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 生成 32 字节安全随机数并以无填充 URL 安全 Base64 编码。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return 43 字符观测会话令牌
      */
     private String newToken() {
         byte[] bytes = new byte[32];
@@ -172,11 +170,11 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 取空闲时长与距离绝对到期的剩余时长中的较小值。
      *
-     * @param now 调用方提供的 {@code now} 值
-     * @param absoluteExpiresAt 当前操作使用的时间点
-     * @return 当前操作产生的 Duration 结果
+     * @param now 本次计算的当前时间
+     * @param absoluteExpiresAt 会话绝对过期时间
+     * @return 本次写入或续期的 Redis TTL
      */
     private Duration sessionTtl(Instant now, Instant absoluteExpiresAt) {
         Duration remaining = Duration.between(now, absoluteExpiresAt);
@@ -184,10 +182,10 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 编码或保护观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 将显式 SessionValue 字段编码为 JSON，编码失败转换为不含原文的异常。
      *
-     * @param value 待处理或存储的值
-     * @return 按当前协议生成或读取的字符串值
+     * @param value 仅含用户名和时间字段的会话记录
+     * @return 待保存的观测会话 JSON
      */
     private String encode(SessionValue value) {
         try {
@@ -198,10 +196,10 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 解析观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按固定 SessionValue 类型解析 JSON，解析失败转换为不含原文的异常。
      *
-     * @param encoded 调用方提供的 {@code encoded} 值
-     * @return 当前操作产生的 SessionValue 结果
+     * @param encoded 待解析的观测会话 JSON，不得记录
+     * @return 观测会话持久化字段
      */
     private SessionValue decode(String encoded) {
         try {
@@ -212,11 +210,11 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 追加 HttpOnly、SameSite=Strict、路径为 /observability 的观测会话 Cookie。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @param value 待处理或存储的值
-     * @param maxAge 调用方提供的 {@code maxAge} 值
+     * @param response 接收 Cookie 或错误正文的 HTTP 响应
+     * @param value 待写入 Cookie 的令牌，清除时为空字符串
+     * @param maxAge Cookie 有效时长，清除时为零
      */
     private void writeCookie(HttpServletResponse response, String value, Duration maxAge) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, value)
@@ -230,20 +228,20 @@ public final class ObservabilitySessionService {
     }
 
     /**
-     * ActiveSession 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 表示当前请求已解析并续期的观测身份及过期时间。
      *
-     * @param username 待认证或查询的账户名
-     * @param idleExpiresAt 当前操作使用的时间点
-     * @param absoluteExpiresAt 当前操作使用的时间点
+     * @param username 观测登录用户名
+     * @param idleExpiresAt 本次续期后的空闲过期时间
+     * @param absoluteExpiresAt 会话绝对过期时间
      */
     public record ActiveSession(String username, Instant idleExpiresAt, Instant absoluteExpiresAt) {}
 
     /**
-     * SessionValue 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 持久化观测用户名、创建时间和绝对期限；空闲期限由 Redis TTL 维护。
      *
-     * @param username 待认证或查询的账户名
-     * @param createdAt 当前操作使用的时间点
-     * @param absoluteExpiresAt 当前操作使用的时间点
+     * @param username 观测登录用户名
+     * @param createdAt 会话创建时间
+     * @param absoluteExpiresAt 会话绝对过期时间
      */
     private record SessionValue(String username, Instant createdAt, Instant absoluteExpiresAt) {}
 }

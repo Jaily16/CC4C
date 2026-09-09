@@ -42,20 +42,20 @@ public final class MybatisMetricsInterceptor implements Interceptor {
     private final ThreadLocal<Integer> depth = ThreadLocal.withInitial(() -> 0);
 
     /**
-     * 创建 MybatisMetricsInterceptor 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存记录 MyBatis 耗时的指标适配器。
      *
-     * @param metrics 调用方提供的 {@code metrics} 值
+     * @param metrics 受控指标适配器
      */
     public MybatisMetricsInterceptor(Cc4cMetrics metrics) {
         this.metrics = metrics;
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 仅为当前线程最外层查询或更新记录耗时及结果；嵌套调用透传，并在退出时恢复深度。
      *
-     * @param invocation 调用方提供的 {@code invocation} 值
-     * @return 当前操作产生的 Object 结果
-     * @throws Throwable 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param invocation 当前 MyBatis 执行器调用
+     * @return 底层 MyBatis 调用的原始返回值
+     * @throws Throwable 底层 MyBatis 调用失败时原样传播
      */
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
@@ -95,9 +95,9 @@ public final class MybatisMetricsInterceptor implements Interceptor {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 恢复嵌套深度；回到最外层时移除 ThreadLocal。
      *
-     * @param value 待处理或存储的值
+     * @param value 进入本次拦截前的线程调用深度
      */
     private void restoreDepth(int value) {
         if (value == 0) {
@@ -108,10 +108,10 @@ public final class MybatisMetricsInterceptor implements Interceptor {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 从 statement ID 去掉末尾方法名，精确匹配五个 Mapper 的业务分类。
      *
-     * @param statementId 目标对象的稳定标识
-     * @return 按当前协议生成或读取的字符串值
+     * @param statementId 包含 Mapper 完整类名和方法名的 statement ID
+     * @return identity、catalog、community、interaction；未知 Mapper 返回 shared
      */
     private String moduleFor(String statementId) {
         int separator = statementId.lastIndexOf('.');

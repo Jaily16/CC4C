@@ -5,26 +5,24 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/**
- * 校验身份认证前置条件，失败时阻止不安全的继续执行。
- */
+/** 启动时检查两张账户表的密码是否具有 bcrypt 标识，发现未迁移记录则阻止就绪。 */
 @Component
 final class PasswordReadinessVerifier implements ApplicationRunner {
     private final JdbcTemplate jdbc;
 
     /**
-     * 创建 PasswordReadinessVerifier 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入仅用于启动密码标识检查的 JDBC 执行器。
      *
-     * @param jdbc 调用方提供的 {@code jdbc} 值
+     * @param jdbc 账户表查询的 JDBC 执行器
      */
     PasswordReadinessVerifier(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     /**
-     * 执行当前组件约定的单次任务，并按既有失败语义向调用方报告结果。
+     * 统计包括逻辑删除记录在内的空密码或非 bcrypt 前缀密码；只检查标识，不验证每份哈希内容。
      *
-     * @param args 调用方提供的 {@code args} 值
+     * @param args Spring 启动参数，本检查不使用其内容
      */
     @Override
     public void run(ApplicationArguments args) {

@@ -30,9 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * IdentityController 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 提供业务用户注册、资料、密码、认证及头像上传入口。 */
 @Validated
 @RestController
 @RequestMapping("/users")
@@ -44,13 +42,13 @@ public class IdentityController {
     private final String requestAvatarPath;
 
     /**
-     * 创建 IdentityController 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入用户、验证码和认证服务，并保存头像存储及公开路径。
      *
-     * @param identityService 由容器注入的 IdentityService 协作组件
-     * @param verificationCodeService 由容器注入的 VerificationCodeService 协作组件
-     * @param authenticationService 由容器注入的 AuthenticationService 协作组件
-     * @param saveAvatarPath 调用方提供的 {@code saveAvatarPath} 值
-     * @param requestAvatarPath 调用方提供的 {@code requestAvatarPath} 值
+     * @param identityService 用户及管理员资料和密码服务
+     * @param verificationCodeService 按用途申请验证码发送的服务
+     * @param authenticationService 业务认证与会话注销服务
+     * @param saveAvatarPath 头像磁盘存储目录
+     * @param requestAvatarPath 头像公开请求路径前缀
      */
     IdentityController(
             IdentityService identityService,
@@ -66,10 +64,10 @@ public class IdentityController {
     }
 
     /**
-     * 执行 IdentityController 中的 uploadAvatar 职责，并保持既有权限、事务与副作用边界。
+     * 存储头像图片并返回公开请求路径；此入口本身不更新用户资料中的头像字段。
      *
-     * @param file 调用方提供的 {@code file} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param file 通过 multipart 提交的图片文件
+     * @return 新头像的公开路径响应
      */
     @Operation(summary = "Upload a user avatar")
     @PostMapping("/me/avatar")
@@ -79,10 +77,10 @@ public class IdentityController {
     }
 
     /**
-     * 变更 IdentityController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 委托用户服务验证注册资料并创建用户，成功使用 HTTP 201。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的用户注册资料和验证码
+     * @return 注册结果响应
      */
     @Operation(summary = "Register a user")
     @PostMapping
@@ -91,12 +89,12 @@ public class IdentityController {
     }
 
     /**
-     * 变更 IdentityController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 使用邮箱验证码重置密码后注销当前业务会话。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @param servletRequest 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param servletResponse 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的邮箱、验证码及新密码
+     * @param servletRequest 当前 HTTP 请求，用于认证或注销会话
+     * @param servletResponse 接收会话 Cookie 变更的 HTTP 响应
+     * @return 密码重置结果
      */
     @PutMapping("/password/forget")
     public ApiResponse<Boolean> resetPassword(
@@ -109,12 +107,12 @@ public class IdentityController {
     }
 
     /**
-     * 变更 IdentityController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 使用当前密码修改用户密码后注销当前业务会话。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @param servletRequest 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param servletResponse 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的当前密码及新密码
+     * @param servletRequest 当前 HTTP 请求，用于认证或注销会话
+     * @param servletResponse 接收会话 Cookie 变更的 HTTP 响应
+     * @return 密码修改结果
      */
     @PutMapping("/me/password")
     public ApiResponse<Boolean> changePassword(
@@ -127,12 +125,12 @@ public class IdentityController {
     }
 
     /**
-     * 执行 IdentityController 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 以邮箱和密码委托认证服务建立 USER 会话。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @param servletRequest 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的用户邮箱和密码
+     * @param servletRequest 当前 HTTP 请求，用于认证或注销会话
+     * @param response 接收协议正文或 Cookie 的 HTTP 响应
+     * @return 用户登录结果
      */
     @PostMapping("/login")
     public ApiResponse<Boolean> login(
@@ -142,11 +140,11 @@ public class IdentityController {
     }
 
     /**
-     * 执行 IdentityController 的身份会话流程，并保持 Cookie、CSRF 与限流边界。
+     * 委托认证服务注销当前业务会话并清理认证 Cookie。
      *
-     * @param request 当前 HTTP 请求，用于读取来源与请求上下文
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 当前 HTTP 请求，提供会话和安全校验上下文
+     * @param response 接收协议正文或 Cookie 的 HTTP 响应
+     * @return 退出结果
      */
     @PostMapping("/logout")
     public ApiResponse<Boolean> logout(HttpServletRequest request, HttpServletResponse response) {
@@ -154,10 +152,10 @@ public class IdentityController {
     }
 
     /**
-     * 变更 IdentityController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 委托用户服务更新当前用户资料。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的当前用户可选更新资料
+     * @return 资料更新结果
      */
     @PutMapping("/me")
     public ApiResponse<Boolean> update(@Valid @RequestBody UserUpdateRequest request) {
@@ -165,10 +163,10 @@ public class IdentityController {
     }
 
     /**
-     * 执行 IdentityController 中的 email 职责，并保持既有权限、事务与副作用边界。
+     * 提交指定用途的验证码发送请求，使用 HTTP 202 表示已接收。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的收件邮箱和验证码用途
+     * @return 验证码发送申请的接收结果
      */
     @PostMapping("/email")
     public ResponseEntity<ApiResponse<Boolean>> email(@Valid @RequestBody VerificationEmailRequest request) {
@@ -177,9 +175,9 @@ public class IdentityController {
     }
 
     /**
-     * 执行 IdentityController 中的 info 职责，并保持既有权限、事务与副作用边界。
+     * 查询当前登录用户的资料响应。
      *
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @return 不含密码字段的当前用户资料
      */
     @GetMapping("/me")
     public ApiResponse<UserResponse> info() {

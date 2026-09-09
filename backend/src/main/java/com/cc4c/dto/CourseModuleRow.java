@@ -2,9 +2,7 @@ package com.cc4c.dto;
 
 import lombok.Data;
 
-/**
- * 承载课程目录查询返回的一行投影数据。
- */
+/** 接收课程模块的语言、序号、名称和级别投影。 */
 @Data
 public class CourseModuleRow {
     private Integer languageId;

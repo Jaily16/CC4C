@@ -12,17 +12,15 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-/**
- * 定义课程目录的 MyBatis 持久化及结果映射边界。
- */
+/** 访问课程、语言及课程模块关联；自定义查询承担收藏数聚合和推荐筛选。 */
 @Mapper
 public interface CatalogMapper extends BaseMapper<CourseEntity> {
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 聚合未删除课程的收藏数，按收藏数降序、课程 ID 升序分页。
      *
-     * @param page 从零或接口约定起算的页码
-     * @return 当前操作产生的 IPage<CourseEntity> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @return 附带收藏数的课程分页结果
      */
     @Select(
             """
@@ -37,19 +35,19 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
     IPage<CourseEntity> selectHome(Page<CourseEntity> page);
 
     /**
-     * 读取所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 读取未删除语言的名称。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 按当前协议生成或读取的字符串值
+     * @param languageId 语言 ID
+     * @return 语言名称，不存在时为空
      */
     @Select("SELECT language_name FROM programming_language WHERE language_id = #{languageId} AND deleted = 0")
     String findLanguageName(int languageId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按模块序号升序查询指定语言的全部模块。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 按当前方法约定返回结果集合
+     * @param languageId 语言 ID
+     * @return 语言模块列表
      */
     @Select(
             """
@@ -61,12 +59,12 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
     List<CourseModuleRow> selectModules(int languageId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按语言和包含两端的级别范围筛选模块，按序号升序排列。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param minimum 调用方提供的 {@code minimum} 值
-     * @param maximum 调用方提供的 {@code maximum} 值
-     * @return 按当前方法约定返回结果集合
+     * @param languageId 语言 ID
+     * @param minimum 级别下限，包含该值
+     * @param maximum 级别上限，包含该值
+     * @return 满足级别范围的模块列表
      */
     @Select(
             """
@@ -79,10 +77,10 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
             @Param("languageId") int languageId, @Param("minimum") int minimum, @Param("maximum") int maximum);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 联合模块课程关系读取未删除课程名称，按模块序号及课程 ID 升序排列。
      *
-     * @param languageId 目标对象的稳定标识
-     * @return 按当前方法约定返回结果集合
+     * @param languageId 语言 ID
+     * @return 模块序号与课程名称投影
      */
     @Select(
             """
@@ -95,12 +93,12 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
     List<ModuleCourseNameRow> selectCourseNamesByLanguage(int languageId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 读取级别处于指定范围或等于 66 的未删除课程名称，保留模块归属。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param minimum 调用方提供的 {@code minimum} 值
-     * @param maximum 调用方提供的 {@code maximum} 值
-     * @return 按当前方法约定返回结果集合
+     * @param languageId 语言 ID
+     * @param minimum 级别下限，包含该值
+     * @param maximum 级别上限，包含该值
+     * @return 推荐课程的模块序号与名称投影
      */
     @Select(
             """
@@ -116,11 +114,11 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
             @Param("languageId") int languageId, @Param("minimum") int minimum, @Param("maximum") int maximum);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按语言 ID 和模块序号统计匹配模块。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param priority 调用方提供的 {@code priority} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param languageId 语言 ID
+     * @param priority 语言下的模块序号
+     * @return 至少存在一个匹配模块时为 true
      */
     @Select(
             """
@@ -131,13 +129,13 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
     boolean moduleExists(@Param("languageId") int languageId, @Param("priority") int priority);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 插入指定语言下的课程模块。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param priority 调用方提供的 {@code priority} 值
-     * @param moduleName 调用方提供的 {@code moduleName} 值
-     * @param level 调用方提供的 {@code level} 值
-     * @return 按当前规则计算或读取的数值
+     * @param languageId 语言 ID
+     * @param priority 语言下的模块序号
+     * @param moduleName 课程模块名称
+     * @param level 模块级别编码
+     * @return 插入影响行数
      */
     @Insert(
             """
@@ -151,12 +149,12 @@ public interface CatalogMapper extends BaseMapper<CourseEntity> {
             @Param("level") int level);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 插入课程与语言模块的关联。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param priority 调用方提供的 {@code priority} 值
-     * @param courseId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param languageId 语言 ID
+     * @param priority 语言下的模块序号
+     * @param courseId 课程 ID
+     * @return 插入影响行数
      */
     @Insert(
             """

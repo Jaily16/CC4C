@@ -1,8 +1,6 @@
 package com.cc4c.common;
 
-/**
- * BusinessCode 枚举共享基础设施的有限状态或协议取值。
- */
+/** 定义统一响应体中的业务码，覆盖通用错误及课程、博客和互动操作；这些数值不等同于 HTTP 状态。 */
 public enum BusinessCode {
     SUCCESS(200),
     FAIL(201),
@@ -57,18 +55,18 @@ public enum BusinessCode {
     private final int code;
 
     /**
-     * 创建 BusinessCode 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 为枚举项绑定响应体中的业务码。
      *
-     * @param code 调用方提供的 {@code code} 值
+     * @param code 统一响应体中的业务码
      */
     BusinessCode(int code) {
         this.code = code;
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 返回该枚举项对应的业务码。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 枚举绑定的业务码
      */
     public int code() {
         return code;

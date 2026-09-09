@@ -22,17 +22,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * ObservabilitySecurityConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
- */
+/** 在管理上下文中配置独立 Basic 认证，隔离 Actuator 与业务身份。 */
 @ManagementContextConfiguration(proxyBeanMethods = false)
 public class ObservabilitySecurityConfiguration {
 
     /**
-     * 执行 ObservabilitySecurityConfiguration 中的 observabilityAuthenticationManager 职责，并保持既有权限、事务与副作用边界。
+     * 使用配置的管理账号和 cost-12 BCrypt 摘要建立内存认证提供器。
      *
-     * @param properties 调用方提供的 {@code properties} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param properties 对应组件的类型化配置
+     * @return 仅供管理端使用的认证管理器
      */
     @Bean("observabilityAuthenticationManager")
     AuthenticationManager observabilityAuthenticationManager(ObservabilityProperties properties) {
@@ -48,13 +46,13 @@ public class ObservabilitySecurityConfiguration {
     }
 
     /**
-     * 执行 ObservabilitySecurityConfiguration 中的 observabilitySecurityFilterChain 职责，并保持既有权限、事务与副作用边界。
+     * 公开健康探测的 GET/HEAD，保护依赖、信息和 Prometheus 端点；无状态 Basic 认证拒绝其余请求。
      *
-     * @param http 调用方提供的 {@code http} 值
-     * @param observabilityAuthenticationManager 调用方提供的 {@code observabilityAuthenticationManager} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @return 按当前声明计算、查询或转换得到的结果
-     * @throws Exception 既有声明所描述的失败条件发生时抛出
+     * @param http Spring Security HTTP 安全构建器
+     * @param observabilityAuthenticationManager 管理端独立认证管理器
+     * @param objectMapper 响应 JSON 映射器
+     * @return 管理端 Actuator 安全链
+     * @throws Exception 构建 Spring Security 过滤器链失败时抛出
      */
     @Bean
     @Order(1)

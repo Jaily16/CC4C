@@ -6,9 +6,7 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.stereotype.Component;
 
-/**
- * AsyncMessagingHealthIndicator 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 根据异步消息采样快照判断积压、失败和采样新鲜度，不在健康请求中重新查询消息表。 */
 @Component("asyncMessagingHealthIndicator")
 final class AsyncMessagingHealthIndicator implements HealthIndicator {
     private static final Status DEGRADED = new Status("DEGRADED");
@@ -16,10 +14,10 @@ final class AsyncMessagingHealthIndicator implements HealthIndicator {
     private final ObservabilityProperties properties;
 
     /**
-     * 创建 AsyncMessagingHealthIndicator 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存消息快照采样器和观测开关。
      *
-     * @param sampler 调用方提供的 {@code sampler} 值
-     * @param properties 由容器注入的 ObservabilityProperties 协作组件
+     * @param sampler 异步消息快照采样器
+     * @param properties 该组件使用的观测或 Prometheus 设置
      */
     AsyncMessagingHealthIndicator(AsyncMetricsSampler sampler, ObservabilityProperties properties) {
         this.sampler = sampler;
@@ -27,9 +25,9 @@ final class AsyncMessagingHealthIndicator implements HealthIndicator {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 观测关闭时报告 UP；采样失败、超过 30 秒未更新、待发送超过 60 秒或存在失败及死信时报告 DEGRADED。
      *
-     * @return 当前操作产生的 Health 结果
+     * @return 包含积压和采样状态的健康结果
      */
     @Override
     public Health health() {

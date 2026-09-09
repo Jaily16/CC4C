@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-/** index 管理页面，协调管理员只可访问的查询与操作状态。 */
+/** 管理员布局容器，提供内容与异步消息导航，并协调管理员退出。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref } from 'vue';
 import { resetCsrfToken } from '@/api/client';
@@ -87,10 +87,10 @@ const menuItems = [
   { path: '/admin/checkBlog', label: '审核社区博客', shortLabel: '审核', icon: Checked },
   { path: '/admin/messaging', label: '异步消息恢复', shortLabel: '消息', icon: Bell },
 ];
-/** 从现有响应式状态派生 activePath，不发起请求或写入外部数据。 */
+/** 读取当前路由用于标记管理菜单。 */
 const activePath = computed(() => route.path);
 
-/** 处理 logout 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 尝试注销管理员会话；无论请求成败都清空本地身份和 CSRF 缓存并进入管理员登录页。 */
 async function logout() {
   try {
     await logoutAdmin();
@@ -104,7 +104,7 @@ async function logout() {
   }
 }
 
-/** 处理 changePassword 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 校验并提交管理员密码修改，成功时清空身份并跳转登录；请求结束后始终清空密码字段。 */
 async function changePassword() {
   passwordError.value = '';
   const bytes = new TextEncoder().encode(passwordForm.newPassword).length;

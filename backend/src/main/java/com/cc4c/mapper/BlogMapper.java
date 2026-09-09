@@ -12,18 +12,16 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-/**
- * 定义博客社区的 MyBatis 持久化及结果映射边界。
- */
+/** 访问博客及语言、作者提交关联和用户草稿；博客状态与归属校验由服务负责。 */
 @Mapper
 public interface BlogMapper extends BaseMapper<BlogEntity> {
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 分页查询指定语言下已通过审核且未删除的博客，按发布时间和 ID 倒序排列。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param languageId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<BlogEntity> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param languageId 语言 ID
+     * @return 该语言的已审核博客分页结果
      */
     @Select(
             """
@@ -36,11 +34,11 @@ public interface BlogMapper extends BaseMapper<BlogEntity> {
     IPage<BlogEntity> selectByLanguage(Page<BlogEntity> page, int languageId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 通过提交关系分页查询指定作者未删除的博客，不筛选审核状态。
      *
-     * @param page 从零或接口约定起算的页码
-     * @param userId 目标对象的稳定标识
-     * @return 当前操作产生的 IPage<BlogEntity> 结果
+     * @param page MyBatis-Plus 分页对象，携带页码和页大小
+     * @param userId 用户 ID
+     * @return 作者博客分页结果
      */
     @Select(
             """
@@ -53,30 +51,30 @@ public interface BlogMapper extends BaseMapper<BlogEntity> {
     IPage<BlogEntity> selectByWriter(Page<BlogEntity> page, long userId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 查询博客关联的语言 ID，按 ID 升序排列。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前方法约定返回结果集合
+     * @param blogId 博客 ID
+     * @return 语言 ID 列表
      */
     @Select("SELECT language_id FROM blog_involves_language WHERE blog_id = #{blogId} ORDER BY language_id")
     List<Integer> selectLanguageIds(long blogId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 插入一条博客与语言的关联。
      *
-     * @param blogId 目标对象的稳定标识
-     * @param languageId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param blogId 博客 ID
+     * @param languageId 语言 ID
+     * @return 插入影响行数
      */
     @Insert("INSERT INTO blog_involves_language(blog_id, language_id) VALUES(#{blogId}, #{languageId})")
     int insertLanguage(@Param("blogId") long blogId, @Param("languageId") int languageId);
 
     /**
-     * 创建所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 插入用户提交博客的关联，并由数据库记录当前提交时间。
      *
-     * @param userId 目标对象的稳定标识
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param blogId 博客 ID
+     * @return 插入影响行数
      */
     @Insert(
             """
@@ -86,11 +84,11 @@ public interface BlogMapper extends BaseMapper<BlogEntity> {
     int insertSubmission(@Param("userId") long userId, @Param("blogId") long blogId);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按用户 ID 新建草稿；已有草稿时覆盖正文。
      *
-     * @param userId 目标对象的稳定标识
-     * @param content 当前业务对象的正文内容
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @param content 用户草稿正文
+     * @return 数据库报告的插入或更新影响行数
      */
     @Insert(
             """
@@ -101,28 +99,28 @@ public interface BlogMapper extends BaseMapper<BlogEntity> {
     int upsertDraft(@Param("userId") long userId, @Param("content") String content);
 
     /**
-     * 执行所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 按用户 ID 读取草稿正文。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 按当前协议生成或读取的字符串值
+     * @param userId 用户 ID
+     * @return 草稿正文，不存在时为空
      */
     @Select("SELECT content FROM blog_draft WHERE user_id = #{userId}")
     String selectDraft(long userId);
 
     /**
-     * 删除或失效所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 物理删除指定用户的草稿记录。
      *
-     * @param userId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param userId 用户 ID
+     * @return 删除影响行数
      */
     @Delete("DELETE FROM blog_draft WHERE user_id = #{userId}")
     int deleteDraft(long userId);
 
     /**
-     * 记录所需持久化数据，保持现有 SQL、锁和状态语义。
+     * 对未删除博客的点击数执行数据库原子加一，不在此处筛选审核状态。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 按当前规则计算或读取的数值
+     * @param blogId 博客 ID
+     * @return 更新影响行数
      */
     @Update("UPDATE blog SET click = click + 1 WHERE blog_id = #{blogId} AND deleted = 0")
     int incrementClick(long blogId);

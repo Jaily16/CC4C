@@ -6,27 +6,25 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.stereotype.Component;
 
-/**
- * BusinessCacheHealthIndicator 负责公共技术支撑的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 将业务缓存的可达性与旁路状态映射为健康结果。 */
 @Component("businessCacheHealthIndicator")
 final class BusinessCacheHealthIndicator implements HealthIndicator {
     private static final Status DEGRADED = new Status("DEGRADED");
     private final BusinessCache cache;
 
     /**
-     * 创建 BusinessCacheHealthIndicator 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存提供健康快照的业务缓存协调器。
      *
-     * @param cache 调用方提供的 {@code cache} 值
+     * @param cache 业务缓存健康快照提供者
      */
     BusinessCacheHealthIndicator(BusinessCache cache) {
         this.cache = cache;
     }
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 缓存关闭时报告 UP；开启但不可达或处于旁路时报告 DEGRADED。
      *
-     * @return 当前操作产生的 Health 结果
+     * @return 包含开启、可达和旁路状态的健康结果
      */
     @Override
     public Health health() {

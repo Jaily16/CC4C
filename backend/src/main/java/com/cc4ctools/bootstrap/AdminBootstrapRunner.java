@@ -19,9 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * AdminBootstrapRunner 负责离线维护工具的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 在确认数据库和密码策略后创建首个管理员；已有唯一同账号同密码管理员时幂等返回。 */
 @Component
 final class AdminBootstrapRunner implements ApplicationRunner {
     private static final Pattern DATABASE_NAME =
@@ -34,12 +32,12 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     private final ConfigurableApplicationContext context;
 
     /**
-     * 创建 AdminBootstrapRunner 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存管理员表访问、事务、引导设置及工具上下文。
      *
-     * @param jdbc 调用方提供的 {@code jdbc} 值
-     * @param transactionTemplate 调用方提供的 {@code transactionTemplate} 值
-     * @param environment 调用方提供的 {@code environment} 值
-     * @param context 调用方提供的 {@code context} 值
+     * @param jdbc 密码或管理员表的 JDBC 访问器
+     * @param transactionTemplate 控制单批迁移或引导写入的事务模板
+     * @param environment 读取显式维护设置的 Spring 环境
+     * @param context 维护工具的 Spring 上下文
      */
     AdminBootstrapRunner(
             JdbcTemplate jdbc,
@@ -53,9 +51,9 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件约定的单次任务，并按既有失败语义向调用方报告结果。
+     * 验证七位 ID、数据库和密码，事务内创建或核对管理员；无论成败都关闭上下文。
      *
-     * @param args 调用方提供的 {@code args} 值
+     * @param args 命令行参数；本入口不自行解析
      */
     @Override
     public void run(ApplicationArguments args) {
@@ -81,12 +79,12 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     }
 
     /**
-     * 创建当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 锁定管理员记录，只在没有有效管理员时插入；同 ID 唯一有效管理员且密码匹配时视为已完成。
      *
-     * @param adminId 目标对象的稳定标识
-     * @param password 仅用于当前安全校验的密码或密码摘要
-     * @param encoder 调用方提供的 {@code encoder} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param adminId 七位数字管理员 ID
+     * @param password 待校验或编码的明文密码
+     * @param encoder 写入 BCrypt 摘要的密码编码器
+     * @return 新建时为 true，已有同一有效管理员且密码匹配时为 false
      */
     private boolean createOrVerify(String adminId, String password, PasswordEncoder encoder) {
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -122,9 +120,7 @@ final class AdminBootstrapRunner implements ApplicationRunner {
         return true;
     }
 
-    /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
-     */
+    /** 精确比较 JDBC URL 的数据库名与引导确认值，不匹配即拒绝。 */
     private void verifyDatabaseConfirmation() {
         String jdbcUrl = required("spring.datasource.url");
         Matcher matcher = DATABASE_NAME.matcher(jdbcUrl);
@@ -138,9 +134,9 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     }
 
     /**
-     * 读取当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 读取密码文件并去除末尾换行，要求 8–64 个 Unicode 码点且不超过 72 个 UTF-8 字节。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return 满足长度约束的管理员明文密码
      */
     private String readPassword() {
         Path passwordFile = Path.of(required("CC4C_ADMIN_BOOTSTRAP_PASSWORD_FILE"))
@@ -165,10 +161,10 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 构造写入 BCrypt 编码前缀的委托密码编码器。
      *
-     * @param strength 调用方提供的 {@code strength} 值
-     * @return 当前操作产生的 PasswordEncoder 结果
+     * @param strength BCrypt 工作因子，运行入口限定为 4–16
+     * @return 使用指定工作因子的编码器
      */
     private PasswordEncoder passwordEncoder(int strength) {
         Map<String, PasswordEncoder> encoders = Map.of("bcrypt", new BCryptPasswordEncoder(strength));
@@ -176,10 +172,10 @@ final class AdminBootstrapRunner implements ApplicationRunner {
     }
 
     /**
-     * 校验当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 读取必需的管理员引导设置，缺失或空白时拒绝。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param name 必需管理员引导设置的名称
+     * @return 非空白的引导设置值
      */
     private String required(String name) {
         String value = environment.getProperty(name);

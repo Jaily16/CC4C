@@ -16,18 +16,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-/**
- * 装配共享基础设施运行组件，并集中声明安全或基础设施策略。
- */
+/** 启用消息调度并声明隔离的事件、重试及死信拓扑。 */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 class RabbitMessagingConfiguration {
 
     /**
-     * 创建并配置 RabbitMessagingConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 声明持久化交换机、主队列和三档 TTL 重试队列；死信队列保留 30 天。
      *
-     * @param topology 调用方提供的 {@code topology} 值
-     * @return 当前操作产生的 Declarables 结果
+     * @param topology 基于消息命名空间生成的拓扑名称
+     * @return 交由 RabbitAdmin 声明的交换机、队列和绑定集合
      */
     @Bean
     Declarables messagingDeclarables(MessagingTopology topology) {
@@ -69,11 +67,11 @@ class RabbitMessagingConfiguration {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 创建持久化 quorum 队列，限制 10 万条及 256 MiB；存在死信交换机时使用至少一次转移。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param extraArguments 调用方提供的 {@code extraArguments} 值
-     * @return 当前操作产生的 Queue 结果
+     * @param name 队列名称
+     * @param extraArguments TTL 或死信路由等附加队列参数
+     * @return 达到容量上限时拒绝发布的队列定义
      */
     private Queue quorumQueue(String name, Map<String, Object> extraArguments) {
         Map<String, Object> arguments = new HashMap<>(extraArguments);

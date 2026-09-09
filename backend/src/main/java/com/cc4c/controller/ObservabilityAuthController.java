@@ -18,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 提供独立观测门户 HTTP 接口，完成输入校验、权限边界和统一响应封装。
- */
+/** 提供观测门户独立登录、退出及会话探测，使用专属 CSRF 服务。 */
 @RestController
 @RequestMapping("/observability/auth")
 public class ObservabilityAuthController {
@@ -28,10 +26,10 @@ public class ObservabilityAuthController {
     private final ObservabilityLoginService loginService;
 
     /**
-     * 创建 ObservabilityAuthController 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入观测 CSRF 签发校验及独立登录服务。
      *
-     * @param csrf 由容器注入的 ObservabilityCsrfService 协作组件
-     * @param loginService 由容器注入的 ObservabilityLoginService 协作组件
+     * @param csrf 观测 CSRF 签发和校验服务
+     * @param loginService 观测独立登录与注销服务
      */
     ObservabilityAuthController(ObservabilityCsrfService csrf, ObservabilityLoginService loginService) {
         this.csrf = csrf;
@@ -39,10 +37,10 @@ public class ObservabilityAuthController {
     }
 
     /**
-     * 处理 {@code csrf} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 签发观测专属 CSRF Token，并通过响应 Cookie 和正文提供给页面。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 统一封装且可安全返回客户端的响应
+     * @param response 接收协议正文或 Cookie 的 HTTP 响应
+     * @return 观测 CSRF 请求头名称及令牌
      */
     @GetMapping("/csrf")
     @Operation(operationId = "observabilityCsrf", summary = "签发观测门户 CSRF Token")
@@ -52,12 +50,12 @@ public class ObservabilityAuthController {
     }
 
     /**
-     * 处理 {@code login} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 先校验观测 CSRF，再建立独立会话并清除本次 CSRF Cookie。
      *
-     * @param body 已经过声明式校验的请求体
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 统一封装且可安全返回客户端的响应
+     * @param body 观测用户名和密码请求
+     * @param request 当前 HTTP 请求，提供会话和安全校验上下文
+     * @param response 接收协议正文或 Cookie 的 HTTP 响应
+     * @return 观测身份及会话过期时间
      */
     @PostMapping("/login")
     @Operation(operationId = "observabilityLogin", summary = "登录独立观测门户")
@@ -72,10 +70,10 @@ public class ObservabilityAuthController {
     }
 
     /**
-     * 处理 {@code session} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 读取过滤器放入请求属性的观测会话；没有活动会话时返回未认证。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 统一封装且可安全返回客户端的响应
+     * @param request 当前 HTTP 请求，提供会话和安全校验上下文
+     * @return 观测会话状态摘要
      */
     @GetMapping("/session")
     @Operation(operationId = "observabilitySession", summary = "读取观测门户 Session 状态")
@@ -89,11 +87,11 @@ public class ObservabilityAuthController {
     }
 
     /**
-     * 处理 {@code logout} 对应的 HTTP 请求，委托业务边界并返回统一响应。
+     * 校验观测 CSRF 后注销独立会话，并清除观测 CSRF Cookie。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @return 统一封装且可安全返回客户端的响应
+     * @param request 当前 HTTP 请求，提供会话和安全校验上下文
+     * @param response 接收协议正文或 Cookie 的 HTTP 响应
+     * @return 观测退出成功标志
      */
     @PostMapping("/logout")
     @Operation(operationId = "observabilityLogout", summary = "注销观测门户 Session")

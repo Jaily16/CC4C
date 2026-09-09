@@ -9,15 +9,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 承载并校验独立观测门户配置，避免调用方直接解释环境变量。
+ * 绑定观测门户独立账号、来源、Cookie 和会话过期配置。
  *
- * @param username 待认证或查询的账户名
- * @param passwordHash 仅用于当前安全校验的密码或密码摘要
- * @param sessionNamespace 调用方提供的 {@code sessionNamespace} 值
- * @param cookieSecure 调用方提供的 {@code cookieSecure} 值
- * @param allowedOrigin 调用方提供的 {@code allowedOrigin} 值
- * @param idleTimeout 调用方提供的 {@code idleTimeout} 值
- * @param absoluteTimeout 调用方提供的 {@code absoluteTimeout} 值
+ * @param username 观测门户用户名
+ * @param passwordHash cost-12 BCrypt 密码摘要，不得记录
+ * @param sessionNamespace 观测门户独立 Redis 会话命名空间
+ * @param cookieSecure 是否仅通过 HTTPS 发送 Cookie
+ * @param allowedOrigin 观测前端精确 HTTP(S) 来源
+ * @param idleTimeout 固定为 30 分钟的空闲过期时长
+ * @param absoluteTimeout 固定为 8 小时的绝对过期时长
  */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.observability.portal")
@@ -34,15 +34,15 @@ public record ObservabilityPortalProperties(
     private static final Pattern NAMESPACE = Pattern.compile("[A-Za-z0-9:_-]{3,120}");
 
     /**
-     * 创建 ObservabilityPortalProperties 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 校验账号、cost-12 BCrypt 摘要和命名空间；固定空闲 30 分钟及绝对 8 小时过期。
      *
-     * @param username 待认证或查询的账户名
-     * @param passwordHash 仅用于当前安全校验的密码或密码摘要
-     * @param sessionNamespace 调用方提供的 {@code sessionNamespace} 值
-     * @param cookieSecure 调用方提供的 {@code cookieSecure} 值
-     * @param allowedOrigin 调用方提供的 {@code allowedOrigin} 值
-     * @param idleTimeout 调用方提供的 {@code idleTimeout} 值
-     * @param absoluteTimeout 调用方提供的 {@code absoluteTimeout} 值
+     * @param username 观测门户用户名
+     * @param passwordHash cost-12 BCrypt 密码摘要，不得记录
+     * @param sessionNamespace 观测门户独立 Redis 会话命名空间
+     * @param cookieSecure 是否仅通过 HTTPS 发送 Cookie
+     * @param allowedOrigin 观测前端精确 HTTP(S) 来源
+     * @param idleTimeout 固定为 30 分钟的空闲过期时长
+     * @param absoluteTimeout 固定为 8 小时的绝对过期时长
      */
     public ObservabilityPortalProperties {
         if (username != null && !USERNAME.matcher(username).matches()) {
@@ -61,18 +61,18 @@ public record ObservabilityPortalProperties(
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 将已校验的观测来源转换为 URI。
      *
-     * @return 当前操作产生的 URI 结果
+     * @return 观测前端的精确来源 URI
      */
     public URI allowedOriginUri() {
         return URI.create(allowedOrigin);
     }
 
     /**
-     * 校验观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 仅接纳无路径、凭据、查询和片段的 HTTP(S) 来源；空值交由字段约束拒绝。
      *
-     * @param candidate 调用方提供的 {@code candidate} 值
+     * @param candidate 待校验的来源字符串
      */
     private static void validateOrigin(String candidate) {
         if (candidate == null) {

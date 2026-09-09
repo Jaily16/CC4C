@@ -15,7 +15,7 @@ const chartRoot = ref(null);
 let chart = null;
 let observer = null;
 
-/** 从现有响应式状态派生 latestValues，不发起请求或写入外部数据。 */
+/** 取每条曲线的最后一个采样值供无障碍摘要使用；没有采样点时保留 null。 */
 const latestValues = computed(() =>
   props.panel.series.map((series) => ({
     name: series.name,
@@ -23,7 +23,7 @@ const latestValues = computed(() =>
   })),
 );
 
-/** renderChart 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 面板不可用时清空图表，否则按当前序列重建时间轴折线配置，连接空值且关闭动画。 */
 function renderChart() {
   if (!chart || props.panel.status !== 'OK') {
     chart?.clear();
@@ -56,7 +56,7 @@ function renderChart() {
   );
 }
 
-/** 组件挂载后执行首次只读加载并登记当前页面需要的运行资源。 */
+/** 挂载时创建 Canvas 图表和尺寸观察器，首次绘图并随容器尺寸调整图表。 */
 onMounted(() => {
   chart = init(chartRoot.value, null, { renderer: 'canvas' });
   observer = new ResizeObserver(() => chart?.resize());
@@ -64,10 +64,10 @@ onMounted(() => {
   renderChart();
 });
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 深度监听面板数据，重新绘制曲线或清空不可用图表。 */
 watch(() => props.panel, renderChart, { deep: true });
 
-/** 组件卸载前取消计时器、监听或未完成请求，避免资源泄漏和过期写回。 */
+/** 卸载时断开尺寸观察器并销毁 ECharts 实例，释放绘图资源。 */
 onBeforeUnmount(() => {
   observer?.disconnect();
   chart?.dispose();

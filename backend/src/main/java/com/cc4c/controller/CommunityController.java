@@ -29,9 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * CommunityController 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 提供博客读取、作者草稿及发布删除入口，并将图片上传适配为编辑器响应。 */
 @Validated
 @RestController
 @RequestMapping("/blogs")
@@ -41,11 +39,11 @@ public class CommunityController {
     private final String requestImagePath;
 
     /**
-     * 创建 CommunityController 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入博客服务，并保存图片磁盘目录与公开路径前缀。
      *
-     * @param service 由容器注入的 CommunityService 协作组件
-     * @param saveImagePath 调用方提供的 {@code saveImagePath} 值
-     * @param requestImagePath 调用方提供的 {@code requestImagePath} 值
+     * @param service 博客读写服务
+     * @param saveImagePath 博客图片磁盘存储目录
+     * @param requestImagePath 博客图片公开请求路径前缀
      */
     CommunityController(
             CommunityService service,
@@ -57,10 +55,10 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 uploadImage 职责，并保持既有权限、事务与副作用边界。
+     * 将图片写入配置的存储目录并返回公开 URL；运行异常统一转为编辑器上传失败提示。
      *
-     * @param file 调用方提供的 {@code file} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param file 通过 multipart 提交的图片文件
+     * @return 编辑器成功或失败协议响应
      */
     @PostMapping("/uploadImg")
     public EditorUploadResponse uploadImage(@RequestParam("file") MultipartFile file) {
@@ -73,11 +71,11 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 home 职责，并保持既有权限、事务与副作用边界。
+     * 分页读取博客首页数据。
      *
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 博客首页分页响应
      */
     @GetMapping("/home")
     public ApiResponse<PageResponse<BlogResponse>> home(
@@ -87,10 +85,10 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 submit 职责，并保持既有权限、事务与副作用边界。
+     * 委托服务提交当前作者博客，成功使用 HTTP 201。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的博客标题、正文和语言列表
+     * @return 新提交博客的响应
      */
     @PostMapping("/submit")
     public ResponseEntity<ApiResponse<BlogResponse>> submit(@Valid @RequestBody BlogSubmitRequest request) {
@@ -98,10 +96,10 @@ public class CommunityController {
     }
 
     /**
-     * 删除 CommunityController 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 委托服务按当前作者权限删除指定博客。
      *
-     * @param blogId 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param blogId 正数博客 ID
+     * @return 删除结果
      */
     @DeleteMapping("/delete")
     public ApiResponse<Boolean> delete(@RequestParam @Positive long blogId) {
@@ -109,11 +107,11 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 myBlogs 职责，并保持既有权限、事务与副作用边界。
+     * 分页查询当前登录作者的博客。
      *
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 当前作者的博客分页响应
      */
     @GetMapping("/myBlogs")
     public ApiResponse<PageResponse<BlogResponse>> myBlogs(
@@ -123,10 +121,10 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 detail 职责，并保持既有权限、事务与副作用边界。
+     * 按博客 ID 读取详情，具体可见性由服务校验。
      *
-     * @param id 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param id 正数博客 ID
+     * @return 博客详情响应
      */
     @GetMapping("/{id}")
     public ApiResponse<BlogResponse> detail(@PathVariable @Positive long id) {
@@ -134,12 +132,12 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     * 按语言 ID 分页查询可展示博客。
      *
-     * @param languageId 目标对象的稳定标识
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param languageId 正数语言 ID
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 语言关联博客的分页响应
      */
     @GetMapping("/list/{languageId}")
     public ApiResponse<PageResponse<BlogResponse>> byLanguage(
@@ -150,11 +148,11 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 all 职责，并保持既有权限、事务与副作用边界。
+     * 通过博客服务分页读取列表。
      *
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 博客列表分页响应
      */
     @GetMapping("/all")
     public ApiResponse<PageResponse<BlogResponse>> all(
@@ -164,10 +162,10 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 saveDraft 职责，并保持既有权限、事务与副作用边界。
+     * 委托服务保存当前用户的博客草稿正文。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的当前用户草稿正文
+     * @return 草稿保存结果
      */
     @PutMapping("/draft")
     public ApiResponse<Boolean> saveDraft(@Valid @RequestBody BlogDraftRequest request) {
@@ -175,9 +173,9 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 draft 职责，并保持既有权限、事务与副作用边界。
+     * 读取当前用户已保存的草稿正文。
      *
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @return 草稿正文响应
      */
     @GetMapping("/draft")
     public ApiResponse<String> draft() {
@@ -185,9 +183,9 @@ public class CommunityController {
     }
 
     /**
-     * 删除 CommunityController 指定状态，并维持既有权限、事务与缓存失效边界。
+     * 删除当前用户的博客草稿。
      *
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @return 草稿删除结果
      */
     @DeleteMapping("/draft")
     public ApiResponse<Boolean> deleteDraft() {
@@ -195,12 +193,12 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 search 职责，并保持既有权限、事务与副作用边界。
+     * 按标题检索词分页查询博客。
      *
-     * @param info 调用方提供的 {@code info} 值
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param info 博客标题检索词，长度 1 至 75
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 匹配博客的分页响应
      */
     @GetMapping("/search/{info}")
     public ApiResponse<PageResponse<BlogResponse>> search(
@@ -211,10 +209,10 @@ public class CommunityController {
     }
 
     /**
-     * 执行 CommunityController 中的 click 职责，并保持既有权限、事务与副作用边界。
+     * 委托博客服务增加指定博客的点击计数。
      *
-     * @param id 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param id 正数博客 ID
+     * @return 点击计数更新结果
      */
     @PutMapping("/click/{id}")
     public ApiResponse<Boolean> click(@PathVariable @Positive long id) {

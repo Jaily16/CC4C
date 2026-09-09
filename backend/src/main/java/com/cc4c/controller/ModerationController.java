@@ -16,9 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * ModerationController 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 提供管理员待审核博客查询及通过、拒绝入口。 */
 @Validated
 @RestController
 @RequestMapping("/blogs")
@@ -26,20 +24,20 @@ public class ModerationController {
     private final BlogModerationUseCase useCase;
 
     /**
-     * 创建 ModerationController 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入博客审核用例，由用例管理状态变化与通知。
      *
-     * @param useCase 调用方提供的 {@code useCase} 值
+     * @param useCase 博客审核状态转换用例
      */
     ModerationController(BlogModerationUseCase useCase) {
         this.useCase = useCase;
     }
 
     /**
-     * 执行 ModerationController 中的 pending 职责，并保持既有权限、事务与副作用边界。
+     * 分页查询待审核博客摘要。
      *
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 待审核博客分页响应
      */
     @GetMapping("/examine")
     public ApiResponse<PageResponse<BlogSummary>> pending(
@@ -49,10 +47,10 @@ public class ModerationController {
     }
 
     /**
-     * 执行 ModerationController 中的 approve 职责，并保持既有权限、事务与副作用边界。
+     * 委托审核用例通过指定博客。
      *
-     * @param id 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param id 正数博客 ID
+     * @return 审核后的博客摘要
      */
     @PutMapping("/approve/{id}")
     public ApiResponse<BlogSummary> approve(@PathVariable @Positive long id) {
@@ -60,10 +58,10 @@ public class ModerationController {
     }
 
     /**
-     * 执行 ModerationController 中的 deny 职责，并保持既有权限、事务与副作用边界。
+     * 委托审核用例拒绝指定博客。
      *
-     * @param id 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param id 正数博客 ID
+     * @return 审核后的博客摘要
      */
     @PutMapping("/deny/{id}")
     public ApiResponse<BlogSummary> deny(@PathVariable @Positive long id) {

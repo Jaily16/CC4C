@@ -6,22 +6,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 承载并校验独立观测门户配置，避免调用方直接解释环境变量。
+ * 绑定观测门户访问 Prometheus 的地址和可选成对凭据。
  *
- * @param url 调用方提供的 {@code url} 值
- * @param username 待认证或查询的账户名
- * @param password 仅用于当前安全校验的密码或密码摘要
+ * @param url Prometheus 的 HTTP(S) 地址
+ * @param username 可选 Prometheus 认证用户名
+ * @param password Prometheus 认证密码，不得记录
  */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.observability.prometheus")
 public record PrometheusProperties(@NotNull URI url, String username, String password) {
 
     /**
-     * 创建 PrometheusProperties 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 拒绝非法 HTTP(S) 地址及只配置一半的用户名密码；地址不得内嵌凭据、查询或片段。
      *
-     * @param url 调用方提供的 {@code url} 值
-     * @param username 待认证或查询的账户名
-     * @param password 仅用于当前安全校验的密码或密码摘要
+     * @param url Prometheus 的 HTTP(S) 地址
+     * @param username 可选 Prometheus 认证用户名
+     * @param password Prometheus 认证密码，不得记录
      */
     public PrometheusProperties {
         if (url != null
@@ -40,9 +40,9 @@ public record PrometheusProperties(@NotNull URI url, String username, String pas
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 检查是否配置非空用户名；成对凭据的完整性已由构造校验保证。
      *
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @return 是否需要向 Prometheus 使用认证
      */
     public boolean authenticated() {
         return username != null && !username.isBlank();

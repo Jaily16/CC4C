@@ -11,18 +11,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 装配共享基础设施运行组件，并集中声明安全或基础设施策略。
- */
+/** 限制 HTTP 请求指标的 URI 标签基数，防止动态路径无限增加时间序列。 */
 @Configuration(proxyBeanMethods = false)
 class ObservabilityMetricsConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(ObservabilityMetricsConfiguration.class);
 
     /**
-     * 创建并配置 ObservabilityMetricsConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 创建进程内共享已接纳 URI 集合的过滤器，达到上限后只放行已接纳 URI。
      *
-     * @param properties 由容器注入的 ObservabilityProperties 协作组件
-     * @return 当前操作产生的 MeterFilter 结果
+     * @param properties 对应组件的类型化配置
+     * @return 只约束 http.server.requests 的指标过滤器
      */
     @Bean
     MeterFilter httpUriCardinalityFilter(ObservabilityProperties properties) {
@@ -30,10 +28,10 @@ class ObservabilityMetricsConfiguration {
         AtomicBoolean logged = new AtomicBoolean();
         return new MeterFilter() {
             /**
-             * 处理观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+             * 保留已有 URI 和其他指标；超过上限时拒绝新 URI，并仅记录一次告警。
              *
-             * @param id 调用方提供的 {@code id} 值
-             * @return 当前操作产生的 MeterFilterReply 结果
+             * @param id 待注册指标的名称及标签
+             * @return 放行返回 NEUTRAL，拒绝返回 DENY
              */
             @Override
             public MeterFilterReply accept(Meter.Id id) {

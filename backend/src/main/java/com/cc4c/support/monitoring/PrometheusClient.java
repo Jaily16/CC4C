@@ -37,9 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
-/**
- * PrometheusClient 负责独立观测门户的一项明确运行职责，并保持现有外部行为不变。
- */
+/** 使用有界线程池向固定 Prometheus 地址发送只读请求，限制响应体、序列、点数和可公开标签。 */
 @Component
 public final class PrometheusClient {
     private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -53,10 +51,10 @@ public final class PrometheusClient {
     private final HttpClient httpClient;
 
     /**
-     * 创建 PrometheusClient 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 构造四线程、三十二项等待队列和禁止重定向的 HTTP 客户端，保存可选 Basic 认证头。
      *
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param properties 由容器注入的 PrometheusProperties 协作组件
+     * @param objectMapper 解析受控 JSON 的映射器
+     * @param properties 该组件使用的观测或 Prometheus 设置
      */
     PrometheusClient(ObjectMapper objectMapper, PrometheusProperties properties) {
         this.objectMapper = objectMapper;
@@ -88,11 +86,11 @@ public final class PrometheusClient {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 将查询任务提交到有界线程池；队列满或受检异常以脱敏来源异常完成 Future。
      *
-     * @param <T> 方法使用的类型参数
-     * @param action 调用方提供的 {@code action} 值
-     * @return 当前操作产生的 CompletableFuture<T> 结果
+     * @param <T> 被观测对象或查询结果的类型
+     * @param action 在查询线程池中执行的任务
+     * @return 异步查询结果；提交拒绝时为失败的 Future
      */
     public <T> CompletableFuture<T> submit(Callable<T> action) {
         try {
@@ -113,13 +111,13 @@ public final class PrometheusClient {
     }
 
     /**
-     * 读取观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按目录中的固定表达式请求时间范围查询，并解析有界时序数据。
      *
-     * @param definition 调用方提供的 {@code definition} 值
-     * @param start 调用方提供的 {@code start} 值
-     * @param end 调用方提供的 {@code end} 值
-     * @param stepSeconds 调用方提供的 {@code stepSeconds} 值
-     * @return 当前操作产生的 QueryResult 结果
+     * @param definition 包含固定表达式和公开标签规则的查询定义
+     * @param start 范围查询开始时间
+     * @param end 范围查询结束时间
+     * @param stepSeconds 相邻查询采样点的间隔秒数
+     * @return 包含序列和部分结果标记的查询结果
      */
     public QueryResult queryRange(QueryDefinition definition, Instant start, Instant end, long stepSeconds) {
         JsonNode root = getJson(
@@ -133,10 +131,10 @@ public final class PrometheusClient {
     }
 
     /**
-     * 读取观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按目录中的固定表达式请求即时查询。
      *
-     * @param definition 调用方提供的 {@code definition} 值
-     * @return 当前操作产生的 QueryResult 结果
+     * @param definition 包含固定表达式和公开标签规则的查询定义
+     * @return 包含即时采样序列和部分结果标记的查询结果
      */
     public QueryResult queryInstant(QueryDefinition definition) {
         JsonNode root = getJson("/api/v1/query", Map.of("query", definition.expression()));
@@ -144,10 +142,10 @@ public final class PrometheusClient {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取告警规则，只保留批准名称的首条规则，并归一化状态及健康字段。
      *
-     * @param allowedNames 调用方提供的 {@code allowedNames} 值
-     * @return 当前操作产生的 Map<String,AlertState> 结果
+     * @param allowedNames 允许返回的告警或标签名称
+     * @return 以允许的告警名称为键的规则状态
      */
     public Map<String, AlertState> alertRules(Set<String> allowedNames) {
         JsonNode root = getJson("/api/v1/rules", Map.of("type", "alert"));
@@ -175,9 +173,9 @@ public final class PrometheusClient {
     }
 
     /**
-     * 读取观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 请求就绪端点；仅当 HTTP 请求成功且响应非空时视为就绪。
      *
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @return 就绪请求返回非空正文时为 true，来源异常时为 false
      */
     public boolean ready() {
         try {
@@ -188,21 +186,19 @@ public final class PrometheusClient {
         }
     }
 
-    /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
-     */
+    /** 关闭查询线程池并中断尚未结束的任务。 */
     @PreDestroy
     void close() {
         queries.shutdownNow();
     }
 
     /**
-     * 解析观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 校验 vector 或 matrix 响应，最多保留 50 个序列、每序列 300 点；截断或非有限值标记为部分结果。
      *
-     * @param root 调用方提供的 {@code root} 值
-     * @param definition 调用方提供的 {@code definition} 值
-     * @param matrix 调用方提供的 {@code matrix} 值
-     * @return 当前操作产生的 QueryResult 结果
+     * @param root Prometheus JSON 响应根节点
+     * @param definition 包含固定表达式和公开标签规则的查询定义
+     * @param matrix 是否要求时间范围 matrix 响应
+     * @return 排序后的公开序列及部分结果标记
      */
     private QueryResult parseResult(JsonNode root, QueryDefinition definition, boolean matrix) {
         requireSuccess(root);
@@ -252,10 +248,10 @@ public final class PrometheusClient {
     }
 
     /**
-     * 解析观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 解析时间戳与数值对，将秒换为毫秒；非有限或无法解析的数值置空并标记部分结果。
      *
-     * @param pair 调用方提供的 {@code pair} 值
-     * @return 当前操作产生的 ParsedPoint 结果
+     * @param pair 包含秒时间戳和数值的二元 JSON 数组
+     * @return 带毫秒时间戳的数据点及其部分结果标记
      */
     private ParsedPoint parsePoint(JsonNode pair) {
         if (!pair.isArray() || pair.size() != 2 || !pair.get(0).isNumber()) {
@@ -275,11 +271,11 @@ public final class PrometheusClient {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 仅复制目录批准的文本标签，并将每个值截到 120 个 UTF-16 代码单元。
      *
-     * @param metric 调用方提供的 {@code metric} 值
-     * @param allowedNames 调用方提供的 {@code allowedNames} 值
-     * @return 当前操作产生的 Map<String,String> 结果
+     * @param metric 原始序列标签节点
+     * @param allowedNames 允许返回的告警或标签名称
+     * @return 不可变的公开标签映射
      */
     private Map<String, String> allowedLabels(JsonNode metric, List<String> allowedNames) {
         Map<String, String> labels = new LinkedHashMap<>();
@@ -293,11 +289,11 @@ public final class PrometheusClient {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 把图例占位符替换为公开标签，未匹配的占位符显示为未知，并截到 160 个 UTF-16 代码单元。
      *
-     * @param template 调用方提供的 {@code template} 值
-     * @param labels 调用方提供的 {@code labels} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param template 目录提供的图例模板
+     * @param labels 已经筛选的公开标签
+     * @return 用于门户展示的序列名
      */
     private String seriesName(String template, Map<String, String> labels) {
         String value = template;
@@ -308,11 +304,11 @@ public final class PrometheusClient {
     }
 
     /**
-     * 读取观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 发送只读请求并解析 JSON；解析失败只抛出脱敏来源异常。
      *
-     * @param path 已验证边界内的文件或请求路径
-     * @param parameters 调用方提供的 {@code parameters} 值
-     * @return 当前操作产生的 JsonNode 结果
+     * @param path 固定 Prometheus API 路径
+     * @param parameters 待编码的查询参数
+     * @return 响应的 JSON 根节点
      */
     private JsonNode getJson(String path, Map<String, String> parameters) {
         byte[] body = send(path, parameters);
@@ -324,11 +320,11 @@ public final class PrometheusClient {
     }
 
     /**
-     * 发布观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按名称排序并编码查询参数，发送超时 5 秒的 GET；只接受 200 状态及不超过 2 MiB 的响应。
      *
-     * @param path 已验证边界内的文件或请求路径
-     * @param parameters 调用方提供的 {@code parameters} 值
-     * @return 按当前方法约定返回结果集合
+     * @param path 固定 Prometheus API 或就绪路径
+     * @param parameters 待编码的查询参数
+     * @return 受限大小的原始响应字节
      */
     private byte[] send(String path, Map<String, String> parameters) {
         String query = parameters.entrySet().stream()
@@ -363,9 +359,9 @@ public final class PrometheusClient {
     }
 
     /**
-     * 校验观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 要求 Prometheus JSON 的 status 为 success，否则抛出来源异常。
      *
-     * @param root 调用方提供的 {@code root} 值
+     * @param root Prometheus JSON 响应根节点
      */
     private void requireSuccess(JsonNode root) {
         if (!"success".equals(root.path("status").asText())) {
@@ -374,43 +370,43 @@ public final class PrometheusClient {
     }
 
     /**
-     * 编码或保护观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 使用 UTF-8 编码 URL 参数，并把空格的加号表示替换为百分号编码。
      *
-     * @param value 待处理或存储的值
-     * @return 按当前协议生成或读取的字符串值
+     * @param value 需要 URL 编码的参数文本
+     * @return 可拼接到查询字符串中的编码值
      */
     private static String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按 UTF-16 代码单元保留字符串前缀。
      *
-     * @param value 待处理或存储的值
-     * @param maximum 调用方提供的 {@code maximum} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param value 需要限制长度的文本
+     * @param maximum 允许的最大 UTF-16 代码单元数
+     * @return 长度不超过上限的字符串
      */
     private static String truncate(String value, int maximum) {
         return value.length() <= maximum ? value : value.substring(0, maximum);
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 保留白名单中的字段值，否则返回指定兜底值。
      *
-     * @param value 待处理或存储的值
-     * @param allowed 调用方提供的 {@code allowed} 值
-     * @param fallback 调用方提供的 {@code fallback} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param value 需要校验的上游字段值
+     * @param allowed 字段允许值集合
+     * @param fallback 不在白名单中时使用的值
+     * @return 批准的值或兜底值
      */
     private static String allowed(String value, Set<String> allowed, String fallback) {
         return allowed.contains(value) ? value : fallback;
     }
 
     /**
-     * 解析观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 解析 ISO-8601 时间；空值或格式错误返回 null。
      *
-     * @param value 待处理或存储的值
-     * @return 当前操作产生的 Instant 结果
+     * @param value ISO-8601 时间文本，可为 null
+     * @return 解析出的时间点，无法解析时为 null
      */
     private static Instant parseInstant(String value) {
         try {
@@ -421,49 +417,47 @@ public final class PrometheusClient {
     }
 
     /**
-     * 以不可变结构承载独立观测门户计算或查询结果。
+     * 承载公开时序数据和截断或缺失值的标记。
      *
-     * @param series 调用方提供的 {@code series} 值
-     * @param partial 调用方提供的 {@code partial} 值
+     * @param series 已限制大小的公开序列列表
+     * @param partial 是否存在截断或无法表示的数值
      */
     public record QueryResult(List<SeriesResponse> series, boolean partial) {}
 
     /**
-     * AlertState 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载告警状态、规则健康与最近评估时间。
      *
-     * @param state 调用方提供的 {@code state} 值
-     * @param health 调用方提供的 {@code health} 值
-     * @param lastEvaluationAt 当前操作使用的时间点
+     * @param state firing、pending 或 inactive 状态
+     * @param health ok、err 或 unknown 规则健康状态
+     * @param lastEvaluationAt 最后评估时间，无法解析时为 null
      */
     public record AlertState(String state, String health, Instant lastEvaluationAt) {}
 
-    /**
-     * 表示独立观测门户处理中可分类且可安全映射的失败。
-     */
+    /** 表示 Prometheus 来源失败，不携带上游正文、认证信息或底层异常消息。 */
     static final class PrometheusSourceException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
     /**
-     * ParsedPoint 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 承载单点解析结果及数值缺失标记。
      *
-     * @param point 调用方提供的 {@code point} 值
-     * @param partial 调用方提供的 {@code partial} 值
+     * @param point 带毫秒时间戳的数据点
+     * @param partial 是否存在截断或无法表示的数值
      */
     private record ParsedPoint(PointResponse point, boolean partial) {}
 
     /**
-     * RawSeries 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 暂存公开标签、图例名称和点列表，供最终结果排序转换。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param labels 调用方提供的 {@code labels} 值
-     * @param points 调用方提供的 {@code points} 值
+     * @param name 序列展示名称
+     * @param labels 已经筛选的公开标签
+     * @param points 该序列的数据点列表
      */
     private record RawSeries(String name, Map<String, String> labels, List<PointResponse> points) {
         /**
-         * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 拼接序列名与标签表示作为排序键。
          *
-         * @return 按当前协议生成或读取的字符串值
+         * @return 当前序列的排序字符串
          */
         String sortKey() {
             return name + labels;

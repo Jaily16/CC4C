@@ -12,9 +12,7 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-/**
- * 消费并处理审核与消息运维消息，遵循既有幂等与重试边界。
- */
+/** 消费博客提交与审核结果通知，按固定载荷类型发信，确认与重试由可靠处理器负责。 */
 @Component
 class ModerationMessageConsumer {
     private final ReliableMessageProcessor processor;
@@ -22,11 +20,11 @@ class ModerationMessageConsumer {
     private final OutboundMailSender mailSender;
 
     /**
-     * 创建 ModerationMessageConsumer 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入可靠消息处理、载荷 JSON 映射与邮件发送服务。
      *
-     * @param processor 调用方提供的 {@code processor} 值
-     * @param objectMapper 应用统一配置的 JSON 映射器
-     * @param mailSender 调用方提供的 {@code mailSender} 值
+     * @param processor 负责解密、幂等、重试及确认的处理器
+     * @param objectMapper 显式信封或载荷 JSON 映射器
+     * @param mailSender 带失败分类的文本邮件发送器
      */
     ModerationMessageConsumer(
             ReliableMessageProcessor processor, ObjectMapper objectMapper, OutboundMailSender mailSender) {
@@ -36,12 +34,12 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 使用博客提交消费者身份处理待审核邮件事件。
      *
-     * @param message 当前处理的消息或用户提示
-     * @param channel 调用方提供的 {@code channel} 值
-     * @param deliveryTag 调用方提供的 {@code deliveryTag} 值
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param message 当前 AMQP 消息及其属性
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag 当前通道中的投递确认标识
+     * @throws IOException AMQP 确认、拒绝或相关 I/O 操作无法完成时抛出
      */
     @RabbitListener(
             queues = "#{@messagingTopology.blogSubmittedQueue()}",
@@ -58,12 +56,12 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 使用博客审核消费者身份处理审核结果邮件事件。
      *
-     * @param message 当前处理的消息或用户提示
-     * @param channel 调用方提供的 {@code channel} 值
-     * @param deliveryTag 调用方提供的 {@code deliveryTag} 值
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param message 当前 AMQP 消息及其属性
+     * @param channel 用于确认或拒绝投递的 RabbitMQ 通道
+     * @param deliveryTag 当前通道中的投递确认标识
+     * @throws IOException AMQP 确认、拒绝或相关 I/O 操作无法完成时抛出
      */
     @RabbitListener(
             queues = "#{@messagingTopology.blogReviewedQueue()}",
@@ -80,10 +78,10 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 发布可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 解析提交载荷并检查收件人，发送包含标题和博客 ID 的待审核通知。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param plaintext 解密后的敏感载荷字节，不得记录
      */
     private void sendSubmitted(MessageEnvelope envelope, byte[] plaintext) {
         BlogSubmittedNotificationV1 payload = read(plaintext, BlogSubmittedNotificationV1.class);
@@ -96,10 +94,10 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 发布可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 解析审核载荷并检查收件人，按通过或拒绝结果选择邮件标题及正文。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param plaintext 解密后的敏感载荷字节，不得记录
      */
     private void sendReviewed(MessageEnvelope envelope, byte[] plaintext) {
         BlogReviewedNotificationV1 payload = read(plaintext, BlogReviewedNotificationV1.class);
@@ -113,9 +111,9 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 校验可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 收件邮箱为空时抛出不可重试的 RECIPIENT_UNAVAILABLE 邮件异常。
      *
-     * @param recipient 调用方提供的 {@code recipient} 值
+     * @param recipient 邮件收件地址
      */
     private void requireRecipient(String recipient) {
         if (recipient == null || recipient.isBlank()) {
@@ -124,12 +122,12 @@ class ModerationMessageConsumer {
     }
 
     /**
-     * 读取可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 按明确的通知类型解析解密 JSON，解析失败转换为 INVALID_PAYLOAD。
      *
-     * @param <T> 方法使用的类型参数
-     * @param plaintext 调用方提供的 {@code plaintext} 值
-     * @param type 调用方提供的 {@code type} 值
-     * @return 当前操作产生的 T 结果
+     * @param <T> 通知载荷类型
+     * @param plaintext 解密后的敏感载荷字节，不得记录
+     * @param type 明确指定的通知载荷 Java 类型
+     * @return 指定类型的博客通知载荷
      */
     private <T> T read(byte[] plaintext, Class<T> type) {
         try {

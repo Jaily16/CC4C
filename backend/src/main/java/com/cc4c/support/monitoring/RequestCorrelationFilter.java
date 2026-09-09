@@ -16,9 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerMapping;
 
-/**
- * 在 Servlet 过滤链中执行共享基础设施检查，并保持请求与响应安全边界。
- */
+/** 为 HTTP 请求建立关联 ID，在响应中回传，并按观测开关记录路由模板、状态和耗时。 */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 final class RequestCorrelationFilter extends OncePerRequestFilter {
@@ -27,22 +25,22 @@ final class RequestCorrelationFilter extends OncePerRequestFilter {
     private final ObservabilityProperties properties;
 
     /**
-     * 创建 RequestCorrelationFilter 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存控制请求完成事件记录的观测开关。
      *
-     * @param properties 由容器注入的 ObservabilityProperties 协作组件
+     * @param properties 该组件使用的观测或 Prometheus 设置
      */
     RequestCorrelationFilter(ObservabilityProperties properties) {
         this.properties = properties;
     }
 
     /**
-     * 在当前请求进入后续过滤链前执行安全处理，并保证响应边界保持一致。
+     * 规范化请求关联 ID，放入属性、响应头及 MDC 作用域；过滤链退出后按路由模板记录结果。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @param filterChain 调用方提供的 {@code filterChain} 值
-     * @throws ServletException 当输入、数据或依赖状态不满足当前方法约束时抛出
-     * @throws IOException 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param request 携带可选关联 ID 的 HTTP 请求
+     * @param response 写入关联 ID 响应头并读取最终状态的 HTTP 响应
+     * @param filterChain 后续 Servlet 过滤链
+     * @throws ServletException 后续过滤链处理请求失败时抛出
+     * @throws IOException 后续过滤链读写请求或响应失败时抛出
      */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

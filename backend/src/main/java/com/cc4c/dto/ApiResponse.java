@@ -3,34 +3,34 @@ package com.cc4c.dto;
 import com.cc4c.common.BusinessCode;
 
 /**
- * 承载共享基础设施接口的脱敏响应字段，不暴露内部凭据或异常。
+ * 统一封装业务码、数据和提示；字段内容由调用方选择，本容器不执行脱敏。
  *
- * @param <T> 类型参数
- * @param code 调用方提供的 {@code code} 值
- * @param data 调用方提供的 {@code data} 值
- * @param msg 调用方提供的 {@code msg} 值
+ * @param <T> 数据元素类型
+ * @param code 业务响应码，不等同于 HTTP 状态码
+ * @param data 响应数据
+ * @param msg 面向客户端的业务提示
  */
 public record ApiResponse<T>(int code, T data, String msg) {
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 使用默认成功业务码包装数据，提示置空。
      *
-     * @param <T> 方法使用的类型参数
-     * @param data 调用方提供的 {@code data} 值
-     * @return 统一封装且可安全返回客户端的响应
+     * @param <T> 数据元素类型
+     * @param data 响应数据
+     * @return 默认成功响应
      */
     public static <T> ApiResponse<T> success(T data) {
         return new ApiResponse<>(BusinessCode.SUCCESS.code(), data, null);
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 使用指定业务码、数据和提示创建响应，不校验或转换数据。
      *
-     * @param <T> 方法使用的类型参数
-     * @param code 调用方提供的 {@code code} 值
-     * @param data 调用方提供的 {@code data} 值
-     * @param message 当前处理的消息或用户提示
-     * @return 统一封装且可安全返回客户端的响应
+     * @param <T> 数据元素类型
+     * @param code 业务响应码，不等同于 HTTP 状态码
+     * @param data 响应数据
+     * @param message 上传结果说明
+     * @return 封装后的业务响应
      */
     public static <T> ApiResponse<T> success(int code, T data, String message) {
         return new ApiResponse<>(code, data, message);

@@ -1,41 +1,41 @@
 import api from './client.js';
 
-/** 只读查询 listHomeCourses 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 分页读取首页课程；Session 由统一客户端携带，错误交由页面呈现。 */
 export function listHomeCourses(params, http = api) {
   return http.get('/courses/home', { params });
 }
 
-/** 只读查询 listCoursesByLanguage 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 按已编码的语言名称分页读取课程。 */
 export function listCoursesByLanguage(language, params, http = api) {
   return http.get(`/courses/language/${encodeURIComponent(language)}`, { params });
 }
 
-/** 只读查询 searchCourses 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 按已编码的搜索词分页查询课程。 */
 export function searchCourses(query, params, http = api) {
   return http.get(`/courses/search/${encodeURIComponent(query)}`, { params });
 }
 
-/** 只读查询 getCourse 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 按课程名称读取详情。 */
 export function getCourse(name, http = api) {
   return http.get(`/courses/${encodeURIComponent(name)}`);
 }
 
-/** 只读查询 getRecommendedCourse 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 按语言编号和专业读取推荐课程。 */
 export function getRecommendedCourse(languageNo, major, http = api) {
   return http.get(`/courses/recommend/${languageNo}/${major}`);
 }
 
-/** 只读查询 listModules 对应的业务数据；浏览器自动携带 Session，错误交由调用页面呈现。 */
+/** 读取指定语言的课程模块。 */
 export function listModules(languageId, http = api) {
   return http.get(`/courses/module/${languageId}`);
 }
 
-/** 提交 createModule 对应的业务写入；统一客户端负责凭据与 CSRF，调用方负责刷新受影响状态。 */
+/** 提交新增课程模块；统一客户端处理 Session 和 CSRF，页面负责刷新模块列表。 */
 export function createModule(payload, http = api) {
   return http.post('/courses/module', payload);
 }
 
-/** 提交 createCourse 对应的业务写入；统一客户端负责凭据与 CSRF，调用方负责刷新受影响状态。 */
+/** 提交课程及模块内容；统一客户端处理 Session 和 CSRF，页面负责成功后的跳转。 */
 export function createCourse(payload, http = api) {
   return http.post('/courses/add', payload);
 }

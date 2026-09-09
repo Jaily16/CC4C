@@ -14,17 +14,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * MessagingProperties 绑定外部配置，并集中表达运行时约束和安全默认值。
+ * 绑定消息隔离、载荷密钥、审核收件人及发布消费调度参数。
  *
- * @param namespace 调用方提供的 {@code namespace} 值
- * @param activeKeyId 目标对象的稳定标识
- * @param payloadKeys 调用方提供的 {@code payloadKeys} 值
- * @param moderationRecipients 调用方提供的 {@code moderationRecipients} 值
- * @param confirmTimeout 调用方提供的 {@code confirmTimeout} 值
- * @param consumerRetryDelays 调用方提供的 {@code consumerRetryDelays} 值
- * @param pollInterval 调用方提供的 {@code pollInterval} 值
- * @param dispatcherEnabled 调用方提供的 {@code dispatcherEnabled} 值
- * @param consumersEnabled 调用方提供的 {@code consumersEnabled} 值
+ * @param namespace 当前能力的隔离命名空间
+ * @param activeKeyId 新消息加密使用的活动密钥 ID
+ * @param payloadKeys 分号分隔的 id=Base64 密钥环，不得记录
+ * @param moderationRecipients 逗号分隔的审核通知收件邮箱
+ * @param confirmTimeout 发布确认等待时长
+ * @param consumerRetryDelays 三档正数消费重试延迟
+ * @param pollInterval Outbox 轮询间隔
+ * @param dispatcherEnabled 是否启用 Outbox 发布调度
+ * @param consumersEnabled 是否启用消息消费
  */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.messaging")
@@ -43,17 +43,17 @@ public record MessagingProperties(
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     /**
-     * 创建 MessagingProperties 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 校验命名格式、正数超时和恰好三档重试延迟，并检查审核收件人格式。
      *
-     * @param namespace 调用方提供的 {@code namespace} 值
-     * @param activeKeyId 目标对象的稳定标识
-     * @param payloadKeys 调用方提供的 {@code payloadKeys} 值
-     * @param moderationRecipients 调用方提供的 {@code moderationRecipients} 值
-     * @param confirmTimeout 调用方提供的 {@code confirmTimeout} 值
-     * @param consumerRetryDelays 调用方提供的 {@code consumerRetryDelays} 值
-     * @param pollInterval 调用方提供的 {@code pollInterval} 值
-     * @param dispatcherEnabled 调用方提供的 {@code dispatcherEnabled} 值
-     * @param consumersEnabled 调用方提供的 {@code consumersEnabled} 值
+     * @param namespace 当前能力的隔离命名空间
+     * @param activeKeyId 新消息加密使用的活动密钥 ID
+     * @param payloadKeys 分号分隔的 id=Base64 密钥环，不得记录
+     * @param moderationRecipients 逗号分隔的审核通知收件邮箱
+     * @param confirmTimeout 发布确认等待时长
+     * @param consumerRetryDelays 三档正数消费重试延迟
+     * @param pollInterval Outbox 轮询间隔
+     * @param dispatcherEnabled 是否启用 Outbox 发布调度
+     * @param consumersEnabled 是否启用消息消费
      */
     public MessagingProperties {
         if (namespace != null && !NAMESPACE.matcher(namespace).matches()) {
@@ -79,9 +79,9 @@ public record MessagingProperties(
     }
 
     /**
-     * 执行 MessagingProperties 中的 payloadKeyMap 职责，并保持既有权限、事务与副作用边界。
+     * 解析以分号分隔的 id=Base64 密钥项；拒绝重复 ID、非 32 字节密钥或缺失的活动密钥。
      *
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @return 按密钥 ID 查找原始密钥字节的只读映射
      */
     public Map<String, byte[]> payloadKeyMap() {
         Map<String, byte[]> result = new LinkedHashMap<>();
@@ -113,19 +113,19 @@ public record MessagingProperties(
     }
 
     /**
-     * 执行 MessagingProperties 中的 moderationRecipientList 职责，并保持既有权限、事务与副作用边界。
+     * 返回经去空白、小写化和去重的审核通知收件人列表。
      *
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @return 非空且邮箱格式有效的收件人列表
      */
     public List<String> moderationRecipientList() {
         return parseModerationRecipients(moderationRecipients);
     }
 
     /**
-     * 执行 MessagingProperties 中的 parseModerationRecipients 职责，并保持既有权限、事务与副作用边界。
+     * 解析逗号分隔邮箱，统一小写并去重；结果为空或存在非法邮箱时拒绝配置。
      *
-     * @param rawRecipients 调用方提供的 {@code rawRecipients} 值
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @param rawRecipients 待解析的逗号分隔收件邮箱
+     * @return 按首次出现顺序保留的有效邮箱列表
      */
     private static List<String> parseModerationRecipients(String rawRecipients) {
         List<String> recipients = Arrays.stream(rawRecipients.split(","))

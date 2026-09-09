@@ -1,32 +1,30 @@
 package com.cc4c.support.messaging;
 
-/**
- * ReliableMessageHandler 定义领域能力的最小接口，供模块之间进行显式协作。
- */
+/** 定义已解密消息的业务处理回调；幂等领取和 AMQP 确认由外层处理器负责。 */
 @FunctionalInterface
 public interface ReliableMessageHandler {
     /**
-     * 处理 ReliableMessageHandler 的输入或消息，并沿用既有幂等、确认与失败恢复策略。
+     * 处理有效期内且已取得幂等租约的明文载荷，失败通过异常交给处理器分类。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param plaintext 解密后的敏感载荷字节，不得记录
      */
     void handle(MessageEnvelope envelope, byte[] plaintext);
 
     /**
-     * 执行 ReliableMessageHandler 中的 expired 职责，并保持既有权限、事务与副作用边界。
+     * 处理消息过期时的业务清理；默认无操作。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param plaintext 解密后的敏感载荷字节，不得记录
      */
     default void expired(MessageEnvelope envelope, byte[] plaintext) {}
 
     /**
-     * 执行 ReliableMessageHandler 中的 dead 职责，并保持既有权限、事务与副作用边界。
+     * 处理消息终止时的业务清理；默认无操作。
      *
-     * @param envelope 调用方提供的 {@code envelope} 值
-     * @param plaintext 调用方提供的 {@code plaintext} 值
-     * @param errorCode 调用方提供的 {@code errorCode} 值
+     * @param envelope 包含事件元数据和加密载荷的信封
+     * @param plaintext 解密后的敏感载荷字节，不得记录
+     * @param errorCode 不含敏感正文的失败分类码
      */
     default void dead(MessageEnvelope envelope, byte[] plaintext, String errorCode) {}
 }

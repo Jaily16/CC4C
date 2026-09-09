@@ -1,8 +1,6 @@
 package com.cc4c.support.messaging;
 
-/**
- * OutboxStatus 枚举共享基础设施的有限状态或协议取值。
- */
+/** 描述事件从待发布、发布中到送达、失败、过期或人工忽略的持久化状态。 */
 public enum OutboxStatus {
     PENDING,
     PUBLISHING,
@@ -14,9 +12,9 @@ public enum OutboxStatus {
     IGNORED;
 
     /**
-     * 执行可靠消息状态，保持事件版本、幂等、重试与确认语义。
+     * 判断状态是否允许进入人工恢复流程；过期及收件人条件由操作服务继续校验。
      *
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @return 仅 PUBLISH_FAILED 或 DEAD 为 true
      */
     public boolean recoverable() {
         return this == PUBLISH_FAILED || this == DEAD;

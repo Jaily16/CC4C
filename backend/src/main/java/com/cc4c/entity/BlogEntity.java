@@ -7,9 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.util.Date;
 import lombok.Data;
 
-/**
- * 映射博客社区数据库记录，字段语义与现有表结构保持一致。
- */
+/** 映射 blog 表中的正文、作者、审核状态和点击数，使用分配式主键及逻辑删除。 */
 @Data
 @TableName("blog")
 public class BlogEntity {

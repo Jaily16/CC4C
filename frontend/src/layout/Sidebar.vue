@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-/** 业务侧栏组件，依据角色和路由状态呈现可访问导航。 */
+/** 业务侧边栏，展示用户资料和站内导航；路由权限由守卫与后端校验。 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
@@ -90,16 +90,16 @@ const isCollapse = ref(false);
 const isCompact = ref(false);
 const avatarLoadFailed = ref(false);
 const { user } = useCurrentUser();
-/** 从现有响应式状态派生 collapsed，不发起请求或写入外部数据。 */
+/** 手动收起或窄屏模式任一成立时折叠侧栏。 */
 const collapsed = computed(() => isCollapse.value || isCompact.value);
-/** 从现有响应式状态派生 displayName，不发起请求或写入外部数据。 */
+/** USER 显示姓名，其他角色显示游客。 */
 const displayName = computed(() => (user.value.role === 'USER' ? user.value.name : '游客'));
-/** 从现有响应式状态派生 avatar，不发起请求或写入外部数据。 */
+/** 头像加载失败时返回空值以显示文字占位。 */
 const avatar = computed(() => (avatarLoadFailed.value ? '' : user.value.avatar));
-/** 从现有响应式状态派生 avatarInitial，不发起请求或写入外部数据。 */
+/** 使用显示名首字符生成头像占位。 */
 const avatarInitial = computed(() => (displayName.value || '游').trim().slice(0, 1).toUpperCase());
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 头像地址变化时清除旧的加载失败标记。 */
 watch(
   () => user.value.avatar,
   () => {
@@ -107,34 +107,34 @@ watch(
   },
 );
 
-/** 处理 updateCompactMode 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 按窗口宽度是否不超过 768 像素更新窄屏折叠状态。 */
 function updateCompactMode() {
   isCompact.value = window.innerWidth <= 768;
 }
 
-/** 响应 toggleCollapse 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 只在非窄屏模式切换手动折叠状态。 */
 function toggleCollapse() {
   if (!isCompact.value) {
     isCollapse.value = !isCollapse.value;
   }
 }
 
-/** handleAvatarError 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 标记头像加载失败并启用文字占位。 */
 function handleAvatarError() {
   avatarLoadFailed.value = true;
   return true;
 }
 
-/** 组件挂载后执行首次只读加载并登记当前页面需要的运行资源。 */
+/** 挂载时计算窄屏模式并登记窗口尺寸监听。 */
 onMounted(() => {
   updateCompactMode();
-  /** 登记页面可见性监听，以便隐藏时暂停轮询并在恢复后安全刷新。 */
+  /** 窗口尺寸变化时重新计算窄屏模式。 */
   window.addEventListener('resize', updateCompactMode);
 });
 
-/** 组件卸载前取消计时器、监听或未完成请求，避免资源泄漏和过期写回。 */
+/** 卸载侧栏时移除其窗口尺寸监听。 */
 onBeforeUnmount(() => {
-  /** 移除页面可见性监听，防止组件卸载后继续接收浏览器事件。 */
+  /** 移除本组件登记的 resize 回调。 */
   window.removeEventListener('resize', updateCompactMode);
 });
 </script>

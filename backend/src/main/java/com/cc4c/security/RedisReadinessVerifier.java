@@ -6,26 +6,24 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * RedisReadinessVerifier 负责组装运行时基础设施，并明确其边界和故障处理策略。
- */
+/** 启动时检查安全 Redis 连接能否返回 PONG；异常直接阻止启动检查通过。 */
 @Component
 public final class RedisReadinessVerifier implements ApplicationRunner {
     private final RedisConnectionFactory connectionFactory;
 
     /**
-     * 创建 RedisReadinessVerifier 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存安全 Redis 连接工厂。
      *
-     * @param connectionFactory 调用方提供的 {@code connectionFactory} 值
+     * @param connectionFactory 安全 Redis 连接工厂
      */
     public RedisReadinessVerifier(RedisConnectionFactory connectionFactory) {
         this.connectionFactory = connectionFactory;
     }
 
     /**
-     * 执行 RedisReadinessVerifier 中的 run 职责，并保持既有权限、事务与副作用边界。
+     * 获取连接执行 PING 并验证 PONG，退出时关闭本次连接。
      *
-     * @param args 调用方提供的 {@code args} 值
+     * @param args Spring 启动参数，本检查不使用其内容
      */
     @Override
     public void run(ApplicationArguments args) {

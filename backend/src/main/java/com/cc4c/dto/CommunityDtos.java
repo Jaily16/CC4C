@@ -11,17 +11,15 @@ import java.util.List;
  * 集中声明博客社区接口请求与响应的数据结构，不承载业务流程。
  */
 public final class CommunityDtos {
-    /**
-     * 创建 CommunityDtos 实例，不触发外部 I/O。
-     */
+    /** 仅作为嵌套 DTO 的命名容器，禁止外部实例化。 */
     private CommunityDtos() {}
 
     /**
-     * 承载博客社区接口的输入字段与声明式校验约束。
+     * 提交博客的标题、正文及语言标签；正文不能为空，语言列表至少包含一项。
      *
-     * @param title 当前博客或课程的标题
-     * @param content 当前业务对象的正文内容
-     * @param languageList 调用方提供的 {@code languageList} 值
+     * @param title 博客标题
+     * @param content 正文内容
+     * @param languageList 博客关联的语言 ID 列表
      */
     public record BlogSubmitRequest(
             @NotBlank @Size(max = 75) String title,
@@ -29,23 +27,23 @@ public final class CommunityDtos {
             @NotEmpty List<@Positive Integer> languageList) {}
 
     /**
-     * 承载博客社区接口的输入字段与声明式校验约束。
+     * 保存当前用户博客草稿的正文请求；发布流程对草稿的处理由服务负责。
      *
-     * @param content 当前业务对象的正文内容
+     * @param content 正文内容
      */
     public record BlogDraftRequest(@NotBlank String content) {}
 
     /**
-     * 承载博客社区接口的脱敏响应字段，不暴露内部凭据或异常。
+     * 博客详情数据，包含正文及语言标签；长整数 ID 以字符串返回。
      *
-     * @param blogId 目标对象的稳定标识
-     * @param writerId 目标对象的稳定标识
-     * @param title 当前博客或课程的标题
-     * @param content 当前业务对象的正文内容
-     * @param publishTime 当前操作使用的时间点
-     * @param click 调用方提供的 {@code click} 值
-     * @param state 调用方提供的 {@code state} 值
-     * @param languageList 调用方提供的 {@code languageList} 值
+     * @param blogId 博客 ID
+     * @param writerId 博客作者 ID
+     * @param title 博客标题
+     * @param content 正文内容
+     * @param publishTime 博客发布时间
+     * @param click 博客点击次数
+     * @param state 博客审核状态
+     * @param languageList 博客关联的语言 ID 列表
      */
     public record BlogResponse(
             String blogId,

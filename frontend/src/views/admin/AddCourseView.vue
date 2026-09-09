@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-/** AddCourseView 管理页面，协调管理员只可访问的查询与操作状态。 */
+/** 管理员新增课程页面，加载语言模块、创建模块并提交带 Markdown 正文的新课程。 */
 import { reportClientError } from '@/utils/reportClientError.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { createCourse, createModule, listModules } from '@/api/catalog';
@@ -178,15 +178,15 @@ const courseForm = reactive({ courseName: '', description: '', level: 0 });
 const moduleForm = reactive({ languageId: 1, moduleName: '', level: 0, priority: 1 });
 const formErrors = reactive({ courseName: '', module: '', description: '' });
 
-/** 从现有响应式状态派生 moduleCount，不发起请求或写入外部数据。 */
+/** 统计四种语言中已加载模块的总数。 */
 const moduleCount = computed(() => modules.value.reduce((total, language) => total + language.children.length, 0));
-/** 从现有响应式状态派生 moduleAvailable，不发起请求或写入外部数据。 */
+/** 存在至少一个模块时允许选择课程归属。 */
 const moduleAvailable = computed(() => moduleCount.value > 0);
-/** 从现有响应式状态派生 editorStatus，不发起请求或写入外部数据。 */
+/** 显示图片上传状态或当前正文字符数。 */
 const editorStatus = computed(() =>
   uploading.value ? '正在上传图片…' : `约 ${courseForm.description.trim().length} 个字符`,
 );
-/** 从现有响应式状态派生 publishDisabledReason，不发起请求或写入外部数据。 */
+/** 根据模块加载、模块错误、可用模块和图片上传状态给出发布阻止原因。 */
 const publishDisabledReason = computed(() => {
   if (moduleLoading.value) return '语言模块仍在加载中。';
   if (moduleError.value) return '语言模块加载失败，请重试。';
@@ -194,25 +194,25 @@ const publishDisabledReason = computed(() => {
   if (uploading.value) return '图片仍在上传中。';
   return '';
 });
-/** 从现有响应式状态派生 publishDisabled，不发起请求或写入外部数据。 */
+/** 有阻止原因或发布请求尚未结束时禁用发布按钮。 */
 const publishDisabled = computed(() => Boolean(publishDisabledReason.value) || publishing.value);
 
-/** 处理 clearFormError 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 清空课程表单中已声明字段的校验提示。 */
 function clearFormError(field) {
   if (Object.prototype.hasOwnProperty.call(formErrors, field)) formErrors[field] = '';
 }
 
-/** 处理 updateCourseFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 只修改课程表单已有字段。 */
 function updateCourseFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(courseForm, field)) courseForm[field] = value;
 }
 
-/** 处理 updateModuleFormField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 只修改模块表单已有字段。 */
 function updateModuleFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(moduleForm, field)) moduleForm[field] = value;
 }
 
-/** 监听受控响应式输入，在来源变化时同步派生状态或重新执行当前查询。 */
+/** 正文变为非空时清除正文必填提示。 */
 watch(
   () => courseForm.description,
   (value) => {
@@ -220,7 +220,7 @@ watch(
   },
 );
 
-/** 读取 loadModules 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+/** 并发读取四种语言的模块并生成级联选项；失败时清空并禁用所有语言选项。 */
 async function loadModules() {
   moduleLoading.value = true;
   moduleError.value = '';
@@ -248,12 +248,12 @@ async function loadModules() {
   }
 }
 
-/** 响应 openModuleDialog 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 打开新增语言模块弹窗。 */
 function openModuleDialog() {
   moduleDialogOpen.value = true;
 }
 
-/** 处理 resetModuleForm 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 将模块草稿和校验提示恢复为初始值。 */
 function resetModuleForm() {
   moduleForm.languageId = 1;
   moduleForm.moduleName = '';
@@ -262,7 +262,7 @@ function resetModuleForm() {
   moduleNameError.value = '';
 }
 
-/** 处理 addModule 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 校验模块名后提交创建，成功时关闭弹窗并重新加载模块选项。 */
 async function addModule() {
   moduleNameError.value = moduleForm.moduleName.trim() ? '' : '请输入模块名称。';
   if (moduleNameError.value || moduleSubmitting.value) return;
@@ -289,7 +289,7 @@ async function addModule() {
   }
 }
 
-/** 校验 validateCourse 对应的输入或会话条件，仅返回受控结果或页面提示。 */
+/** 校验课程标题、两级模块选择和正文是否完整。 */
 function validateCourse() {
   formErrors.courseName = courseForm.courseName.trim() ? '' : '请输入课程标题。';
   formErrors.module = selectedModule.value.length === 2 ? '' : '请选择课程语言模块。';
@@ -297,7 +297,7 @@ function validateCourse() {
   return !formErrors.courseName && !formErrors.module && !formErrors.description;
 }
 
-/** 处理 publishCourse 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 校验表单与所选语言后提交课程；成功时清空本地课程草稿和模块选择。 */
 async function publishCourse() {
   if (!validateCourse() || publishDisabled.value) return;
   const language = languages.find((item) => item.name === selectedModule.value[0]);
@@ -332,12 +332,12 @@ async function publishCourse() {
   }
 }
 
-/** codeSave 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 提示编辑器内容仅保留在当前页面，真正保存需要发布课程。 */
 function codeSave() {
   ElMessage.info('内容保留在当前编辑器中，发布后才会保存为课程');
 }
 
-/** onUploadImg 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 并发上传编辑器图片，全部成功后把 URL 列表交回编辑器；部分成功文件不会在失败时回滚。 */
 async function onUploadImg(files, callback) {
   uploading.value = true;
   try {

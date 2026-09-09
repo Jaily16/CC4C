@@ -10,7 +10,7 @@ export function loginUser(payload, http = api) {
   return http.post('/users/login', payload);
 }
 
-/** 请求发送一次邮箱验证码；该操作产生外部邮件副作用，页面负责倒计时与泛化错误。 */
+/** 请求创建并投递邮箱验证码邮件；页面负责防重复提交、倒计时和错误提示。 */
 export function requestVerificationCode(payload, http = api) {
   return http.post('/users/email', payload);
 }

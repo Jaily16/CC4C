@@ -10,13 +10,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * SecurityProperties 绑定外部配置，并集中表达运行时约束和安全默认值。
+ * 绑定业务密码强度、摘要 pepper、CORS 来源及 Redis 安全键前缀。
  *
- * @param pepper 调用方提供的 {@code pepper} 值
- * @param cookieSecure 调用方提供的 {@code cookieSecure} 值
- * @param allowedOrigins 调用方提供的 {@code allowedOrigins} 值
- * @param bcryptStrength 调用方提供的 {@code bcryptStrength} 值
- * @param keyPrefix 调用方提供的 {@code keyPrefix} 值
+ * @param pepper 安全键摘要使用的秘密 pepper，不得记录
+ * @param cookieSecure 是否仅通过 HTTPS 发送 Cookie
+ * @param allowedOrigins 逗号分隔的业务前端精确来源
+ * @param bcryptStrength BCrypt 工作因子，范围 4 至 16
+ * @param keyPrefix 业务限流等安全键的 Redis 前缀
  */
 @Validated
 @ConfigurationProperties(prefix = "cc4c.security")
@@ -27,9 +27,9 @@ public record SecurityProperties(
         @Min(4) @Max(16) int bcryptStrength,
         @NotBlank String keyPrefix) {
     /**
-     * 执行 SecurityProperties 中的 allowedOriginList 职责，并保持既有权限、事务与副作用边界。
+     * 按逗号拆分允许来源并去除空项；没有任何来源时拒绝配置。
      *
-     * @return 符合当前条件且保持稳定顺序的结果集合
+     * @return 去除首尾空白后的来源列表
      */
     public List<String> allowedOriginList() {
         List<String> origins = Arrays.stream(allowedOrigins.split(","))

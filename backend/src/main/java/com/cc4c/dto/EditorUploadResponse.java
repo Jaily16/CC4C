@@ -4,13 +4,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * EditorUploadResponse 是不可变的数据载体，保持现有字段语义和序列化契约。
+ * 适配编辑器上传协议：成功使用 success/message/url，失败使用 STATUS/MSG；空字段不输出。
  *
- * @param success 调用方提供的 {@code success} 值
- * @param message 待处理的消息及其属性
- * @param url 调用方提供的 {@code url} 值
- * @param status 调用方提供的 {@code status} 值
- * @param errorMessage 调用方提供的 {@code errorMessage} 值
+ * @param success 成功时为字符串 1，失败时为空
+ * @param message 上传结果说明
+ * @param url 上传图片的公开 URL
+ * @param status 失败时输出为 STATUS，值为 ERROR
+ * @param errorMessage 失败时输出为 MSG 的错误说明
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record EditorUploadResponse(
@@ -20,20 +20,20 @@ public record EditorUploadResponse(
         @JsonProperty("STATUS") String status,
         @JsonProperty("MSG") String errorMessage) {
     /**
-     * 执行 EditorUploadResponse 中的 success 职责，并保持既有权限、事务与副作用边界。
+     * 构造编辑器成功响应，设置 success 为字符串 1 并携带图片 URL。
      *
-     * @param url 调用方提供的 {@code url} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param url 上传图片的公开 URL
+     * @return 仅含成功协议字段的响应
      */
     public static EditorUploadResponse success(String url) {
         return new EditorUploadResponse("1", "success", url, null, null);
     }
 
     /**
-     * 执行 EditorUploadResponse 中的 error 职责，并保持既有权限、事务与副作用边界。
+     * 构造编辑器失败响应，设置 STATUS 为 ERROR 并携带 MSG。
      *
-     * @param message 待处理的消息及其属性
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param message 上传结果说明
+     * @return 仅含失败协议字段的响应
      */
     public static EditorUploadResponse error(String message) {
         return new EditorUploadResponse(null, null, null, "ERROR", message);

@@ -2,73 +2,71 @@ package com.cc4c.support.cache;
 
 import java.time.Duration;
 
-/**
- * 定义或实现共享基础设施状态的基础设施存取边界。
- */
+/** 定义缓存数据、代次和锁所需的原子存取能力；故障旁路由 BusinessCache 协调。 */
 public interface BusinessCacheStore {
     /**
-     * 读取业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 读取指定缓存键的字符串值。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @return 按当前协议生成或读取的字符串值
+     * @param key 完整缓存数据键
+     * @return 键值，键不存在时为空
      */
     String get(String key);
 
     /**
-     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 写入字符串值并设置有效期。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param value 待处理或存储的值
-     * @param ttl 正向值的有效期
+     * @param key 完整缓存数据键
+     * @param value 待封装或存储的缓存值
+     * @param ttl 本次写入的基础有效期
      */
     void set(String key, String value, Duration ttl);
 
     /**
-     * 更新业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 仅在键不存在时原子写入值及有效期，用于锁领取。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param value 待处理或存储的值
-     * @param ttl 正向值的有效期
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param key 完整缓存数据键
+     * @param value 待封装或存储的缓存值
+     * @param ttl 本次写入的基础有效期
+     * @return 成功写入时为 true
      */
     boolean setIfAbsent(String key, String value, Duration ttl);
 
     /**
-     * 记录业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 原子递增整型键，用于推进分区代次。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @return 按当前规则计算或读取的数值
+     * @param key 完整缓存数据键
+     * @return 递增后的计数
      */
     long increment(String key);
 
     /**
-     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 删除指定缓存键。
      *
-     * @param key 当前存取操作使用的稳定键
+     * @param key 完整缓存数据键
      */
     void delete(String key);
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 仅当键值与预期令牌一致时原子删除，避免释放其他工作者的锁。
      *
-     * @param key 当前存取操作使用的稳定键
-     * @param expectedValue 调用方提供的 {@code expectedValue} 值
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @param key 完整缓存数据键
+     * @param expectedValue 仅允许删除匹配此令牌的键
+     * @return 比较匹配且完成删除时为 true
      */
     boolean compareAndDelete(String key, String expectedValue);
 
     /**
-     * 删除或失效业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 删除匹配前缀的缓存键，调用方负责提供正确隔离范围。
      *
-     * @param prefix 调用方提供的 {@code prefix} 值
-     * @return 按当前规则计算或读取的数值
+     * @param prefix 调用方批准的隔离键前缀
+     * @return 实际删除键数
      */
     long deleteByPrefix(String prefix);
 
     /**
-     * 执行业务缓存状态，并遵循现有命名空间、失效与故障旁路规则。
+     * 提供默认连通性结果；真实远端存储实现应覆盖此方法。
      *
-     * @return 条件成立时返回 {@code true}，否则返回 {@code false}
+     * @return 默认返回 true
      */
     default boolean ping() {
         return true;

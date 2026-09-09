@@ -1,10 +1,10 @@
 package com.cc4c.dto;
 
 /**
- * 以不可变结构承载身份认证计算或查询结果。
+ * 供业务协作使用的用户 ID、昵称和头像快照，不包含认证凭据。
  *
- * @param userId 目标对象的稳定标识
- * @param name 调用方提供的 {@code name} 值
- * @param avatar 调用方提供的 {@code avatar} 值
+ * @param userId 用户 ID
+ * @param name 用户昵称
+ * @param avatar 头像请求路径
  */
 public record UserSnapshot(long userId, String name, String avatar) {}

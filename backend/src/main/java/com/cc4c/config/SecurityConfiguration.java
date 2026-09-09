@@ -46,18 +46,16 @@ import org.springframework.session.Session;
 import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
-/**
- * 装配身份认证运行组件，并集中声明安全或基础设施策略。
- */
+/** 装配业务密码、Session、CSRF 和角色授权，使用顺序为 2 的安全链承接业务请求。 */
 @Configuration
 @EnableMethodSecurity
 class SecurityConfiguration {
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 以配置的 BCrypt 强度构造带 bcrypt 编码标识的密码编码器。
      *
-     * @param properties 由容器注入的 SecurityProperties 协作组件
-     * @return 当前操作产生的 PasswordEncoder 结果
+     * @param properties 对应组件的类型化配置
+     * @return 只注册 bcrypt 算法的委托编码器
      */
     @Bean
     PasswordEncoder passwordEncoder(SecurityProperties properties) {
@@ -67,10 +65,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 使用 CC4C 认证提供器处理用户和管理员认证。
      *
-     * @param provider 调用方提供的 {@code provider} 值
-     * @return 当前操作产生的 AuthenticationManager 结果
+     * @param provider 业务用户及管理员认证提供器
+     * @return 业务认证管理器
      */
     @Bean
     AuthenticationManager authenticationManager(Cc4cAuthenticationProvider provider) {
@@ -78,9 +76,9 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 通过 HttpSession 保存和读取业务安全上下文。
      *
-     * @return 当前操作产生的 SecurityContextRepository 结果
+     * @return 业务安全上下文仓库
      */
     @Bean
     SecurityContextRepository securityContextRepository() {
@@ -88,10 +86,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 配置可由前端读取的 XSRF-TOKEN Cookie，并通过 X-XSRF-TOKEN 请求头校验。
      *
-     * @param properties 由容器注入的 SecurityProperties 协作组件
-     * @return 当前操作产生的 CookieCsrfTokenRepository 结果
+     * @param properties 对应组件的类型化配置
+     * @return SameSite=Lax 的业务 CSRF 仓库
      */
     @Bean
     CookieCsrfTokenRepository csrfTokenRepository(SecurityProperties properties) {
@@ -104,10 +102,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 配置根路径的 HttpOnly 业务 Session Cookie，使用 SameSite=Lax 和两小时 Cookie 有效期。
      *
-     * @param properties 由容器注入的 SecurityProperties 协作组件
-     * @return 当前操作产生的 DefaultCookieSerializer 结果
+     * @param properties 对应组件的类型化配置
+     * @return 业务 Session Cookie 序列化器
      */
     @Bean
     DefaultCookieSerializer cookieSerializer(SecurityProperties properties) {
@@ -122,11 +120,11 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 基于 Spring Session 索引查询身份名关联的会话。
      *
-     * @param <S> 方法使用的类型参数
-     * @param repository 调用方提供的 {@code repository} 值
-     * @return 当前操作产生的 SessionRegistry 结果
+     * @param <S> 持久化会话类型
+     * @param repository 按身份名建立索引的会话仓库
+     * @return 共享持久化会话索引的注册表
      */
     @Bean
     <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> repository) {
@@ -134,10 +132,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 依次执行角色并发限制、会话 ID 更换和会话注册。
      *
-     * @param sessionRegistry 调用方提供的 {@code sessionRegistry} 值
-     * @return 当前操作产生的 SessionAuthenticationStrategy 结果
+     * @param sessionRegistry 业务共享会话注册表
+     * @return 登录成功时使用的组合会话策略
      */
     @Bean
     SessionAuthenticationStrategy sessionAuthenticationStrategy(SessionRegistry sessionRegistry) {
@@ -148,11 +146,11 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 检测已过期的并发会话并返回 401 JSON 提示。
      *
-     * @param sessionRegistry 调用方提供的 {@code sessionRegistry} 值
-     * @param errorWriter 调用方提供的 {@code errorWriter} 值
-     * @return 当前操作产生的 ConcurrentSessionFilter 结果
+     * @param sessionRegistry 业务共享会话注册表
+     * @param errorWriter 统一安全错误响应写入器
+     * @return 会话失效响应过滤器
      */
     @Bean
     ConcurrentSessionFilter concurrentSessionFilter(SessionRegistry sessionRegistry, SecurityErrorWriter errorWriter) {
@@ -162,10 +160,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 将 Redis 故障转换过滤器注册在靠前的 Servlet 过滤器位置。
      *
-     * @param errorWriter 调用方提供的 {@code errorWriter} 值
-     * @return 当前操作产生的 FilterRegistrationBean<RedisFailureResponseFilter> 结果
+     * @param errorWriter 统一安全错误响应写入器
+     * @return 带明确执行顺序的过滤器注册项
      */
     @Bean
     FilterRegistrationBean<RedisFailureResponseFilter> redisFailureResponseFilter(SecurityErrorWriter errorWriter) {
@@ -176,10 +174,10 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 保留 Spring Session 默认序列化器 Bean 名，使用受限类型及旧身份别名兼容的 JSON 实现。
      *
-     * @param source 由容器注入的 ObjectMapper 协作组件
-     * @return 当前操作产生的 RedisSerializer<Object> 结果
+     * @param source 用于复制配置的应用 JSON 映射器
+     * @return 业务 Session JSON 序列化器
      */
     @Bean(name = "springSessionDefaultRedisSerializer")
     RedisSerializer<Object> springSessionDefaultRedisSerializer(ObjectMapper source) {
@@ -187,17 +185,17 @@ class SecurityConfiguration {
     }
 
     /**
-     * 创建并配置 SecurityConfiguration 所需的 Spring Bean，集中维护运行策略。
+     * 按请求路径和方法区分公开读取、USER 与 ADMIN 权限，显式保存会话并启用业务 CSRF。
      *
-     * @param http 调用方提供的 {@code http} 值
-     * @param csrfTokenRepository 当前协议使用且不得记录的安全令牌
-     * @param securityContextRepository 由容器注入的 SecurityContextRepository 协作组件
-     * @param legacyCookieCleanupFilter 调用方提供的 {@code legacyCookieCleanupFilter} 值
-     * @param concurrentSessionFilter 调用方提供的 {@code concurrentSessionFilter} 值
-     * @param errorWriter 调用方提供的 {@code errorWriter} 值
-     * @param metrics 调用方提供的 {@code metrics} 值
-     * @return 当前操作产生的 SecurityFilterChain 结果
-     * @throws Exception 当输入、数据或依赖状态不满足当前方法约束时抛出
+     * @param http Spring Security HTTP 安全构建器
+     * @param csrfTokenRepository 业务 CSRF Cookie 与请求头仓库
+     * @param securityContextRepository 业务 HttpSession 安全上下文仓库
+     * @param legacyCookieCleanupFilter 过期身份 Cookie 清理过滤器
+     * @param concurrentSessionFilter 并发会话失效检测过滤器
+     * @param errorWriter 统一安全错误响应写入器
+     * @param metrics 统一指标记录器
+     * @return 包含旧 Cookie 清理及并发会话检测的业务安全链
+     * @throws Exception 构建 Spring Security 过滤器链失败时抛出
      */
     @Bean
     @Order(2)
@@ -304,9 +302,9 @@ class SecurityConfiguration {
     }
 
     /**
-     * 执行认证或 Session 状态，不跨越既有角色、Cookie 与脱敏边界。
+     * 从当前认证的权限集合提取低基数指标角色标签，优先管理员，其次用户。
      *
-     * @return 按当前协议生成或读取的字符串值
+     * @return admin、user 或 anonymous
      */
     private static String currentRole() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

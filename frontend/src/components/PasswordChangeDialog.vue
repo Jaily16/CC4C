@@ -53,7 +53,7 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue', 'closed', 'clear-error', 'update-field', 'save']);
 
-/** 处理 updateField 用户操作，提交既有写入请求并在成功后同步页面状态。 */
+/** 通知父页面更新指定密码字段并清除该字段错误；不发送密码修改请求。 */
 function updateField(field, value) {
   emit('update-field', field, value);
   emit('clear-error', field);

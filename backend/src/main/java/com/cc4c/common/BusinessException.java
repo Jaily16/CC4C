@@ -2,32 +2,30 @@ package com.cc4c.common;
 
 import org.springframework.http.HttpStatus;
 
-/**
- * 表示共享基础设施处理中可分类且可安全映射的失败。
- */
+/** 携带可公开的 HTTP 状态、业务码、响应数据和提示，由全局异常处理器转换为统一响应。 */
 public final class BusinessException extends RuntimeException {
     private final HttpStatus status;
     private final int code;
     private final Object data;
 
     /**
-     * 创建 BusinessException 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存将由全局处理器公开返回的状态、业务码、数据及提示。
      *
-     * @param status 当前对象或流程的有限状态
-     * @param code 调用方提供的 {@code code} 值
-     * @param message 当前处理的消息或用户提示
+     * @param status 对外响应使用的 HTTP 状态
+     * @param code 统一响应体中的业务码
+     * @param message 由当前异常保存的提示或内部诊断消息
      */
     public BusinessException(HttpStatus status, BusinessCode code, String message) {
         this(status, code.code(), false, message);
     }
 
     /**
-     * 创建 BusinessException 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 保存将由全局处理器公开返回的状态、业务码、数据及提示。
      *
-     * @param status 当前对象或流程的有限状态
-     * @param code 调用方提供的 {@code code} 值
-     * @param data 调用方提供的 {@code data} 值
-     * @param message 当前处理的消息或用户提示
+     * @param status 对外响应使用的 HTTP 状态
+     * @param code 统一响应体中的业务码
+     * @param data 对外响应的数据字段；应由调用方保证可公开
+     * @param message 由当前异常保存的提示或内部诊断消息
      */
     public BusinessException(HttpStatus status, int code, Object data, String message) {
         super(message);
@@ -37,27 +35,27 @@ public final class BusinessException extends RuntimeException {
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 返回该业务异常应使用的 HTTP 状态。
      *
-     * @return 当前操作产生的 HttpStatus 结果
+     * @return 保存的 HTTP 状态
      */
     public HttpStatus status() {
         return status;
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 返回统一响应体中的业务码。
      *
-     * @return 按当前规则计算或读取的数值
+     * @return 保存的业务码
      */
     public int code() {
         return code;
     }
 
     /**
-     * 执行当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+     * 返回统一响应体中的数据字段。
      *
-     * @return 当前操作产生的 Object 结果
+     * @return 保存的响应数据
      */
     public Object data() {
         return data;

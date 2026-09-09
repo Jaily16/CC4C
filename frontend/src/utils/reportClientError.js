@@ -1,16 +1,16 @@
 /* eslint-disable no-console */
 
-/** safeText 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+/** 仅接收字符串，将换行和制表符压成空格，并保留前 160 个 UTF-16 代码单元。 */
 function safeText(value, fallback = '') {
   if (typeof value !== 'string') return fallback;
   return value.replace(/[\r\n\t]/g, ' ').slice(0, 160);
 }
 
 /**
- * 在开发环境提供脱敏错误诊断；生产环境只让调用方继续处理用户可见状态。
+ * 仅在开发模式输出异常名称、截短消息和固定上下文；不采集请求对象，但消息内容仍由异常来源决定。
  * @param {unknown} error 捕获到的异常。
  * @param {string} context 固定的功能上下文，不应包含请求数据。
- * @param {{sink?: (payload: object) => void, development?: boolean}} options 测试或开发注入项。
+ * @param {{sink?: (payload: object) => void, development?: boolean}} options 开发或校验使用的输出与模式覆盖项。
  */
 export function reportClientError(error, context = '', options = {}) {
   const development = options.development ?? import.meta.env?.DEV === true;

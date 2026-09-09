@@ -30,19 +30,17 @@ import java.util.concurrent.CompletionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-/**
- * 协调独立观测门户用例及其持久化、安全和外部协作边界。
- */
+/** 执行目录中预定义的观测查询，将并发结果聚合为总览、Dashboard 和告警展示状态。 */
 @Service
 public final class ObservabilityQueryService {
     private final ObservabilityCatalog catalog;
     private final PrometheusClient prometheus;
 
     /**
-     * 创建 ObservabilityQueryService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入只含固定查询的观测目录和有界 Prometheus 客户端。
      *
-     * @param catalog 调用方提供的 {@code catalog} 值
-     * @param prometheus 由容器注入的 PrometheusClient 协作组件
+     * @param catalog 固定查询、面板及告警目录
+     * @param prometheus 固定查询及就绪探测的 Prometheus 客户端
      */
     ObservabilityQueryService(ObservabilityCatalog catalog, PrometheusClient prometheus) {
         this.catalog = catalog;
@@ -50,9 +48,9 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 并发执行固定总览即时查询，按目录顺序返回卡片；区分空值、有效值和查询失败。
      *
-     * @return 当前操作产生的 OverviewResponse 结果
+     * @return 带聚合数据源状态的总览
      */
     public OverviewResponse overview() {
         Instant generatedAt = Instant.now();
@@ -92,11 +90,11 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 校验固定 Dashboard 和时间范围后并发查询面板，按配置步长聚合曲线及部分失败标志。
      *
-     * @param dashboardId 目标对象的稳定标识
-     * @param requestedRange 调用方提供的 {@code requestedRange} 值
-     * @return 当前操作产生的 DashboardResponse 结果
+     * @param dashboardId 目录内 Dashboard 标识
+     * @param requestedRange 15m、1h、6h 或 24h
+     * @return 指定范围内的 Dashboard 结果
      */
     public DashboardResponse dashboard(String dashboardId, String requestedRange) {
         DashboardDefinition dashboard = catalog.dashboard(dashboardId)
@@ -135,9 +133,9 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 仅查询目录内告警名称，统计加载、firing 和 pending 数量；失败或缺失规则使用明确状态。
      *
-     * @return 当前操作产生的 AlertsResponse 结果
+     * @return 告警规则及加载完整性汇总
      */
     public AlertsResponse alerts() {
         Instant generatedAt = Instant.now();
@@ -174,10 +172,10 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 合并面板各查询的曲线；有数据时保留成功状态并提示部分失败，无数据时区分 EMPTY 和 ERROR。
      *
-     * @param pending 调用方提供的 {@code pending} 值
-     * @return 当前操作产生的 PanelAggregate 结果
+     * @param pending 待汇总的面板定义与查询任务
+     * @return 面板响应及供上层汇总的计数
      */
     private PanelAggregate aggregate(PendingPanel pending) {
         List<SeriesResponse> series = new ArrayList<>();
@@ -216,12 +214,12 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 合并规则定义和运行状态；缺失状态用 MISSING、UNKNOWN 及空评估时间表示。
      *
-     * @param definition 调用方提供的 {@code definition} 值
-     * @param state 调用方提供的 {@code state} 值
-     * @param message 当前处理的消息或用户提示
-     * @return 当前操作产生的 AlertRuleResponse 结果
+     * @param definition 预定义告警名称和展示字段
+     * @param state 可空的 Prometheus 规则状态
+     * @param message 查询失败或规则缺失的展示提示
+     * @return 单条告警展示响应
      */
     private AlertRuleResponse alertResponse(
             AlertDefinition definition, PrometheusClient.AlertState state, String message) {
@@ -237,10 +235,10 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取第一条序列的最后一个采样值，不跨序列求和或补零。
      *
-     * @param series 调用方提供的 {@code series} 值
-     * @return 按当前规则计算或读取的数值
+     * @param series 即时查询返回的序列集合
+     * @return 最新采样值；无序列、无点或点值为空时为空
      */
     private Double lastValue(List<SeriesResponse> series) {
         if (series.isEmpty() || series.getFirst().points().isEmpty()) {
@@ -250,12 +248,12 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 按错误数、有效结果数及部分标志区分不可用、部分可用、空结果和可用。
      *
-     * @param errors 调用方提供的 {@code errors} 值
-     * @param available 调用方提供的 {@code available} 值
-     * @param partial 调用方提供的 {@code partial} 值
-     * @return 当前操作产生的 SourceStatus 结果
+     * @param errors 失败查询数量
+     * @param available 有效结果数量
+     * @param partial 是否有结果报告部分数据不可用或截断
+     * @return 聚合后的数据源状态
      */
     private SourceStatus sourceStatus(int errors, int available, boolean partial) {
         if (errors > 0 && available == 0) {
@@ -268,30 +266,30 @@ public final class ObservabilityQueryService {
     }
 
     /**
-     * PendingPanel 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 关联面板定义及已提交的各项异步查询。
      *
-     * @param definition 调用方提供的 {@code definition} 值
-     * @param futures 调用方提供的 {@code futures} 值
+     * @param definition 当前面板定义
+     * @param futures 已提交的面板查询任务
      */
     private record PendingPanel(
             PanelDefinition definition, List<CompletableFuture<PrometheusClient.QueryResult>> futures) {}
 
     /**
-     * PanelAggregate 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 保存单面板展示响应及整体状态汇总所需计数。
      *
-     * @param response 当前 HTTP 响应，用于写入状态或安全 Cookie
-     * @param errors 调用方提供的 {@code errors} 值
-     * @param available 调用方提供的 {@code available} 值
-     * @param partial 调用方提供的 {@code partial} 值
+     * @param response 当前面板展示响应
+     * @param errors 失败查询数量
+     * @param available 存在任意序列时为 1，否则为 0
+     * @param partial 是否有结果报告部分数据不可用或截断
      */
     private record PanelAggregate(PanelResponse response, int errors, int available, boolean partial) {}
 
     /**
-     * Range 以不可变结构承载独立观测门户数据，并保持现有字段语义。
+     * 绑定允许的查询时段和步长：15m/15秒、1h/30秒、6h/120秒、24h/300秒。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param duration 调用方提供的 {@code duration} 值
-     * @param stepSeconds 调用方提供的 {@code stepSeconds} 值
+     * @param id 固定时间范围标识
+     * @param duration 查询窗口时长
+     * @param stepSeconds 范围查询采样步长，单位秒
      */
     private record Range(String id, Duration duration, long stepSeconds) {
         private static final Map<String, Range> ALLOWED = new LinkedHashMap<>();
@@ -304,10 +302,10 @@ public final class ObservabilityQueryService {
         }
 
         /**
-         * 解析当前组件负责的数据或状态，并把失败交由既有异常边界处理。
+         * 只接受四个固定范围标识，未知值抛出 400 校验异常。
          *
-         * @param candidate 调用方提供的 {@code candidate} 值
-         * @return 当前操作产生的 Range 结果
+         * @param candidate 请求中的时间范围标识
+         * @return 带固定时长和步长的查询范围
          */
         static Range parse(String candidate) {
             Range range = ALLOWED.get(candidate);

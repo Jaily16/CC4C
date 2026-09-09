@@ -46,7 +46,7 @@ const navItems = [
   { label: '所有博客', to: '/allBlogs' },
 ];
 
-/** 处理 logout 清理操作，仅影响当前功能明确指向的状态或资源。 */
+/** 请求注销 USER 会话；后端确认成功后清空业务身份和 CSRF 缓存并跳转登录页。 */
 async function logout() {
   try {
     const resp = await logoutUser();
@@ -66,7 +66,7 @@ async function logout() {
   }
 }
 
-/** 响应 flyToLogin 导航或界面事件，更新当前组件的受控展示状态。 */
+/** 进入普通用户登录页。 */
 function flyToLogin() {
   router.push('/login');
 }

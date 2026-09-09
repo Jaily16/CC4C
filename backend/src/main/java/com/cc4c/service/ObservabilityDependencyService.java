@@ -19,9 +19,7 @@ import org.springframework.boot.availability.LivenessState;
 import org.springframework.boot.availability.ReadinessState;
 import org.springframework.stereotype.Service;
 
-/**
- * 协调独立观测门户用例及其持久化、安全和外部协作边界。
- */
+/** 聚合应用可用性、固定依赖健康和 Prometheus 就绪状态，仅返回允许的状态及固定提示。 */
 @Service
 public final class ObservabilityDependencyService {
     private static final Set<String> SAFE_STATUSES = Set.of("UP", "DOWN", "OUT_OF_SERVICE", "DEGRADED", "UNKNOWN");
@@ -31,11 +29,11 @@ public final class ObservabilityDependencyService {
     private final PrometheusClient prometheus;
 
     /**
-     * 创建 ObservabilityDependencyService 并保存所需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入健康贡献者注册表、应用可用性和 Prometheus 探测客户端。
      *
-     * @param healthRegistry 调用方提供的 {@code healthRegistry} 值
-     * @param availability 调用方提供的 {@code availability} 值
-     * @param prometheus 由容器注入的 PrometheusClient 协作组件
+     * @param healthRegistry 按名称查找健康贡献者的注册表
+     * @param availability 应用存活及就绪状态
+     * @param prometheus 固定查询及就绪探测的 Prometheus 客户端
      */
     ObservabilityDependencyService(
             HealthContributorRegistry healthRegistry,
@@ -47,10 +45,10 @@ public final class ObservabilityDependencyService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 检查六项依赖；存活、就绪或核心数据库/Session Redis 故障判为 DOWN，其他非正常项判为 DEGRADED。
      *
-     * @param request 当前 HTTP 请求，仅用于读取受控请求信息
-     * @return 当前操作产生的 DependenciesResponse 结果
+     * @param request 当前 HTTP 请求，提供关联 ID 或会话和来源上下文
+     * @return 带请求关联 ID 的依赖快照
      */
     public DependenciesResponse snapshot(HttpServletRequest request) {
         String liveness = availability.getLivenessState() == LivenessState.CORRECT ? "UP" : "DOWN";
@@ -81,12 +79,12 @@ public final class ObservabilityDependencyService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 将依赖状态转换为固定中文提示，不返回健康详情中的内部错误。
      *
-     * @param id 调用方提供的 {@code id} 值
-     * @param title 当前博客或课程的标题
-     * @param status 当前对象或流程的有限状态
-     * @return 当前操作产生的 DependencyItemResponse 结果
+     * @param id 预定义依赖标识
+     * @param title 依赖展示名称
+     * @param status 已归一化的健康状态
+     * @return 单项依赖展示结果
      */
     private DependencyItemResponse item(String id, String title, String status) {
         String message =
@@ -100,10 +98,10 @@ public final class ObservabilityDependencyService {
     }
 
     /**
-     * 执行观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 读取指定健康贡献者；组合贡献者只聚合直接 HealthIndicator 子项，缺失或无法识别时返回 UNKNOWN。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param name 健康贡献者注册名称
+     * @return 归一后的依赖状态
      */
     private String contributorStatus(String name) {
         HealthContributor contributor = healthRegistry.getContributor(name);
@@ -133,10 +131,10 @@ public final class ObservabilityDependencyService {
     }
 
     /**
-     * 规范化观测门户数据，保持独立身份、查询白名单和脱敏失败状态。
+     * 将健康状态转为大写并限制在允许集合，其他值统一为 UNKNOWN。
      *
-     * @param candidate 调用方提供的 {@code candidate} 值
-     * @return 按当前协议生成或读取的字符串值
+     * @param candidate 待归一化的健康状态
+     * @return 允许的健康状态编码
      */
     private String normalize(String candidate) {
         String upper = candidate == null ? "UNKNOWN" : candidate.toUpperCase(Locale.ROOT);

@@ -27,9 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * CatalogController 协调 CC4C 的一项运行职责，并保持现有外部行为不变。
- */
+/** 提供公开课程读取和管理员课程创建入口，将分页及字段校验后的请求交给目录服务。 */
 @Validated
 @RestController
 @RequestMapping("/courses")
@@ -37,20 +35,20 @@ public class CatalogController {
     private final CatalogService service;
 
     /**
-     * 创建 CatalogController 并保存其必需协作组件；构造阶段不主动执行外部业务操作。
+     * 接入课程查询与写入服务。
      *
-     * @param service 由容器注入的 CatalogService 协作组件
+     * @param service 课程目录服务
      */
     CatalogController(CatalogService service) {
         this.service = service;
     }
 
     /**
-     * 执行 CatalogController 中的 home 职责，并保持既有权限、事务与副作用边界。
+     * 分页查询首页课程并封装分页元数据。
      *
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 首页课程分页结果
      */
     @GetMapping("/home")
     public ApiResponse<PageResponse<CourseResponse>> home(
@@ -60,11 +58,11 @@ public class CatalogController {
     }
 
     /**
-     * 执行 CatalogController 中的 recommend 职责，并保持既有权限、事务与副作用边界。
+     * 按语言 ID 与专业分类查询推荐课程模块。
      *
-     * @param language 调用方提供的 {@code language} 值
-     * @param major 调用方提供的 {@code major} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param language 正数语言 ID
+     * @param major 专业分类（-1、0、1）
+     * @return 带推荐业务码的模块列表
      */
     @GetMapping("/recommend/{language}/{major}")
     public ApiResponse<List<CourseModuleResponse>> recommend(
@@ -76,10 +74,10 @@ public class CatalogController {
     }
 
     /**
-     * 执行 CatalogController 中的 byName 职责，并保持既有权限、事务与副作用边界。
+     * 按课程名称查询单门课程详情。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param name 课程名称，长度 1 至 200
+     * @return 课程详情响应
      */
     @GetMapping("/{name}")
     public ApiResponse<CourseResponse> byName(@PathVariable @Size(min = 1, max = 200) String name) {
@@ -87,12 +85,12 @@ public class CatalogController {
     }
 
     /**
-     * 执行 CatalogController 中的 search 职责，并保持既有权限、事务与副作用边界。
+     * 按检索词查询课程并返回分页结果。
      *
-     * @param info 调用方提供的 {@code info} 值
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param info 课程检索词，长度 1 至 200
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 匹配课程的分页响应
      */
     @GetMapping("/search/{info}")
     public ApiResponse<PageResponse<CourseResponse>> search(
@@ -106,12 +104,12 @@ public class CatalogController {
     }
 
     /**
-     * 执行 CatalogController 中的 byLanguage 职责，并保持既有权限、事务与副作用边界。
+     * 按语言名称分页查询课程。
      *
-     * @param name 调用方提供的 {@code name} 值
-     * @param page 分页查询边界值
-     * @param size 分页查询边界值
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param name 语言名称，长度 1 至 15
+     * @param page 从 1 起算的页码，默认 1
+     * @param size 每页记录数，范围 1 至 100，默认 20
+     * @return 该语言的课程分页响应
      */
     @GetMapping("/language/{name}")
     public ApiResponse<PageResponse<CourseResponse>> byLanguage(
@@ -125,10 +123,10 @@ public class CatalogController {
     }
 
     /**
-     * 变更 CatalogController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 将已校验的模块创建请求交给目录服务，成功使用 HTTP 201。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的新课程模块字段
+     * @return 包含新模块的创建响应
      */
     @PostMapping("/module")
     public ResponseEntity<ApiResponse<CourseModuleResponse>> createModule(
@@ -139,10 +137,10 @@ public class CatalogController {
     }
 
     /**
-     * 执行 CatalogController 中的 modules 职责，并保持既有权限、事务与副作用边界。
+     * 按语言 ID 查询课程模块列表。
      *
-     * @param id 目标对象的稳定标识
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param id 正数语言 ID
+     * @return 该语言的模块列表
      */
     @GetMapping("/module/{id}")
     public ApiResponse<List<CourseModuleResponse>> modules(@PathVariable @Positive int id) {
@@ -150,10 +148,10 @@ public class CatalogController {
     }
 
     /**
-     * 变更 CatalogController 对应状态，并维持既有校验、事务及外部副作用边界。
+     * 将已校验的课程创建请求交给目录服务，成功使用 HTTP 201。
      *
-     * @param request 已经过声明式校验的接口请求体
-     * @return 使用统一协议封装且不暴露内部异常的接口响应
+     * @param request 已校验的新课程字段
+     * @return 包含新课程的创建响应
      */
     @PostMapping("/add")
     public ResponseEntity<ApiResponse<CourseResponse>> createCourse(@Valid @RequestBody CourseCreateRequest request) {

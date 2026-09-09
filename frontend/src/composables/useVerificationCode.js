@@ -8,7 +8,7 @@ export function useVerificationCode({ requestCode, buildRequest, cooldownSeconds
   const countdown = ref(0);
   let timer = null;
 
-  /** 处理 clearTimer 清理操作，仅影响当前功能明确指向的状态或资源。 */
+  /** 取消当前验证码倒计时并清空计时器引用。 */
   function clearTimer() {
     if (timer) {
       globalThis.clearInterval(timer);
@@ -16,11 +16,11 @@ export function useVerificationCode({ requestCode, buildRequest, cooldownSeconds
     }
   }
 
-  /** startCountdown 封装当前组件的一项语义操作，并保持既有状态与错误处理边界。 */
+  /** 清除旧倒计时，设置冷却秒数并启动每秒递减。 */
   function startCountdown() {
     clearTimer();
     countdown.value = cooldownSeconds;
-    /** 按既定时间安排下一次动作，并由所属组件或 composable 负责取消。 */
+    /** 每秒递减剩余时间，到零时取消计时器并将显示值归零。 */
     timer = globalThis.setInterval(() => {
       countdown.value -= 1;
       if (countdown.value <= 0) {
@@ -30,7 +30,7 @@ export function useVerificationCode({ requestCode, buildRequest, cooldownSeconds
     }, 1000);
   }
 
-  /** 读取 request 所需数据并更新加载、成功或失败状态，不改变业务数据。 */
+  /** 发送验证码请求；发送中或冷却期内不重复发送，仅在后端明确成功后开始倒计时。 */
   async function request() {
     if (sending.value || countdown.value > 0) return null;
 
@@ -45,7 +45,7 @@ export function useVerificationCode({ requestCode, buildRequest, cooldownSeconds
   }
 
   if (getCurrentInstance()) {
-    /** 组件卸载前取消计时器、监听或未完成请求，避免资源泄漏和过期写回。 */
+    /** 组件卸载前取消验证码倒计时。 */
     onBeforeUnmount(clearTimer);
   }
 

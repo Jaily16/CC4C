@@ -8,9 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.util.Date;
 import lombok.Data;
 
-/**
- * 映射身份认证数据库记录，字段语义与现有表结构保持一致。
- */
+/** 映射 user 表中的资料、密码和账户状态；包含敏感字段，不直接作为接口响应。 */
 @Data
 @TableName("user")
 public class UserEntity {

@@ -6,17 +6,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * CorsConfiguration 负责组装运行时基础设施，并明确其边界和故障处理策略。
- */
+/** 为业务接口配置允许携带 Cookie 的精确来源 CORS 策略。 */
 @Configuration
 public class CorsConfiguration {
 
     /**
-     * 执行 CorsConfiguration 中的 corsConfigurationSource 职责，并保持既有权限、事务与副作用边界。
+     * 拒绝带通配符的来源，允许业务读写方法及 CSRF 请求头，并暴露重试和关联 ID 响应头。
      *
-     * @param properties 调用方提供的 {@code properties} 值
-     * @return 按当前声明计算、查询或转换得到的结果
+     * @param properties 对应组件的类型化配置
+     * @return 应用于所有业务路径的 CORS 配置源
      */
     @Bean
     UrlBasedCorsConfigurationSource corsConfigurationSource(SecurityProperties properties) {
