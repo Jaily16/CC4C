@@ -162,744 +162,259 @@ Mapper 与 Repository 处于同一数据访问层，不增加转发式 DAO 包�
 
 ## 环境要求
 
-本地复现按下表准备；Linux 示例针对 Ubuntu 24.04 / Bash。Windows 脚本要求 **PowerShell 7**，系统自带 Windows PowerShell 5.1 无法执行这些脚本。
+先准备好下列工具和服务，无需额外安装 Python。当前版本是项目的验证基线；推荐范围是保守的兼容预期，并未逐个组合实测。项目依赖版本由 POM 和 lock 文件管理，不需要手动安装 Spring Boot、Vue 等库。
 
-| 组件 | 仓库基线 | 用途／默认端口 |
-| --- | --- | --- |
-| JDK | 21 | 后端与独立 Java 工具 |
-| Maven | 3.9.16 | 后端依赖与打包 |
-| Node.js / npm | 24.18.0 / 11.16.0 | 两端依赖与 Vite |
-| PowerShell | 7.6.5 | Windows 脚本；Linux 下文使用 Bash |
-| MySQL | 8.4.11 | 业务与消息表，3306 |
-| Redis | 8.2.9 | Session、缓存与安全状态，6379 |
-| RabbitMQ | 4.3.5，配 Erlang 27.x | AMQP 5672；管理 15672；指标 15692 |
-| Prometheus | 3.13.2 | 指标查询，9090 |
-| SMTP | 服务商提供 | 验证码与通知；通常 587 STARTTLS 或 465 SSL |
-| Git | 可用的 Git CLI | 获取源码 |
+| 工具／服务 | 当前使用版本 | 推荐版本范围 | 用途 |
+| --- | --- | --- | --- |
+| Java JDK | 21 | 21.x | 后端构建与运行 |
+| Maven | 3.9.16 | ≥3.9.16、<4 | 后端依赖与打包 |
+| Node.js | 24.18.0 | 24.x | 两端构建、跨平台启动辅助 |
+| npm | 11.16.0 | 11.x | 按 lock 文件准备前端依赖 |
+| MySQL | 8.4.11 | 8.4.x | 业务数据、Outbox 与 Inbox |
+| Redis | 8.2.9 | 8.2.x | Session、验证码、限流和缓存 |
+| RabbitMQ | 4.3.5 | 4.3.x | 可靠异步消息 |
+| Erlang/OTP | RabbitMQ 配套要求 | 27.x | RabbitMQ 运行环境 |
+| Prometheus | 3.13.2 | 3.13.x | 指标抓取、查询和告警 |
+| PowerShell，可选 | 7.6.5 | 7.6.x | 旧 Windows 入口及完整质量检查 |
 
-应用端口为 **4080**（业务及观测 API）、**4081**（本机管理端）、**5173**（业务页面）、**5174**（观测页面）。本机示例统一使用 `localhost` 访问两个前端，避免与 `127.0.0.1` 混用导致 Origin 或 Cookie 行为不同。
+新启动入口在 Windows 和 Linux 上使用同一组 Node 命令。Node 24 满足 [Vite 的要求](https://vite.dev/guide/)，RabbitMQ 与 Erlang 的组合以[官方兼容矩阵](https://www.rabbitmq.com/docs/which-erlang)为准。CI 继续使用 [versions.yml](versions.yml) 中的精确版本。
 
-Python、Docker、Grafana 都不是当前三端运行的必需组件。Python 如用于个人辅助工作，可通过 [Python 官方安装入口](https://www.python.org/downloads/) 安装，Ubuntu 可使用 `sudo apt install python3`；项目启动不调用 Python。
+| 本机端口 | 服务 |
+| --- | --- |
+| 3306 / 6379 | MySQL / Redis |
+| 5672 / 15672 / 15692 | RabbitMQ 消息 / 管理页面 / 指标 |
+| 9090 | Prometheus |
+| 4080 / 4081 | 后端业务 API / 本机管理指标 |
+| 5173 / 5174 | 业务前端 / 观测前端 |
 
 ## 启动项目
 
-以下命令供读者在自己的开发环境执行。Windows 入口沿用已记录的本机运行方式；Linux 命令依据当前源码与官方说明编写，**未进行 Linux 实机运行验证**。首次启动会执行 Flyway 校验／迁移，正常运行也会写入 Session、消息和业务数据。
+### 1. 确认工具与基础设施已就绪
 
-### 1. 安装工具链与基础设施
+~~~bash
+java -version
+mvn --version
+node --version
+npm --version
+~~~
 
-安装包可选择下表中的一种方式。优先使用上节锁定版本；软件源的默认最新版不等于项目版本，安装前查看可用版本。已有兼容环境直接复用，不重复创建账号或覆盖配置。
+确认 Maven 显示 Java 21。若终端仍选择其他 Java，只需将 `JAVA_HOME` 指向已有 JDK，并把其 bin 加到 PATH：
 
-| 组件 | Windows | Ubuntu 24.04 |
-| --- | --- | --- |
-| Java 21 | [Temurin 安装包](https://adoptium.net/installation/)；或 `winget install EclipseAdoptium.Temurin.21.JDK` | 按 [Adoptium Linux 安装说明](https://adoptium.net/installation/linux/) 配置软件源后安装 `temurin-21-jdk` |
-| Maven | 下载 [3.9.16 二进制 ZIP](https://maven.apache.org/install.html)，解压并将 `bin` 加入 PATH | 同页下载二进制 tar.gz，解压，将 `bin` 加入 PATH |
-| Node.js | [24.18.0 MSI／ZIP](https://nodejs.org/en/download/archive/v24.18.0)，安装后核对 npm | 同页选择 Linux 对应架构 tar.xz，解压并将 `bin` 加入 PATH |
-| PowerShell | [官方安装说明](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)；或 `winget install Microsoft.PowerShell`，打开 `pwsh` | 下文启动方式不要求安装 |
-| MySQL | [8.4 MSI 与 Configurator](https://dev.mysql.com/doc/refman/8.4/en/windows-installation.html)，安装 Server 与命令行客户端 | [MySQL APT 源](https://dev.mysql.com/doc/refman/8.4/en/linux-installation-apt-repo.html)，选择 8.4 LTS 后安装 Server／Client |
-| Redis | 在 [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) 的 Ubuntu 中按右侧方式安装；Windows 应用连接本机转发端口 | 使用 [Redis 官方安装入口](https://redis.io/docs/latest/operate/oss_and_stack/install/) 的 APT 说明，选择 8.2.9 |
-| RabbitMQ | 先装兼容 Erlang，再运行 [RabbitMQ 安装包](https://www.rabbitmq.com/docs/install-windows) | 按 [官方 APT 说明](https://www.rabbitmq.com/docs/install-debian) 配置 Erlang／RabbitMQ 软件源并选定版本 |
-| Prometheus | [官方二进制下载](https://prometheus.io/download/)，选择 3.13.2 windows-amd64 | 同页选择 3.13.2 linux-amd64 或适合设备的架构 |
-| Git | [Git for Windows](https://git-scm.com/install/windows) | `sudo apt update && sudo apt install git` |
-
-RabbitMQ 4.3.5 使用官方兼容矩阵支持的 Erlang 27.x，不直接追随 Erlang 最新大版本。[兼容矩阵](https://www.rabbitmq.com/docs/which-erlang)
-
-**Windows：**建议安装路径不包含特殊字符。设置自己的 JDK 与 Maven 路径后，重新打开 PowerShell 7：
-
-```powershell
-# 临时选择本次终端的工具链；路径按实际安装位置修改。
+~~~powershell
+# Windows；替换为自己的安装目录。
 $env:JAVA_HOME = 'C:\tools\jdk-21'
-$env:PATH = "$env:JAVA_HOME\bin;C:\tools\apache-maven-3.9.16\bin;$env:PATH"
-$PSVersionTable.PSVersion
-java -version
-mvn --version
-node --version
-npm --version
-```
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+~~~
 
-**Linux：**解压工具的位置按实际安装路径调整：
-
-```bash
+~~~bash
+# Linux；替换为自己的安装目录。
 export JAVA_HOME=/opt/jdk-21
-export PATH="$JAVA_HOME/bin:/opt/apache-maven-3.9.16/bin:/opt/node-v24.18.0-linux-x64/bin:$PATH"
-java -version
-mvn --version
-node --version
-npm --version
-```
+export PATH="$JAVA_HOME/bin:$PATH"
+~~~
 
-预期 Java 为 21，Maven 为 3.9.16，Node 为 v24.18.0，npm 为 11.16.0。两端 engines 已固定；版本不匹配应先修正工具链。
+已安装的服务按自己的服务名启动；不要重复启动已有实例。Windows 服务安装方式与 Linux 示例分别如下：
 
-通过系统安装器／软件源安装的服务可使用以下命令启动；Windows MySQL 服务名以 Configurator 的实际设置为准：
-
-```powershell
-# 管理员 PowerShell；Redis 命令在已安装 Redis 的 WSL Ubuntu 内运行。
+~~~powershell
+# Windows 服务名以实际安装为准。
 Start-Service MySQL84
 Start-Service RabbitMQ
-wsl -d Ubuntu -- sudo service redis-server start
-```
+# Redis 使用已有实例的启动入口，例如在它的目录运行：
+.\redis-server.exe .\redis.conf
+~~~
 
-```bash
-# Ubuntu；只针对刚配置好的本机服务。
-sudo systemctl start mysql
-sudo systemctl start redis-server
-sudo systemctl start rabbitmq-server
-redis-cli ping
-```
+~~~bash
+# Linux，Redis 服务名可能为 redis 或 redis-server。
+sudo systemctl start mysql redis-server rabbitmq-server
+~~~
 
-Redis 返回 `PONG` 表示连接可用。WSL 的 Redis 只用于本机开发，保持 loopback／protected-mode；不要为解决连接问题直接开放公网访问。[WSL 数据库安装与启动](https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-database)
+确认结果即可，不需要读取数据库内容：
 
-### 2. 获取源码与准备构建产物
+~~~bash
+mysqladmin -h 127.0.0.1 -u root -p ping
+redis-cli -h 127.0.0.1 -p 6379 ping
+rabbitmq-diagnostics ping
+~~~
 
-在存放项目的父目录执行：
+预期分别看到 MySQL 存活、`PONG` 和 RabbitMQ 节点正常。Windows RabbitMQ 命令使用 `.bat` 后缀；Linux 按安装方式使用服务账号或 `sudo`。Redis 如启用认证，使用已有认证方式，不把密码写在命令参数中。SMTP 需另行准备可用的发件账户和授权码。
 
-```bash
+### 2. 获取源码与构建
+
+~~~bash
 git clone https://github.com/Jaily16/CC4C.git
 cd CC4C
-```
+~~~
 
-下面两段均从仓库根目录开始。首次构建允许 Maven 下载固定依赖；`npm ci` 按锁文件安装，不使用 `npm install` 重写锁文件。
+以下命令在各自目录执行，Windows、Linux 相同。首次准备需要下载锁定依赖；命令失败时先处理原因，不继续启动。
 
-**Windows / PowerShell 7：**
+~~~bash
+# backend 目录
+mvn clean package -DskipTests
+~~~
 
-```powershell
-$ErrorActionPreference = 'Stop'
-Push-Location backend
-try {
-    mvn -B -ntp clean package -DskipTests
-    if ($LASTEXITCODE -ne 0) { throw 'Backend build failed' }
-} finally { Pop-Location }
-foreach ($app in @('frontend', 'observability')) {
-    Push-Location $app
-    try {
-        npm ci --ignore-scripts --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
-        npm run build
-        if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' }
-    } finally { Pop-Location }
-}
-```
+~~~bash
+# frontend 目录与 observability 目录，各执行一次
+npm ci
+npm run build
+~~~
 
-**Linux / Bash：**
+后端生成主应用、管理员引导和密码辅助三种 JAR；两端各生成 `dist`。构建无需 `.env.local`。已有完整 Maven 缓存时，可使用 `mvn -o clean package -DskipTests` 离线构建。
 
-```bash
-(
-  set -e
-  (cd backend && mvn -B -ntp clean package -DskipTests)
-  for app in frontend observability; do
-    (cd "$app" && npm ci --ignore-scripts --no-audit --no-fund && npm run build)
-  done
-)
-```
+### 3. 准备专用数据库和 RabbitMQ 资源
 
-后端生成主应用 JAR、`-admin-bootstrap.jar` 和 `-observability-password.jar`；两个前端生成各自的 `dist`。构建不需要读取本机环境文件。依赖已经齐备时，可以在 Maven 命令中加入 `-o` 离线运行。
+使用 MySQL 管理员登录后，在**新环境**执行以下 SQL，替换密码占位符。同名库或账号已存在时先核对，不删除重建。
 
-### 3. 准备 MySQL、Redis、RabbitMQ 与 SMTP
-
-**MySQL：**先以数据库管理员连接，`-p` 后不写密码，由客户端提示输入：
-
-```bash
-mysql -h 127.0.0.1 -P 3306 -u root -p
-```
-
-在 MySQL 客户端执行，替换密码占位符；示例只面向新环境，同名数据库或账号已存在时先核对，不能删掉重建：
-
-```sql
-CREATE DATABASE cc4c_runtime
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'cc4c_runtime_user'@'127.0.0.1'
-  IDENTIFIED BY 'REPLACE_WITH_DATABASE_PASSWORD';
+~~~sql
+CREATE DATABASE cc4c_runtime CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'cc4c_runtime_user'@'127.0.0.1' IDENTIFIED BY 'REPLACE_WITH_DATABASE_PASSWORD';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
   ON cc4c_runtime.* TO 'cc4c_runtime_user'@'127.0.0.1';
-```
+~~~
 
-运行账户只获得专用库的业务与迁移权限，不使用 root。首次后端启动由 **Flyway V1–V7** 自动创建表，导入 **4 种语言、61 门公开课程、9 个模块及 61 条模块课程关联**。数据库必须为空，不能手工导入 `infrastructure/database/legacy/cc4c.sql` 再让 Flyway 接管；该文件属于历史资料。
+空库由首次后端启动时的 **Flyway V1–V7** 自动建表，导入 **4 种语言、61 门公开课程、9 个模块及 61 条模块课程关联**，不需要手动导入课程 SQL。项目没有默认用户或管理员。
 
-**Redis：**本机示例连接 `redis://127.0.0.1:6379/0`。如实例使用 ACL／密码，按自己的凭据填写连接 URL。业务 Session、缓存、观测 Session 必须使用不同 namespace；重启时保留原 namespace 和数据，不能通过清库排查登录问题。
+RabbitMQ 只需一个专用 vhost、一个业务账号和一个监控账号。以下命令在 RabbitMQ CLI 可用的终端执行；Windows 为命令加 `.bat`，Linux 通常加 `sudo`。`add_user` 会提示输入密码，两个账号分别设置自己的密码。
 
-**RabbitMQ：**在 RabbitMQ CLI 可用的终端执行。Windows 命令带 `.bat`；Linux 使用同名无后缀命令，通常通过 `sudo` 以服务权限执行：
+~~~bash
+rabbitmq-plugins enable rabbitmq_management rabbitmq_prometheus
+rabbitmqctl add_vhost cc4c
+rabbitmqctl add_user cc4c_user
+rabbitmqctl set_permissions -p cc4c cc4c_user '.*' '.*' '.*'
+rabbitmqctl add_user cc4c_monitor
+rabbitmqctl set_user_tags cc4c_monitor monitoring
+rabbitmqctl set_permissions -p cc4c cc4c_monitor '^$' '^$' '^$'
+~~~
 
-```powershell
-# Windows：RabbitMQ sbin 已加入 PATH。
-rabbitmq-plugins.bat enable rabbitmq_management rabbitmq_prometheus
-rabbitmqctl.bat add_vhost cc4c
-rabbitmqctl.bat add_user cc4c_user
-rabbitmqctl.bat set_permissions -p cc4c cc4c_user '.*' '.*' '.*'
-rabbitmqctl.bat add_user cc4c_monitor
-rabbitmqctl.bat set_user_tags cc4c_monitor monitoring
-rabbitmqctl.bat set_permissions -p cc4c cc4c_monitor '^$' '^$' '^$'
-```
+业务账号只访问自己的 vhost；监控账号没有消息读写权限。将 [rabbitmq.conf](infrastructure/rabbitmq/rabbitmq.conf) 中的必要项合入实例配置，保留 `prometheus.authentication.enabled = true`，按服务管理方式重启生效。已有实例不能直接覆盖配置或重新创建账号。
 
-```bash
-sudo rabbitmq-plugins enable rabbitmq_management rabbitmq_prometheus
-sudo rabbitmqctl add_vhost cc4c
-sudo rabbitmqctl add_user cc4c_user
-sudo rabbitmqctl set_permissions -p cc4c cc4c_user '.*' '.*' '.*'
-sudo rabbitmqctl add_user cc4c_monitor
-sudo rabbitmqctl set_user_tags cc4c_monitor monitoring
-sudo rabbitmqctl set_permissions -p cc4c cc4c_monitor '^$' '^$' '^$'
-```
+### 4. 填写自己的配置
 
-`add_user` 在未提供密码参数时交互提示输入；为应用账号和监控账号选择不同密码。应用权限只属于 `cc4c` 这个专用 vhost，不授予管理标签。将公开的 [rabbitmq.conf](infrastructure/rabbitmq/rabbitmq.conf) 配置项合入自己实例的配置，启用 `prometheus.authentication.enabled = true`；配置位置及修改后的服务重启按[官方配置说明](https://www.rabbitmq.com/docs/configure)处理，不覆盖已有实例配置。指标端口为 15692。
+分别将 `backend`、`frontend`、`observability` 中的 `.env.example` **复制为同目录的 `.env.local`**；已有本机配置直接保留。文件使用 UTF-8，每行 `NAME=value`，不要添加 `export`、外层引号或行尾注释。后端中的 `$`、`#`、空格和后续 `=` 均按字面保存。
 
-**SMTP：**准备服务商的主机、端口、发件账户和密码／授权码。587 通常配 `STARTTLS=true、SSL=false`；465 通常配 `SSL=true、STARTTLS=false`，具体按服务商要求设置，不能同时启用。`CC4C_MODERATION_NOTIFICATION_RECIPIENTS` 填写真实审核通知收件人。注册验证码与审核邮件需要可用 SMTP，不会随数据库初始化创建。
+**新环境的后端只需重点填写以下内容，其余预填值可保留：**
 
-### 4. 创建三端环境文件
+~~~dotenv
+# MySQL：如库名和用户名采用上述示例，只需填写密码。
+CC4C_DB_PASSWORD=你的数据库密码
 
-只从公开模板创建**尚不存在**的本机文件。下面命令从根目录执行，任一文件已存在便停止，避免覆盖配置。
+# SMTP：587 示例使用 STARTTLS；用户名通常也是发件邮箱。
+CC4C_MAIL_HOST=你的SMTP服务器
+CC4C_MAIL_USERNAME=你的发件邮箱
+CC4C_MAIL_PASSWORD=你的SMTP密码或授权码
+CC4C_MODERATION_NOTIFICATION_RECIPIENTS=审核通知收件邮箱
 
-```powershell
-$ErrorActionPreference = 'Stop'
-foreach ($app in @('backend', 'frontend', 'observability')) {
-    if (Test-Path -LiteralPath "$app/.env.local") { throw "$app/.env.local already exists" }
-}
-foreach ($app in @('backend', 'frontend', 'observability')) {
-    [IO.File]::Copy(
-        (Join-Path $PWD "$app/.env.example"),
-        (Join-Path $PWD "$app/.env.local"), $false)
-}
-git check-ignore -- backend/.env.local frontend/.env.local observability/.env.local
-```
+# RabbitMQ：对应刚创建的业务账号和独立监控账号。
+CC4C_RABBITMQ_URL=amqp://cc4c_user:你的URL编码密码@127.0.0.1:5672/cc4c
+CC4C_RABBITMQ_MONITOR_PASSWORD=你的监控账号密码
 
-```bash
-(
-  set -e
-  for app in backend frontend observability; do
-    [[ ! -e "$app/.env.local" && ! -L "$app/.env.local" ]] || {
-      printf '%s\n' "$app/.env.local already exists" >&2; exit 1;
-    }
-  done
-  umask 077
-  set -o noclobber
-  for app in backend frontend observability; do
-    cat "$app/.env.example" > "$app/.env.local"
-  done
-  git check-ignore -- backend/.env.local frontend/.env.local observability/.env.local
-)
-```
+# 观测门户：12–64 个字符，UTF-8 不超过 72 字节，无需特定字符组合。
+CC4C_OBSERVABILITY_PASSWORD=你设置的观测登录密码
+~~~
 
-配置文件使用 UTF-8、无 BOM、每行 `NAME=value`。后端值按字面读取，不加 `export`、外层引号或行尾注释；密码中的 `$`、`#`、空格及 `=` 都是值的一部分。布尔值写小写 `true／false`。不要新建其他 Vite 模式环境文件。
+- 数据库名称或地址不同：修改 `CC4C_DB_URL`、`CC4C_DB_USERNAME`；启动时确认同一个库名。
+- Redis 地址或认证不同：修改 `CC4C_REDIS_URL`；保留三个互不相同的 Session／缓存 namespace。
+- SMTP 使用 465：按服务商要求设置端口、`SSL=true`、`STARTTLS=false`；两种 TLS 方式不能同时启用。
+- URL 中密码包含 `@`、`:`、`/`、`#`、`%` 等字符时，需要对用户名／密码部分进行 URL 编码；其他独立密码字段不编码。
+- 两端 `.env.local` 默认都是公开 API 地址 `http://localhost:4080`，本机复现可直接保留，不能填写后端秘密。
+- 上传默认保存在项目 `temp/uploads`。磁盘位置与浏览器 URL 分开配置；改变磁盘路径时修改后端的两个 `CC4C_SAVE_…` 字段。新入口会把两个非 `VITE_` 根变量传给业务 Vite，观测端不接收它们。
 
-#### backend/.env.local：完整 50 项示例
+回到**仓库根目录**，新环境执行一次：
 
-以下 `REPLACE_…` 和 `example.com` 都必须按自己的环境替换；密码摘要和密钥的生成见下一节。
+~~~bash
+node infrastructure/host/cc4c.mjs setup --new-environment
+~~~
 
-```dotenv
-# MySQL
-CC4C_DB_URL=jdbc:mysql://127.0.0.1:3306/cc4c_runtime
-CC4C_DB_USERNAME=cc4c_runtime_user
-CC4C_DB_PASSWORD=REPLACE_WITH_DATABASE_PASSWORD
-CC4C_DB_CONNECTION_TIMEOUT_MS=3000
-CC4C_DB_VALIDATION_TIMEOUT_MS=1000
+程序在被 Git 忽略的 `temp/local-runtime` 中生成独立的 Pepper、消息密钥、指标抓取密码及 Prometheus 私有配置。**不需要手工生成密钥或粘贴 BCrypt**：两套摘要由启动入口计算，观测门户使用你填写的密码，指标抓取使用程序生成的独立密码。
 
-# Redis：三个 namespace 必须不同
-CC4C_REDIS_URL=redis://127.0.0.1:6379/0
-CC4C_SESSION_NAMESPACE=cc4c:session
-CC4C_BUSINESS_CACHE_ENABLED=true
-CC4C_CACHE_NAMESPACE=cc4c:v3:cache:local
-CC4C_SECURITY_PEPPER=REPLACE_WITH_RANDOM_PEPPER_AT_LEAST_32_CHARACTERS
-CC4C_SESSION_COOKIE_SECURE=false
-CC4C_ALLOWED_ORIGINS=http://localhost:5173
+这份私有目录需要随自己的运行环境保留，不能作为缓存删除或上传。重复 setup 会保留随机材料，只更新自己生成的抓取配置。普通启动不会自动重建丢失的密钥。已有完整旧配置继续原样启动，不执行 setup；不要把新旧安全字段混填。兼容、恢复及密钥轮换见[项目指南](docs/project-guide.md#自动安全材料与旧配置兼容)。
 
-# SMTP
-CC4C_MAIL_HOST=smtp.example.com
-CC4C_MAIL_PORT=587
-CC4C_MAIL_AUTH=true
-CC4C_MAIL_SSL_ENABLED=false
-CC4C_MAIL_STARTTLS_ENABLED=true
-CC4C_MAIL_USERNAME=REPLACE_WITH_SMTP_ACCOUNT
-CC4C_MAIL_PASSWORD=REPLACE_WITH_SMTP_PASSWORD
+### 5. 启动 Prometheus 和三端
 
-# RabbitMQ 与可靠消息
-CC4C_RABBITMQ_URL=amqp://cc4c_user:REPLACE_WITH_URL_ENCODED_PASSWORD@127.0.0.1:5672/cc4c
-CC4C_RABBITMQ_NAMESPACE=cc4c.v3.messaging.local
-CC4C_MODERATION_NOTIFICATION_RECIPIENTS=reviewer@example.com
-CC4C_MESSAGING_ACTIVE_KEY_ID=local-v1
-CC4C_MESSAGING_PAYLOAD_KEYS=local-v1=REPLACE_WITH_BASE64_32_BYTE_KEY
-CC4C_MESSAGING_CONFIRM_TIMEOUT=5s
-CC4C_MESSAGING_CONSUMER_RETRY_DELAYS=30s,5m,30m
-CC4C_OUTBOX_DISPATCHER_ENABLED=true
-CC4C_MESSAGE_CONSUMERS_ENABLED=true
+**新环境 Prometheus** 在仓库根目录启动；可执行文件不在 PATH 时换成它的绝对路径：
 
-# 管理指标：仅监听本机；摘要对应 Prometheus 抓取时使用的密码
-CC4C_API_DOCS_ENABLED=false
-CC4C_OBSERVABILITY_ENABLED=true
-CC4C_MANAGEMENT_ADDRESS=127.0.0.1
-CC4C_MANAGEMENT_PORT=4081
-CC4C_MANAGEMENT_USERNAME=cc4c_observer
-CC4C_MANAGEMENT_PASSWORD_HASH=REPLACE_WITH_MANAGEMENT_BCRYPT_COST12
+~~~bash
+prometheus --config.file=temp/local-runtime/prometheus.yml --storage.tsdb.path=temp/prometheus-data --web.listen-address=127.0.0.1:9090
+~~~
 
-# 观测门户：另一套密码与独立 Session
-CC4C_OBSERVABILITY_USERNAME=cc4c_observer
-CC4C_OBSERVABILITY_PASSWORD_HASH=REPLACE_WITH_PORTAL_BCRYPT_COST12
-CC4C_OBSERVABILITY_SESSION_NAMESPACE=cc4c:observability
-CC4C_OBSERVABILITY_COOKIE_SECURE=false
-CC4C_OBSERVABILITY_ALLOWED_ORIGIN=http://localhost:5174
-CC4C_PROMETHEUS_URL=http://127.0.0.1:9090
-CC4C_PROMETHEUS_USERNAME=
-CC4C_PROMETHEUS_PASSWORD=
-CC4C_OBSERVABILITY_ENVIRONMENT=local
-CC4C_LOG_FORMAT=ecs
-CC4C_MESSAGING_SAMPLE_INTERVAL=15s
-CC4C_MAX_HTTP_URI_TAGS=100
+生成的 YAML 已填好端口、用户名、环境标签、规则和 vhost／队列过滤，密码通过私有文件引用。打开 `http://localhost:9090/targets` 查看抓取状态；后端尚未启动时其 target 为 DOWN 属于正常现象。已有环境继续使用原 Prometheus 私有配置及数据目录，不替换或重载。
 
-# 上传：磁盘路径相对 backend；浏览器 URL 由业务前端映射
-CC4C_SAVE_IMG_PATH=../temp/uploads/blogImg/
-CC4C_REQUEST_IMG_PATH=http://localhost:5173/blogImg/
-CC4C_SAVE_AVATAR_PATH=../temp/uploads/avatar/
-CC4C_REQUEST_AVATAR_PATH=http://localhost:5173/avatar/
-```
+在工具链就绪的**三个独立终端**中进入仓库根目录，依次执行。Windows 与 Linux 命令相同：
 
-两个前端的 `.env.local` **分别只填一行**，不放入数据库、SMTP、观测密码或消息密钥：
+~~~bash
+# 终端一：后端，库名必须与自己的配置精确一致。
+node infrastructure/host/cc4c.mjs backend --database cc4c_runtime
+~~~
 
-```dotenv
-VITE_API_BASE_URL=http://localhost:4080
-```
+~~~bash
+# 终端二：业务前端。
+node infrastructure/host/cc4c.mjs frontend
+~~~
 
-`CC4C_PROMETHEUS_USERNAME/PASSWORD` 是后端访问 **Prometheus 自身 API** 的可选认证；本机 Prometheus 未启用 API 认证时两项都留空，不能误填成管理端抓取密码。两项如需配置必须同时填写。
+~~~bash
+# 终端三：观测前端。
+node infrastructure/host/cc4c.mjs observability
+~~~
 
-Redis／RabbitMQ URL 中的用户名与密码需要 URL 编码，例如 `@ → %40`、`: → %3A`、`/ → %2F`；普通 `CC4C_DB_PASSWORD` 和 SMTP 密码字段不做 URL 编码。示例 Cookie 的 `secure=false` 仅用于本机 HTTP；HTTPS 部署需相应调整 Origin、Cookie 和资源 URL。
+入口负责配置加载、正确的执行目录、环境隔离和前台运行；不会安装依赖、启动中间件或占用其他端口。后端运行本次构建的 JAR，修改 Java 后需重新构建。两端使用 Vite 开发服务器及既有上传映射，**dist 本身不是完整的本机部署入口**。
 
-#### Pepper、消息密钥与两套 BCrypt 摘要
-
-下列命令在自己的终端生成随机值，Windows 和 Linux 通用；不要把输出提交到 Git：
-
-```bash
-# 第一项写入 CC4C_SECURITY_PEPPER。
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-# 第二项放到 CC4C_MESSAGING_PAYLOAD_KEYS 的 local-v1= 后面。
-node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
-```
-
-已有环境的 Pepper 和消息密钥不能随重启重新生成，否则既有安全数据或加密消息可能无法继续使用；轮换规则见[异步消息维护](docs/project-guide.md#异步消息维护)。
-
-准备一个仓库外的私有目录，例如 Windows 的 `$HOME\CC4C-local`，Linux 的 `$HOME/.config/cc4c`。手工创建 `management-password.txt` 与 `portal-password.txt`，各含一行不同密码，无 BOM；限制为当前用户可读。密码为 12–64 个字符，且 UTF-8 不超过 72 字节。
-
-在 **Java 21 已生效、后端已打包** 的终端执行：
-
-```powershell
-# 仓库根目录；输出两个不同的 cost-12 BCrypt 摘要。
-.\backend\scripts\hash-observability-password.ps1 -PasswordFile "$HOME\CC4C-local\management-password.txt"
-if ($LASTEXITCODE -ne 0) { throw 'Management password hashing failed' }
-.\backend\scripts\hash-observability-password.ps1 -PasswordFile "$HOME\CC4C-local\portal-password.txt"
-if ($LASTEXITCODE -ne 0) { throw 'Portal password hashing failed' }
-```
-
-```bash
-# backend 目录；密码文件仅保存在仓库外。
-chmod 700 "$HOME/.config/cc4c"
-chmod 600 "$HOME/.config/cc4c/management-password.txt" "$HOME/.config/cc4c/portal-password.txt"
-CC4C_OBSERVABILITY_PASSWORD_FILE="$HOME/.config/cc4c/management-password.txt" \
-  java -jar target/cc4c-6.0.0-SNAPSHOT-observability-password.jar
-CC4C_OBSERVABILITY_PASSWORD_FILE="$HOME/.config/cc4c/portal-password.txt" \
-  java -jar target/cc4c-6.0.0-SNAPSHOT-observability-password.jar
-```
-
-第一个摘要填 `CC4C_MANAGEMENT_PASSWORD_HASH`，第二个填 `CC4C_OBSERVABILITY_PASSWORD_HASH`；保留完整 `$2…$12$…` 字符串，不加引号。Prometheus 使用第一个文件对应的**原密码**抓取后端；浏览器观测登录使用第二个文件对应的原密码。
-
-### 5. 配置与启动 Prometheus
-
-将 [Prometheus 公开模板](infrastructure/prometheus/prometheus.yml.template) 和 [告警规则](infrastructure/prometheus/rules/cc4c-alerts.yml) 复制到仓库外自己的目录。模板没有真实密码，不能直接作为已完成配置使用。
-
-**Windows，仓库根目录：**
-
-```powershell
-$ErrorActionPreference = 'Stop'
-$promConfigDir = Join-Path $HOME 'CC4C-local\prometheus'
-foreach ($file in @('prometheus.yml', 'rules\cc4c-alerts.yml')) {
-    if (Test-Path -LiteralPath (Join-Path $promConfigDir $file)) { throw 'Prometheus target already exists' }
-}
-[IO.Directory]::CreateDirectory((Join-Path $promConfigDir 'rules')) | Out-Null
-[IO.File]::Copy((Join-Path $PWD 'infrastructure\prometheus\prometheus.yml.template'),
-    (Join-Path $promConfigDir 'prometheus.yml'), $false)
-[IO.File]::Copy((Join-Path $PWD 'infrastructure\prometheus\rules\cc4c-alerts.yml'),
-    (Join-Path $promConfigDir 'rules\cc4c-alerts.yml'), $false)
-```
-
-**Linux，仓库根目录：**
-
-```bash
-(
-  set -e
-  umask 077
-  config_dir="$HOME/.config/cc4c/prometheus"
-  mkdir -p "$config_dir/rules"
-  set -o noclobber
-  cat infrastructure/prometheus/prometheus.yml.template > "$config_dir/prometheus.yml"
-  cat infrastructure/prometheus/rules/cc4c-alerts.yml > "$config_dir/rules/cc4c-alerts.yml"
-)
-```
-
-在自己的 `prometheus.yml` 中替换以下全部占位符，保留相对规则路径 `rules/cc4c-alerts.yml`：
-
-| 占位符 | 本机示例／填写来源 |
+| 检查入口 | 预期结果 |
 | --- | --- |
-| `__CC4C_MANAGEMENT_USERNAME__` | `cc4c_observer`，与后端管理用户名相同 |
-| `__CC4C_MANAGEMENT_PASSWORD__` | `management-password.txt` 中的原密码，不是 BCrypt 摘要 |
-| `__CC4C_ENVIRONMENT__` | `local`，与后端环境标签相同 |
-| `__CC4C_RABBITMQ_MONITOR_USERNAME__` | `cc4c_monitor` |
-| `__CC4C_RABBITMQ_MONITOR_PASSWORD__` | RabbitMQ 监控账号密码 |
-| `__CC4C_RABBITMQ_VHOST_REGEX__` | `cc4c` |
-| `__CC4C_RABBITMQ_NAMESPACE_REGEX__` | `cc4c\.v3\.messaging\.local`，将 namespace 中的点转义 |
+| `http://localhost:5173` | 业务首页，可以注册自己的用户 |
+| `http://localhost:5174` | 独立观测登录；默认用户名 `cc4c_observer` |
+| `http://127.0.0.1:4081/actuator/health` | 后端公开健康状态 |
+| `http://127.0.0.1:4081/actuator/health/readiness` | 数据库与安全 Redis 就绪 |
+| `http://localhost:9090/targets` | 后端、RabbitMQ 的抓取结果 |
 
-模板使用 YAML 单引号；密码含单引号时，在 YAML 内写成两个连续单引号。保留配置中的原始反斜杠。私有文件只授予当前运行用户读取权限，不提交到项目；Windows 可在目录“属性 → 安全”中设置，Linux 使用前述 `umask 077`。
+停止时按**观测端 → 业务前端 → 后端**顺序，在各自终端按 `Ctrl+C`。Prometheus 使用自己的终端停止；应用入口不会停止其他基础设施。Linux 步骤与跨平台辅助依据源码编写，不代表经过完整 Linux 服务部署验证。
 
-在独立终端检查配置并前台启动，工具路径按实际安装位置修改：
+### 6. 首次账号与自己的数据恢复
 
-```powershell
-$promDir = 'C:\tools\prometheus-3.13.2.windows-amd64'
-$promConfigDir = Join-Path $HOME 'CC4C-local\prometheus'
-& "$promDir\promtool.exe" check config "$promConfigDir\prometheus.yml"
-if ($LASTEXITCODE -ne 0) { throw 'Prometheus config is invalid' }
-& "$promDir\promtool.exe" check rules "$promConfigDir\rules\cc4c-alerts.yml"
-if ($LASTEXITCODE -ne 0) { throw 'Prometheus rules are invalid' }
-& "$promDir\prometheus.exe" `
-    --config.file="$promConfigDir\prometheus.yml" `
-    --storage.tsdb.path="$HOME\CC4C-local\prometheus-data" `
-    --web.listen-address=127.0.0.1:9090
-```
+普通用户通过注册页面及邮件验证码创建。观测账号和业务管理员不同，登录观测端不会取得业务管理权限。
 
-```bash
-(
-  set -e
-  prom_dir=/opt/prometheus-3.13.2.linux-amd64
-  config_dir="$HOME/.config/cc4c/prometheus"
-  "$prom_dir/promtool" check config "$config_dir/prometheus.yml"
-  "$prom_dir/promtool" check rules "$config_dir/rules/cc4c-alerts.yml"
-  "$prom_dir/prometheus" \
-    --config.file="$config_dir/prometheus.yml" \
-    --storage.tsdb.path="$HOME/.local/share/cc4c/prometheus-data" \
-    --web.listen-address=127.0.0.1:9090
-)
-```
+新空库的七份 Flyway 迁移完成后，若要创建**首个管理员**，先停止后端，把自己的管理员密码保存到仓库外的一个普通 UTF-8 文件中，再显式运行现有引导工具的短入口：
 
-访问 `http://127.0.0.1:9090`。后端尚未启动时 backend target 暂时 DOWN 属于预期，三端启动后再核对抓取。生产暴露、HTTPS 和 Prometheus 自身 API 认证需要单独设计，不在本机教程中放开管理端监听。
+~~~bash
+# 根目录；替换为自己的仓库外绝对路径，Windows 可使用 C:/Users/自己的用户名/CC4C-local/admin-password.txt。
+node infrastructure/host/cc4c.mjs bootstrap-admin --database cc4c_runtime --id 1000001 --password-file /absolute/private/admin-password.txt
+~~~
 
-### 6. Windows：三个前台终端启动
+密码为 8–64 个 Unicode 字符、UTF-8 不超过 72 字节。管理员以七位 ID 登录；该命令会写入管理员账户，已有管理员的环境不重复执行，不覆盖现有账户。完成后用前面的 backend 命令重新启动。
 
-打开三个独立 **PowerShell 7** 终端。下例仓库位于 `C:\projects\CC4C`，请统一替换为自己的 clone 路径。每个包裹命令只接收一个前台 Maven、Java 或 npm 命令，不支持把多条命令、管道或重定向塞入 `-Command`。
+如果是在**恢复自己的当前版本备份**，先另建一个空目标库，再在 MySQL 客户端中导入自己的文件；这条路径不用于首次课程初始化：
 
-**终端一：后端。**替换 JDK 路径，确保前述全部配置已经填写；`ConfirmDatabase` 必须精确等于 JDBC URL 中的库名。
+~~~bash
+mysql -h 127.0.0.1 -u root -p cc4c_restore
+~~~
 
-```powershell
-Set-Location -LiteralPath 'C:\projects\CC4C\backend'
-$previousJavaHome = $env:JAVA_HOME
-$previousPath = $env:PATH
-$previousMavenArgs = $env:MAVEN_ARGS
-try {
-    $env:JAVA_HOME = 'C:\tools\jdk-21'
-    $env:PATH = "$env:JAVA_HOME\bin;$previousPath"
-    $env:MAVEN_ARGS = ''
-    & ..\infrastructure\host\with-app-environment.ps1 `
-        -Application Backend -ConfirmDatabase cc4c_runtime `
-        -Command { mvn spring-boot:run }
-    if ($LASTEXITCODE -ne 0) { throw 'Backend command failed' }
-}
-finally {
-    $env:JAVA_HOME = $previousJavaHome
-    $env:PATH = $previousPath
-    $env:MAVEN_ARGS = $previousMavenArgs
-}
-```
+~~~sql
+SOURCE /absolute/path/to/your-current-backup.sql;
+~~~
 
-需要使用已构建 JAR 时，在上面同一包裹调用中把 `-Command { mvn spring-boot:run }` 换成 `-Command { java -jar target/cc4c-6.0.0-SNAPSHOT.jar }`，不同时运行两个后端入口。
+Windows 可使用 `C:/backups/your-current-backup.sql`。恢复后核对 Flyway 历史，再把连接地址和启动确认名一起改为恢复库。不要关闭校验或对非空历史库自动 baseline；详细边界见[数据库维护](docs/project-guide.md#数据库维护)。
 
-已有 Maven 运行依赖时可改为 `-Command { mvn -o spring-boot:run }`。生产打包缓存不保证包含 `spring-boot:run` 所需的全部插件依赖，离线缺失时应明确补齐依赖或使用已构建 JAR。
-
-**终端二：业务前端。**
-
-```powershell
-Set-Location -LiteralPath 'C:\projects\CC4C\frontend'
-& ..\infrastructure\host\with-app-environment.ps1 `
-    -Application Frontend `
-    -Command { npm run dev -- --host localhost --port 5173 --strictPort }
-if ($LASTEXITCODE -ne 0) { throw 'Frontend command failed' }
-```
-
-**终端三：观测前端。**
-
-```powershell
-Set-Location -LiteralPath 'C:\projects\CC4C\observability'
-& ..\infrastructure\host\with-app-environment.ps1 `
-    -Application Observability `
-    -Command { npm run dev -- --host localhost --port 5174 --strictPort }
-if ($LASTEXITCODE -ne 0) { throw 'Observability command failed' }
-```
-
-包裹脚本会检查应用目录、配置键和数据库确认值，在退出时恢复其调整过的环境变量。它不负责启动 MySQL、Redis、RabbitMQ 或 Prometheus，也不写入后台 PID 记录。
-
-### 7. Linux：Bash 加载配置与前台启动
-
-现有 PowerShell 主机脚本使用 Windows 绝对路径和进程检查，**不能直接在 Linux 复用**。下面函数仅是 README 中的 Bash 示例，不需要修改项目文件。
-
-每个应用终端先进入仓库根目录，执行以下命令进入干净的临时 Bash；退出该 shell 即返回原来的终端环境。`JAVA_HOME`、PATH 应已按安装步骤设置，仓库路径按实际修改：
-
-```bash
-cd "$HOME/projects/CC4C"
-env -i HOME="$HOME" PATH="$PATH" JAVA_HOME="$JAVA_HOME" \
-  LANG=C.UTF-8 bash --noprofile --norc
-```
-
-在**每个临时 Bash** 中粘贴一次以下函数。它用公开模板限定变量名，按第一个 `=` 拆分，拒绝缺项、重复项、占位符及文件链接，不执行配置里的表达式。后端业务规则仍由应用检查，不能将此函数视为 Windows 全部预检的替代品。
-
-```bash
-CC4C_REPO="$(pwd -P)"
-
-cc4c_read_env() {
-  local app="$1" file line key value expected
-  local -A allowed=() seen=()
-  CC4C_VALUES=()
-  for file in "$CC4C_REPO/$app/.env.example" "$CC4C_REPO/$app/.env.local"; do
-    [[ -f "$file" && ! -L "$file" ]] || { echo "Missing or linked environment file" >&2; return 1; }
-    [[ "$(realpath -e -- "$file")" == "$(realpath -ms -- "$file")" ]] || return 1
-    [[ "$(stat -c %h -- "$file")" == 1 ]] || return 1
-  done
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line=${line%$'\r'}
-    [[ -z ${line//[[:space:]]/} || "$line" =~ ^[[:space:]]*"#" ]] && continue
-    key=${line%%=*}
-    [[ "$line" == *=* && "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || return 1
-    allowed["$key"]=1
-  done < "$CC4C_REPO/$app/.env.example"
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line=${line%$'\r'}
-    [[ -z ${line//[[:space:]]/} || "$line" =~ ^[[:space:]]*"#" ]] && continue
-    key=${line%%=*}
-    value=${line#*=}
-    [[ "$line" == *=* && "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || return 1
-    [[ ${allowed[$key]+present} && ! ${seen[$key]+present} ]] || {
-      echo "Unknown or duplicate environment key" >&2; return 1;
-    }
-    [[ "$value" != *REPLACE_* ]] || { echo "Replace all placeholders first" >&2; return 1; }
-    seen["$key"]=1
-    CC4C_VALUES["$key"]="$value"
-  done < "$CC4C_REPO/$app/.env.local"
-  for expected in "${!allowed[@]}"; do
-    [[ ${seen[$expected]+present} ]] || { echo "Missing environment key" >&2; return 1; }
-  done
-}
-
-cc4c_run() (
-  set -e
-  local app="$1" confirm key blog_root avatar_root extra
-  local db_pattern='^jdbc:mysql://[^/]+/([A-Za-z0-9_]+)(\?.*)?$'
-  local -A CC4C_VALUES=()
-  shift
-  case "$app" in
-    backend)
-      confirm="$1"; shift
-      cc4c_read_env backend
-      [[ "${CC4C_VALUES[CC4C_DB_URL]}" =~ $db_pattern ]] || exit 1
-      [[ "${BASH_REMATCH[1]}" == "$confirm" ]] || {
-        echo "Database confirmation does not match" >&2; exit 1;
-      }
-      for key in "${!CC4C_VALUES[@]}"; do export "$key=${CC4C_VALUES[$key]}"; done
-      export SPRING_CONFIG_NAME=application SPRING_APPLICATION_NAME=CC4C
-      export SPRING_CONFIG_LOCATION=classpath:/application.yml
-      unset SPRING_CONFIG_ADDITIONAL_LOCATION SPRING_CONFIG_IMPORT
-      ;;
-    frontend|observability)
-      for extra in .env .env.development .env.development.local .env.production .env.production.local; do
-        [[ ! -e "$CC4C_REPO/$app/$extra" && ! -L "$CC4C_REPO/$app/$extra" ]] || {
-          echo "Keep only the documented .env.local entry" >&2; exit 1;
-        }
-      done
-      if [[ "$app" == frontend ]]; then
-        cc4c_read_env backend
-        cd "$CC4C_REPO/backend"
-        [[ -n "${CC4C_VALUES[CC4C_SAVE_IMG_PATH]}" && -n "${CC4C_VALUES[CC4C_SAVE_AVATAR_PATH]}" ]] || exit 1
-        blog_root="$(realpath -m -- "${CC4C_VALUES[CC4C_SAVE_IMG_PATH]}")"
-        avatar_root="$(realpath -m -- "${CC4C_VALUES[CC4C_SAVE_AVATAR_PATH]}")"
-        [[ "$blog_root" != / && "$avatar_root" != / && "$blog_root" != "$avatar_root" ]] || exit 1
-        export CC4C_HOST_BLOG_IMG_ROOT="$blog_root" CC4C_HOST_AVATAR_ROOT="$avatar_root"
-      fi
-      cc4c_read_env "$app"
-      [[ "${CC4C_VALUES[VITE_API_BASE_URL]}" == http://* || "${CC4C_VALUES[VITE_API_BASE_URL]}" == https://* ]] || exit 1
-      export VITE_API_BASE_URL="${CC4C_VALUES[VITE_API_BASE_URL]}"
-      ;;
-    *) echo "Use backend, frontend or observability" >&2; exit 1 ;;
-  esac
-  unset CC4C_VALUES
-  cd "$CC4C_REPO/$app"
-  "$@"
-)
-```
-
-函数中的环境赋值发生在子 shell；不要向该临时 Bash 另外导入后端秘密或其他 `VITE_` 变量。业务前端只收到公开 API 和两个非 `VITE_` 上传根变量，观测端只收到公开 API；两端不会接收解析过程中读取的后端配置值。
-
-**终端一：**先启动后端，确认数据库名与配置相同：
-
-```bash
-cc4c_run backend cc4c_runtime mvn spring-boot:run
-```
-
-使用已构建 JAR 时替换为以下命令，不与 Maven 入口同时运行：
-
-```bash
-cc4c_run backend cc4c_runtime java -jar target/cc4c-6.0.0-SNAPSHOT.jar
-```
-
-**终端二、三：**各自完成前述临时 Bash 与函数准备，再分别执行：
-
-```bash
-# 终端二
-cc4c_run frontend npm run dev -- --host localhost --port 5173 --strictPort
-```
-
-```bash
-# 终端三
-cc4c_run observability npm run dev -- --host localhost --port 5174 --strictPort
-```
-
-上传磁盘路径按 backend 目录解析。上传目录由应用正常使用时创建，不能将其指向文件系统根目录或链接；图片通过业务 Vite 的 `/blogImg/`、`/avatar/` 映射访问。该插件仅在开发服务启用，`npm run preview` 或直接托管 `dist` 不会自动提供这套上传映射。
-
-### 8. 初始化完成后：管理员与普通用户
-
-首次后端启动后，确认 Flyway 已完成 V1–V7、公开健康接口正常。此时课程可以直接浏览；博客和用户资料不会凭空生成，也没有默认管理员密码。
-
-**只在新环境且尚无有效管理员时**引导首个管理员。手工准备仓库外的 `admin-password.txt`，密码为 8–64 个字符且 UTF-8 不超过 72 字节。示例 `1000001` 是可自行选择的七位管理员 ID，不是预置账号。
-
-Windows：在 Java 21 环境、仓库根目录执行：
-
-```powershell
-.\backend\scripts\bootstrap-admin.ps1 `
-    -AdminId 1000001 -ConfirmDatabase cc4c_runtime `
-    -PasswordFile "$HOME\CC4C-local\admin-password.txt"
-if ($LASTEXITCODE -ne 0) { throw 'Administrator bootstrap failed' }
-```
-
-Linux：在另一个按第 7 节准备好函数的临时 Bash 中执行；密码文件先限定为当前用户可读：
-
-```bash
-chmod 600 "$HOME/.config/cc4c/admin-password.txt"
-CC4C_ADMIN_BOOTSTRAP_ID=1000001 \
-CC4C_ADMIN_BOOTSTRAP_CONFIRM_DATABASE=cc4c_runtime \
-CC4C_ADMIN_BOOTSTRAP_PASSWORD_FILE="$HOME/.config/cc4c/admin-password.txt" \
-  cc4c_run backend cc4c_runtime java -jar target/cc4c-6.0.0-SNAPSHOT-admin-bootstrap.jar
-```
-
-工具只处理明确确认的数据库中的首个管理员，不是重置密码入口。已有其他有效管理员或账号冲突时应停止排查，不删除历史账户重来。
-
-普通用户在业务站点注册，使用自己的邮箱收取验证码；管理员通过管理员入口登录。观测端使用 `CC4C_OBSERVABILITY_USERNAME` 和 `portal-password.txt` 对应的原密码，不使用管理员账号。
-
-#### 恢复自己的当前版本数据（可选）
-
-全新复现无需导入 SQL 文件，Flyway 已完成初始化。只有迁移自己的现有环境时，才使用可信的**当前版本备份**恢复到另一个新建数据库。先在数据库管理员客户端执行；同名目标已存在时停止，不覆盖：
-
-```sql
-CREATE DATABASE cc4c_restore
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
-  ON cc4c_restore.* TO 'cc4c_runtime_user'@'127.0.0.1';
-```
-
-先确认备份包含当前表结构、数据与 `flyway_schema_history`，且不含切换回原库的 `USE`、`CREATE DATABASE` 或删库命令；若来源、版本不明，先按[数据库维护指南](docs/project-guide.md#数据库维护)处理。不要将旧版本的历史 SQL 与当前迁移混合。
-
-Windows 使用 MySQL 客户端的 `SOURCE`，避免 PowerShell 文本管道改变 SQL 编码：
-
-```powershell
-mysql -h 127.0.0.1 -u root -p --default-character-set=utf8mb4 cc4c_restore
-```
-
-进入该客户端后执行，替换为自己的备份路径：
-
-```sql
-SOURCE C:/backups/cc4c-current.sql;
-```
-
-Linux 可使用标准输入重定向：
-
-```bash
-mysql -h 127.0.0.1 -u root -p --default-character-set=utf8mb4 cc4c_restore \
-  < "$HOME/backups/cc4c-current.sql"
-```
-
-恢复完成后给目标库配置专用应用权限，修改后端 JDBC URL，并将启动确认参数同时改为 `cc4c_restore`。SQL 备份不包含上传文件、消息密钥或 Redis 会话；相关资料需按自己的迁移方案保留，不能把导入 SQL 等同于完整环境恢复。
-
-### 9. 访问、检查与停止
-
-| 入口 | 地址／预期 |
-| --- | --- |
-| 业务前端 | `http://localhost:5173`，可浏览课程、注册和登录 |
-| 观测前端 | `http://localhost:5174`，独立登录后查看总览和 Dashboard |
-| API | `http://localhost:4080`，不要求根路径返回网页 |
-| 公开健康 | 管理端的 `/actuator/health`、`/actuator/health/liveness`、`/actuator/health/readiness` 均返回 `UP` |
-| Prometheus | `http://127.0.0.1:9090`，Targets 中 backend／rabbitmq 抓取成功 |
-| RabbitMQ 管理 | `http://localhost:15672`，仅使用为管理目的单独授权的账户 |
-
-Windows 在单独终端检查三个健康接口：
-
-```powershell
-foreach ($endpoint in @('health', 'health/liveness', 'health/readiness')) {
-    $result = Invoke-RestMethod "http://127.0.0.1:4081/actuator/$endpoint"
-    if ($result.status -cne 'UP') { throw "$endpoint is not UP" }
-}
-```
-
-Linux 使用：
-
-```bash
-for endpoint in health health/liveness health/readiness; do
-  curl --fail --silent --show-error "http://127.0.0.1:4081/actuator/$endpoint" || break
-  printf '\n'
-done
-```
-
-Prometheus 页面查询 `up{job="cc4c-backend"}` 和 `up{job="cc4c-rabbitmq"}`，预期为 1；`up=1` 只说明目标抓取成功，部分面板仍需要对应业务活动才有样本。Windows 还可从仓库根目录运行现有只读检查：
-
-```powershell
-.\infrastructure\prometheus\check-prometheus.ps1 `
-    -PromtoolPath 'C:\tools\prometheus-3.13.2.windows-amd64\promtool.exe' `
-    -RequireBackendScrape
-```
-
-前台模式按 **观测端 → 业务前端 → 后端** 顺序，在各自终端按 `Ctrl+C`。Linux 再执行 `exit` 离开临时 Bash。Prometheus 如也需要停止，在它自己的终端按 `Ctrl+C`；三个应用的停止操作不会停止其他中间件。
-
-#### Windows 可选整栈脚本
-
-现有脚本适合工具链、配置、JAR、两端依赖及外部服务全部准备完毕的环境。先确保没有前台应用占用端口，在 **Java 21 / PowerShell 7、仓库根目录**运行：
-
-```powershell
-.\infrastructure\host\start-host-stack.ps1 -ConfirmDatabase cc4c_runtime
-if ($LASTEXITCODE -ne 0) { throw 'Host stack start failed' }
-.\infrastructure\host\health-host-stack.ps1
-```
-
-对应停止入口：
-
-```powershell
-.\infrastructure\host\stop-host-stack.ps1
-```
-
-这些脚本进行预检、后台启动和进程身份记录，在项目忽略的 `temp` 内保存状态及运行输出；停止仅针对记录匹配的本次应用，不按进程名批量结束，也不管理中间件。前台包裹命令不生成这些记录，不能用整栈停止脚本代替前台终端的 `Ctrl+C`。完整行为见[配置与本机运行](docs/project-guide.md#配置与本机运行)。
-
-#### 常见问题
+### 常见问题与可选入口
 
 | 现象 | 首先检查 |
 | --- | --- |
-| `#requires` 提示版本不匹配 | 运行 `pwsh` 并检查版本；Windows PowerShell 5.1 不满足要求 |
-| Maven 使用 Java 17 或 enforcer 失败 | 查看 `mvn --version`，校正当前终端 JAVA_HOME 与 PATH，而不仅是系统安装列表 |
-| Redis `Connection refused` | 检查 Redis／WSL 服务是否启动、6379 是否可达、连接地址是否正确；不要清空 Redis |
-| RabbitMQ 认证／权限失败 | 核对应用账号、URL 编码、vhost 名称和该 vhost 的权限；不使用 guest 代替专用账号 |
-| 无法收取验证码／审核邮件 | 核对 SMTP 授权码、SSL／STARTTLS、端口与收件人；观察自己的服务商投递结果 |
-| 页面 `Network Error` | 先检查后端健康，再检查公开 API 地址、端口和精确 Origin；不要把前端页面可打开等同于 API 已启动 |
-| `strictPort` 失败 | 查清占用来源；停止自己确认的旧进程，不自动换端口或按名称杀进程 |
-| 上传图片无法显示 | 磁盘路径必须相对 backend 正确解析；通过包裹／Bash 入口注入两个上传根，使用业务 Vite 开发服务 |
-| Prometheus target DOWN | 核对 4081／15692、管理密码与监控密码、配置占位符；BCrypt 摘要不能作为抓取原密码 |
-| 面板显示无数据或时间范围截断 | 核对 target 和环境／vhost／namespace 标签，再查看业务是否产生样本；界面有查询范围限制 |
-| 管理员引导拒绝执行 | 确认七位 ID、目标数据库和已有管理员状态；该工具不覆盖现有账号 |
+| Java 版本错误 | `mvn --version` 是否显示 Java 21；检查本终端 JAVA_HOME |
+| Redis 连接拒绝 | 现有 Redis 是否启动、6379 是否可达；不清空 Redis |
+| RabbitMQ 认证失败 | URL 编码、vhost 及业务账号权限是否对应 |
+| 收不到验证码／审核邮件 | SMTP 授权码、端口、SSL／STARTTLS、发件人与收件人 |
+| 页面 Network Error | 后端 readiness、公开 API 地址和精确 Origin |
+| 端口被占用 | 核实已有进程身份，不自动换端口或批量结束进程 |
+| 本机材料缺失或损坏 | 恢复原私有材料，不删除后重新生成消息密钥 |
+| 图片不显示 | 使用新启动入口传递上传根，检查磁盘路径与 URL 的对应 |
+| Prometheus 无数据 | targets、指标凭据及环境／vhost／namespace；后端摘要不是抓取密码 |
 
-更多实现与维护说明见[项目指南](docs/project-guide.md)，历次验证结果与限制见[迭代总结](docs/iteration-summary.md)。
+旧 PowerShell 包裹和整栈脚本继续支持原有完整环境配置，属于可选兼容入口；新自动配置使用上面的 Node 命令。旧脚本的前提、预检、进程记录和停止范围见[项目指南](docs/project-guide.md#可选旧入口预检启动与健康)。
 
 ## 性能简介
 
-项目保留了缓存对照、Gatling 负载、分页查询与故障演练的历史证据。以下只摘录 **V3 原始缓存实验（`bc7dcf8`）**的同机受控结果：九类公开读取目标，三轮热路径测量，每轮 3,000 请求、并发上限 16，延迟和吞吐取三轮中位数。
+当前实现保留 Redis 业务缓存、细粒度失效及 MyBatis 查询指标。缓存命中时，公开读取可以直接复用结果，减少重复 SELECT 和请求延迟。下面展示该缓存优化的受控对照：
 
-| 指标 | 无缓存基线 | 热缓存 |
+| 指标 | 优化前：无缓存 | 优化后：热缓存 |
 | --- | ---: | ---: |
 | p95 | 182.514 ms | 5.177 ms |
 | 吞吐 | 464.458 req/s | 4,633.079 req/s |
 | 测量阶段 MyBatis SELECT | 10,995 | 0 |
 
-该组实验 HTTP 错误为 0，热缓存命中率为 100%；它说明特定请求组合下缓存对数据库访问和延迟的影响。**这不是 V6 本轮压测或生产容量承诺**，不同主机、数据、负载与冷缓存条件不能直接类比。原始逐轮文件未提交，当前仓库也不再包含历史性能执行工具。
-
-实验方法、环境、其他重跑结果与证据缺失说明见[历史性能汇总](docs/performance-history.md#3-缓存基准)。
+条件为同机九类公开读取、每轮 3,000 请求、并发上限 16，延迟与吞吐取三轮中位数；HTTP 错误为 0，热缓存命中率为 100%。这些数字来自该优化方案已有的对照记录，本次复现流程整理未重新压测。实验条件、其他测量及证据留存情况见[性能记录](docs/performance-history.md#3-缓存基准)。
