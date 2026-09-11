@@ -32,6 +32,7 @@ function Invoke-QualityStep {
 }
 
 try {
+    Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'node' -Arguments @('infrastructure/quality/check-local-launcher.mjs')
     Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'pwsh' -Arguments @('-NoProfile', '-File', 'infrastructure/quality/check-powershell-quality.ps1')
     Invoke-QualityStep -WorkingDirectory $workspaceRoot -Command 'java' -Arguments @('--source', '21', 'infrastructure/quality/JavaCommentCoverage.java', '--repository-root', '.')
     Invoke-QualityStep -WorkingDirectory (Join-Path $workspaceRoot 'backend') -Command 'mvn' -Arguments @('-B', '-ntp', 'spotless:check')

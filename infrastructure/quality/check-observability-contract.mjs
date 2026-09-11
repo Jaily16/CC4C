@@ -57,6 +57,8 @@ async function main() {
   const rules = await safeRead('infrastructure/prometheus/rules/cc4c-alerts.yml', files);
   const application = await safeRead('backend/src/main/resources/application.yml', files);
   const runtimeExample = await safeRead('backend/.env.example', files);
+  const environmentHelper = await safeRead('infrastructure/host/app-environment.mjs', files);
+  const launcher = await safeRead('infrastructure/host/cc4c.mjs', files);
   const packageDocument = JSON.parse(await safeRead('observability/package.json', files));
 
   const panels = catalog.dashboards.flatMap((dashboard) => dashboard.panels);
@@ -85,15 +87,18 @@ async function main() {
   );
 
   for (const name of [
-    'CC4C_MANAGEMENT_PASSWORD_HASH',
     'CC4C_OBSERVABILITY_USERNAME',
-    'CC4C_OBSERVABILITY_PASSWORD_HASH',
     'CC4C_OBSERVABILITY_SESSION_NAMESPACE',
     'CC4C_OBSERVABILITY_ALLOWED_ORIGIN',
     'CC4C_PROMETHEUS_URL',
   ]) {
     invariant(runtimeExample.includes(name) && application.includes(name), `Missing runtime contract: ${name}`);
   }
+  for (const name of ['CC4C_MANAGEMENT_PASSWORD_HASH', 'CC4C_OBSERVABILITY_PASSWORD_HASH']) {
+    invariant(application.includes(name) && environmentHelper.includes(name) && launcher.includes(name), `Missing generated/legacy hash contract: ${name}`);
+    invariant(!runtimeExample.includes(`${name}=`), 'New environments must not require manual BCrypt hashes.');
+  }
+  invariant(runtimeExample.includes('CC4C_OBSERVABILITY_PASSWORD=') && !application.includes('${CC4C_OBSERVABILITY_PASSWORD}'), 'The setup password must remain outside Spring application configuration.');
   invariant(!runtimeExample.includes('CC4C_MANAGEMENT_PASSWORD='), 'Plain management password configuration must be removed.');
   invariant(application.includes('idle-timeout: 30m') && application.includes('absolute-timeout: 8h'), 'Session limits changed.');
 

@@ -258,7 +258,7 @@ MyBatis 从 statement ID 提取完整 Mapper 名，保持既有 module 标签：
 
 ### 首次依赖准备与生产构建
 
-以下是新环境的操作说明，本次文档整理没有执行这些命令。先准备 [versions.yml](../versions.yml) 中的工具链，确认当前终端使用 PowerShell 7 和 Java 21；原有环境直接复用，不重复安装或引导账户。
+以下是新环境的操作说明，本次文档整理没有执行这些命令。先准备 [versions.yml](../versions.yml) 中的工具链，确认当前终端使用 Java 21；完整质量检查和旧 Windows 入口另需 PowerShell 7；原有环境直接复用，不重复安装或引导账户。
 
 首次缺少依赖时，维护者在允许访问依赖仓库的环境按锁文件安装。下列每段在标明的应用目录执行，任一步非零即停止：
 
@@ -287,29 +287,61 @@ Maven 只过滤受控配置的项目版本标记，Spring 环境占位符、Flyw
 
 ### 初次准备三份配置
 
-只在对应 `.env.local` 不存在时，由维护者根据同目录 `.env.example` 创建并手工填写。已有文件原地保留，禁止覆盖。下例从仓库根目录执行，复制不会覆盖现有文件：
+在 backend、frontend、observability 中分别复制 .env.example 为同目录的 .env.local；已有本机文件原样保留。公开模板已填好本机地址和开关，具体需要填写的账号、SMTP 和观测密码见根 README 的启动项目章节。两个前端只填写公开 API 地址。
 
-```powershell
-foreach ($app in @('backend', 'frontend', 'observability')) {
-    $template = Join-Path (Get-Location).Path "$app/.env.example"
-    $local = Join-Path (Get-Location).Path "$app/.env.local"
-    if (Test-Path -LiteralPath $local) { throw "Configuration already exists: $app" }
-    [System.IO.File]::Copy($template, $local, $false)
-}
-git check-ignore -- backend/.env.local frontend/.env.local observability/.env.local
-```
+新环境执行 Node setup，将独立安全材料保存在被 Git 忽略的 temp/local-runtime；当前已有完整旧配置不执行初始化，不迁移原密钥或外部 Prometheus 私有配置。管理员密码文件继续保存在仓库外。
 
-先由数据库管理员准备专用数据库及最小权限账户，另行准备原有 Redis、RabbitMQ、SMTP 和外部 Prometheus。密码文件、哈希、消息密钥及私有 Prometheus 配置只保留在仓库外；两个前端只接受公开 API 地址。新环境管理员引导与密码工具见下文，均不是已有环境的重复启动步骤。
+### 跨平台命令入口
+
+在仓库根目录使用现有 Node.js；Windows 与 Linux 命令相同，后端 Java 由 JAVA_HOME 或 PATH 选择，限定为 Java 21。
+
+~~~bash
+# 仅新环境初始化，不启动应用、不连接数据库或中间件。
+node infrastructure/host/cc4c.mjs setup --new-environment
+
+# 三个终端分别运行；数据库名与自己的配置精确一致。
+node infrastructure/host/cc4c.mjs backend --database cc4c_runtime
+node infrastructure/host/cc4c.mjs frontend
+node infrastructure/host/cc4c.mjs observability
+~~~
+
+入口运行已构建的后端 JAR 和本地 Vite，不执行依赖安装或自动构建。应用结束时返回其退出码；Ctrl+C 结束当前前台进程。先停观测端，再停业务前端和后端。它不使用旧整栈状态文件，因此不应使用旧停止脚本停止新入口。
+
+辅助按第一个等号解析字面值，并校验白名单、重复键、文件身份、数据库、namespace、CORS、SMTP、管理端口和上传根。子进程使用独立环境：后端固定读取 classpath:/application.yml；业务前端只有公开 API 和两个非 VITE_ 上传根，观测端没有上传根和后端凭据。
+
+首个管理员仍由独立引导 JAR 创建。后端首次 Flyway 完成并停止后，可显式执行以下跨平台包裹入口；七位 ID、数据库与仓库外密码文件均须明确指定，普通启动不会调用它：
+
+~~~bash
+node infrastructure/host/cc4c.mjs bootstrap-admin --database cc4c_runtime --id 1000001 --password-file /absolute/private/admin-password.txt
+~~~
+
+该操作具有原工具的账户写入副作用；已有管理员不重复执行。Linux 路径替换为自己的绝对路径，Windows 可使用 C:/Users/自己的用户名/CC4C-local/admin-password.txt。原有引导类、schema 检查、事务、拒绝覆盖账户与密码要求保持不变。
+
+### 自动安全材料与旧配置兼容
+
+新环境只填写 CC4C_OBSERVABILITY_PASSWORD（12–64 个 Unicode 码点，UTF-8 最多 72 字节）。setup 使用安全随机数分别生成 Pepper、32 字节 AES 消息密钥和后端指标抓取密码；业务密码、数据库、SMTP、RabbitMQ 凭据不合并。Pepper 继续服务安全键摘要，消息密钥继续服务原加密信封。
+
+材料位于 temp/local-runtime/material.json，完成记录为 manifest.json；生成目录具备当前用户专用权限。management-password.txt 和 rabbitmq-password.txt 供生成的 prometheus.yml 通过 password_file 引用。没有秘密进入受控模板、命令参数、浏览器或日志。
+
+两套 BCrypt 在准备后端进程时由现有独立密码 JAR 的 --stdin 接口生成，cost 保持 12；该内部输入是无换行、最多 72 字节的 UTF-8，拒绝未知参数和畸形编码。旧密码文件接口继续支持。观测密码改变只影响下一次启动的登录校验，不更换 Pepper、消息密钥或指标密码；它不会自动撤销已有 Session。
+
+重复 setup 保留所有随机材料，只更新完成记录中明确归属本程序的 Prometheus 派生文件。未知目录、重定向、权限异常、手改文件、缺失材料和未完成初始化均停止，不自动覆盖、补齐或重建。普通启动只读取和校验，不创建材料。私有目录必须随运行环境保存，不能作为构建缓存删除；材料丢失时恢复原件，不能用重新生成代替恢复旧消息密钥。
+
+旧完整模式保留 CC4C_SECURITY_PEPPER、CC4C_MESSAGING_ACTIVE_KEY_ID、CC4C_MESSAGING_PAYLOAD_KEYS、CC4C_MANAGEMENT_PASSWORD_HASH 和 CC4C_OBSERVABILITY_PASSWORD_HASH，且不填写新明文观测字段。新旧模式不能混合。已有实例继续使用原文件和 Prometheus 配置，不从已有摘要推导原密码，不读取或清理 Redis。旧消息密钥轮换仍遵循下文既有人工流程，本次不自动轮换。
+
+新生成 Prometheus 配置使用实际环境标签、RabbitMQ vhost 与 namespace，正则和 YAML 字符串分别转义；监控凭据来自独立 RabbitMQ 监控账号，后端指标凭据来自本机材料。当前外部 Prometheus 的配置和数据不会被程序修改或重载。
 
 ### 适用范围与安全边界
 
 本机入口只管理当前工作区的后端 JAR、业务前端和独立观测前端，启动顺序为后端、业务前端、观测前端，停止顺序相反。MySQL、一个 Redis、RabbitMQ、SMTP 和 Prometheus 均由用户预先提供；项目不启动、停止、重启或重载这些外部服务。
 
-数据库必须已存在，通过 -ConfirmDatabase 精确确认。脚本不建库、不清库、不删除数据。业务 HTTP API、DTO、Cookie、CSRF、上传 URL、Flyway V1–V7 和三个已发布事件协议保持不变。不提供静态 Web 服务器或 Grafana 运行入口。
+数据库必须已存在，Node 入口通过 --database、旧 PowerShell 入口通过 -ConfirmDatabase 精确确认。脚本不建库、不清库、不删除数据。业务 HTTP API、DTO、Cookie、CSRF、上传 URL、Flyway V1–V7 和三个已发布事件协议保持不变。不提供静态 Web 服务器或 Grafana 运行入口。
 
-不得读取、复制、暂存或上传本机私有配置、秘密目录、数据库内容或备份、上传数据、Cookie、Token、SMTP 授权码、Pepper 和消息密钥。环境文件仅在用户明确运行项目入口时由严格加载器读取，值不回显、不展开变量、不执行表达式。已跟踪的 backend/src/main/resources/application.yml 是受控脱敏配置，不得用旧本机配置覆盖。
+人工审阅与代码质量工具不读取本机私有配置、秘密目录、数据库内容、上传数据、Cookie 或 Token；这些资料不得进入受控备份、暂存区或 GitHub。环境文件仅在用户明确运行项目入口时由严格加载器读取，值不回显、不展开变量、不执行表达式。已跟踪的 backend/src/main/resources/application.yml 是受控脱敏配置，不得用旧本机配置覆盖。
 
 ### V6 前台命令入口
+
+以下保留 V6 已验证的 PowerShell 兼容入口及历史本机证据，仅适用于原有完整环境配置；新自动配置使用上面的跨平台 Node 入口。
 
 V6 使用 infrastructure/host/with-app-environment.ps1 包裹一个标准 Maven、Java 或 npm 前台命令；退出时恢复环境，不创建日志或 PID 状态。2026-09-09 的方面三已验证以下入口、最小业务闭环及 Maven 到 JAR 的会话恢复，具体证据和限制见 [V6 规划](iteration-summary.md#v6可读性迭代与交接)。下文原有整栈脚本仍是可选入口，其状态文件不适用于这些前台命令。
 
@@ -399,6 +431,8 @@ foreach ($endpoint in @('health', 'health/liveness', 'health/readiness')) {
 用户确认精简运行范围：身份隔离、USER/ADMIN 切换、管理员查询、登录后观测内容及 JAR 重启会话恢复复用方面三历史证据，本轮未重跑；现有头像也未重新验证。不重复收藏、上传、发布、审核或评论闭环，公共博客正常读取计数可能增加。用户已确认依次 Ctrl+C 停止三端；本次三个进程均退出、四端口释放，外部中间件保留。真实 V5 会话缺失等历史限制保留；实际状态以[方面六记录](iteration-summary.md#方面六最终验证与-github-收口)和本轮检查点为准。
 
 ### 三端配置入口
+
+本节的原始安全字段描述适用于旧完整模式；新自动模式由 Node 辅助生成同名安全输出，Spring 配置接口不变。
 
 只使用以下三份模板及对应本机文件：
 
@@ -534,7 +568,7 @@ git check-ignore -- backend/.env.local frontend/.env.local observability/.env.lo
 | `V6__add_async_outbox_and_inbox.sql` | 增加加密消息 Outbox/Inbox、租约、尝试次数、generation、受控错误码及发布/消费扫描索引 |
 | `V7__add_outbox_correlation_id.sql` | 为 Outbox 增加可空 ASCII 请求关联 ID，使 HTTP、发布、重试和消费者日志可关联，同时兼容 Flyway V6 阶段的历史积压 |
 
-`infrastructure/database/legacy/cc4c.sql` 仅供历史对照，已移除默认管理员，不得用于初始化新环境。应用配置中的 `baseline-on-migrate` 默认并持续保持 `false`。
+旧 legacy SQL 已从当前树移除，首次初始化只使用 Flyway V1–V7；历史资料可从先前 Git 提交检索，不恢复为运行入口。应用配置中的 `baseline-on-migrate` 默认并持续保持 `false`。
 
 ### 新建空数据库
 
@@ -822,6 +856,8 @@ Prometheus 不可达、响应超限、格式错误或查询部分失败时，数
 
 ### 格式范围
 
+复现辅助新增 Node 标准库合成检查，验证字面配置解析、密钥保留、权限、旧配置兼容、环境隔离、路径、Prometheus 渲染和子进程退出。检查不加载真实环境或启动应用，接入既有质量入口；Java 文档单元和 PowerShell 脚本数维持 936／18。
+
 - Java 使用 Spotless 2.44.5 和 Palantir Java Format 2.68.0，缩进为四个空格。
 - JavaScript、Vue、CSS、JSON、YAML 和 Markdown 使用 Prettier，缩进为两个空格、单引号、保留分号、120 列和 LF 换行。
 - PowerShell 和 SQL 的缩进分别为四个空格；所有活动文本文件使用 UTF-8、无 BOM、末尾换行。
@@ -845,7 +881,7 @@ cd D:\codex\CC4C_v5
 .\infrastructure\quality\check-code-quality.ps1
 ```
 
-本机质量入口先执行 PowerShell AST 与 Java 中文 Javadoc 覆盖检查，再执行 `spotless:check`、两端前端的
+本机质量入口先执行 Node 配置与启动合成检查、PowerShell AST 与 Java 中文 Javadoc 覆盖检查，再执行 `spotless:check`、两端前端的
 `npm run lint` 与 `npm run format:check`、源码质量、文档链接和观测契约检查。入口不自动改写文件、
 不安装依赖、不运行自动化测试。[GitHub build 工作流](../.github/workflows/build.yml)在
 `v6/readability`、`v5/restructure`、`main` 和面向 `main` 的拉取请求上执行相同质量门禁，并完成后端生产打包和两个前端
