@@ -164,7 +164,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.2</version>
                 <executions>
                     <!-- Spring Boot 的父 POM 预置了一个全量 shade 执行；本项目只保留下方的最小密码工具。 -->
                     <execution>
